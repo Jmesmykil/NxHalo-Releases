@@ -2,7 +2,7 @@
 
 A native Halo: Combat Evolved port for the original Nintendo Switch. This repository contains public releases, offline setup tools, and support information. Development stays separate.
 
-**First release: Build13 / v0.1.0 experimental preview.** Download the files attached to the [Build13 preview release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.0-build13). Campaign testing and optimization continue. Multiplayer is unsupported.
+**First release: Build13 / v0.1.0 experimental preview.** Download the files attached to the [Build13 preview release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.0-build13). Campaign testing and optimization continue. Multiplayer is unsupported. Build13 is the current public baseline while further fixes are tested privately. Its exact assets are pinned in [the baseline record](releases/build13-baseline.json).
 
 ## Play with your own game
 
