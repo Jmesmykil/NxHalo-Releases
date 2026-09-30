@@ -149,6 +149,21 @@ class InstallerTests(unittest.TestCase):
         self.shader_mock.start()
         self.hash_mock = mock.patch.object(core, "SHADER_SHA256", hashlib.sha256(b"synthetic-shaders").hexdigest())
         self.hash_mock.start()
+        if os.name == "nt":
+            # Windows does not execute a shebang script directly. Adapt only our
+            # known synthetic packer launch; keep a real child process, its cwd,
+            # argv, return code, and diagnostic suppression under production code.
+            real_run = core.subprocess.run
+
+            def run_test_packer(command, *args, **kwargs):
+                executable = Path(command[0])
+                if executable.parent.resolve() == self.root.resolve() and executable.name.startswith("local packer "):
+                    command = [sys.executable, *command]
+                return real_run(command, *args, **kwargs)
+
+            launcher = mock.patch.object(core.subprocess, "run", side_effect=run_test_packer)
+            launcher.start()
+            self.addCleanup(launcher.stop)
 
     def tearDown(self):
         self.shader_mock.stop()
@@ -617,7 +632,14 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(core._system_root(PureWindowsPath("C:\\"), "C:"))
         self.assertTrue(core._system_root(PureWindowsPath("E:\\"), "E:"))
         self.assertFalse(core._system_root(PureWindowsPath("C:\\Users\\Player"), "C:"))
-        self.assertTrue(core._system_root(Path("/")))
+        if os.name == "nt":
+            # A drive-less slash is not an absolute Windows system-drive root.
+            # Test the actual host system drive rather than assuming POSIX paths.
+            system_drive = os.environ.get("SystemDrive", "C:").rstrip("/\\")
+            self.assertTrue(core._system_root(Path(system_drive + "\\")))
+            self.assertFalse(core._system_root(Path("/")))
+        else:
+            self.assertTrue(core._system_root(Path("/")))
 
     def test_sd_low_space_and_failed_delivery_do_not_create_maps(self):
         game = folder_fixture(self.root)
