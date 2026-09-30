@@ -12,7 +12,7 @@ A native Halo: Combat Evolved port for the original Nintendo Switch. This reposi
 
 The Switch must already be configured to run this homebrew title. No ROM, game maps, game executable, console keys, or personal saves are supplied. The recommended player flow needs no keys, compiler, or packaging tool.
 
-Start with [the player guide](docs/START_HERE.md). The importer source preview requires **Python 3.10 or newer with Tk**. Standalone desktop apps are not available yet. Use the included setup guide for exact supported image formats and installation steps. Halo PC, Custom Edition, Anniversary, MCC, and Switch 2 are outside this preview.
+Start with [the player guide](docs/START_HERE.md). Standalone setup apps are available for **Windows x64** and **Apple Silicon macOS**. Extract the ZIP and open `NxHalo-Setup.exe` or `NxHalo-Setup.app`; keep the Windows app folder intact. These preview apps are unsigned. Other computers can use the importer source with **Python 3.10 or newer with Tk**. Use the included setup guide for exact supported image formats and installation steps. Halo PC, Custom Edition, Anniversary, MCC, and Switch 2 are outside this preview.
 
 ## What has been tested
 

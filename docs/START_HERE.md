@@ -1,6 +1,6 @@
 # Start here
 
-**Status: v0.1.0 experimental campaign preview.** Native Build13 gameplay is tested; this download supplies the importer source. Standalone desktop apps and clean public setup tests remain in progress. Read the
+**Status: v0.1.0 experimental campaign preview.** Private native Build13 gameplay has been tested. Public runtime first-install tests remain in progress; native desktop apps passed their packaged GUI startup checks. Read the
 [known issues](COMPATIBILITY.md) before expecting a finished campaign port.
 
 The recommended flow is **your Xbox image → automatic SD import → small app
@@ -17,7 +17,7 @@ or SD; this project supplies no ROM downloads.
   Anniversary, and MCC use different data formats.
 - A computer and enough local/SD space for the roughly 1.8 GB map dataset.
 - The release assets from [NxHalo Releases](https://github.com/Jmesmykil/NxHalo-Releases/releases).
-  This importer source requires Python 3.10+ with Tk. Check the release notes for runtime availability; standalone desktop apps are not included.
+  Choose `NxHalo-Setup-windows-AMD64.zip` for Windows x64 or `NxHalo-Setup-darwin-arm64.zip` for Apple Silicon macOS. Extract the entire ZIP and open the EXE inside its app folder or the APP. These preview apps are unsigned. The source alternative requires Python 3.10+ with Tk.
 
 Xbox cache build `01.10.12.2276` (NTSC) was tested on Switch. The engine also
 accepts `01.01.14.2342` (PAL), with device testing pending. A filename ending in
@@ -28,7 +28,7 @@ validation of every compressed payload.
 
 ## Import once
 
-1. Open the NxHalo setup tool and choose your Xbox image or complete game folder.
+1. Open the NxHalo setup tool and choose your Xbox image or complete game folder. The packaged app needs no Python installation.
 2. Choose the root of your mounted Switch SD explicitly. The tool does not guess
    drives or eject them. Alternatively, export into a new local data folder first.
 3. Choose **Prepare game data**. The importer extracts only the required maps,
