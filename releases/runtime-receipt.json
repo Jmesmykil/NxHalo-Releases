@@ -1,0 +1,55 @@
+{
+  "elapsed_seconds": 0.1,
+  "game": null,
+  "generated_asset": null,
+  "installer": {
+    "bytes": 7892696,
+    "contents": [
+      {
+        "bytes": 19968,
+        "name": "76e15d909f62e3a20e635989056a0d7a.cnmt.nca",
+        "sha256": "76e15d909f62e3a20e635989056a0d7afd75404b7f90cc563c0d93cd09a34fbd"
+      },
+      {
+        "bytes": 134144,
+        "name": "528f08add96b19af831733560bf1683f.nca",
+        "sha256": "528f08add96b19af831733560bf1683fede288a1b965d4a90549054c12f0e216"
+      },
+      {
+        "bytes": 7738368,
+        "name": "adbda574934864374dad38b476091122.nca",
+        "sha256": "adbda574934864374dad38b47609112259d608e8ed5cc1d5f03a7c901746b1be"
+      }
+    ],
+    "name": "Halo_CE_Runtime.nsp",
+    "sha256": "d80c325844dfdef711050c910ef4cc0e177cace9e3573ea29a05feefaa24571a",
+    "verification": "PFS0 bounds and all encrypted NCA hashes; native launch is tested separately."
+  },
+  "maps": [],
+  "privacy": "No game image, private key, save, or absolute input path is included in this receipt.",
+  "runtime_build": "native13-v0.1.0-external-shaders",
+  "runtime_files": {
+    "control/control.nacp": {
+      "bytes": 16384,
+      "sha256": "d9f16b8cb3823309c2f07cab0506eb170aa2c6639ef64bae667343b142f1a206"
+    },
+    "control/icon_AmericanEnglish.dat": {
+      "bytes": 18542,
+      "sha256": "1e4aace26209e08c8dcdf638aa5e783519136b1bb40861827456a4e4eebce21e"
+    },
+    "exefs/main": {
+      "bytes": 3572674,
+      "sha256": "3a3786ca3deae98b50e7c95d832ff0d5027d157f8486b646150688facde1f164"
+    },
+    "exefs/main.npdm": {
+      "bytes": 972,
+      "sha256": "17c182e54d7e7ae531286d6127914609dce269d69289b2d3acdd4cf755858d11"
+    },
+    "romfs/halo_guest.elf": {
+      "bytes": 4052064,
+      "sha256": "1233555564029ed63aa9307d47aa1c2c2eb3f51a127bb5fe3345b9c895e27dfe"
+    }
+  },
+  "schema": 1,
+  "title_id": "010048414c4f0000"
+}

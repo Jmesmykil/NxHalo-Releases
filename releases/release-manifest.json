@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "version": "0.1.0-preview",
+  "repository": "https://github.com/Jmesmykil/NxHalo-Releases",
+  "assets": [
+    {
+      "name": "NxHalo-v0.1.0-importer-source.zip",
+      "bytes": 49075,
+      "sha256": "0627d699f7ca112606c019c2bbd0a141b4facac860768bf68b8c7db872530f4f",
+      "archive_records": 16
+    },
+    {
+      "name": "NxHalo-v0.1.0-runtime-source.zip",
+      "bytes": 7103424,
+      "sha256": "17503787efc58c6775dc8b1eb373ed7bc2f1a2fa4eb37a20323ec266b44e4148",
+      "archive_records": 4205
+    },
+    {
+      "name": "Halo_CE_Runtime.nsp",
+      "bytes": 7892696,
+      "sha256": "d80c325844dfdef711050c910ef4cc0e177cace9e3573ea29a05feefaa24571a"
+    }
+  ],
+  "guest_sha256": "1233555564029ed63aa9307d47aa1c2c2eb3f51a127bb5fe3345b9c895e27dfe",
+  "host_sha256": "3a3786ca3deae98b50e7c95d832ff0d5027d157f8486b646150688facde1f164",
+  "tests": "54 tests PASS1Tk skip; realretailshaderextractPASS; publicguest ABI andloader fixturesPASS",
+  "physical_public_variant_tested": false
+}
