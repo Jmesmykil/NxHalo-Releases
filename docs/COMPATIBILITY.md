@@ -1,3 +1,9 @@
+# Build14 campaign preview evidence
+
+Build14 is the newest public release. Private hardware logs confirm 6,900 profiled frames and four successful 16 MiB RAM checkpoint saves (6.46–7.04 ms). No restore event appeared in the captured run; public external-shader first launch, relaunch/map transitions and full campaign acceptance remain unconfirmed. Shader compile/link appeared in 35 of 37 distinct sampled frames over 100 ms. This is sampled attribution, not a complete frame population or a measured improvement against Build13.
+
+The following Build13 and earlier observations remain historical evidence.
+
 # Build13 campaign preview evidence
 
 The creator reports improved Pelican flight and no Warthog stutter in the latest tested scenes. Small ground-battle spikes remain. Multiplayer is unsupported and has crashed. Full campaign completion is not certified.

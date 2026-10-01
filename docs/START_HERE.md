@@ -1,7 +1,6 @@
 # Start here
 
-**Status: v0.1.0 experimental campaign preview.** Private native Build13 gameplay has been tested. Public runtime first-install tests remain in progress; native desktop apps passed their packaged GUI startup checks. Read the
-[known issues](COMPATIBILITY.md) before expecting a finished campaign port.
+**Status: Build14 / v0.1.1 campaign preview.** Private Build14 gameplay and RAM checkpoint writes have hardware log evidence. This exact public external-shader package's first physical launch remains unconfirmed. Read the [known issues](COMPATIBILITY.md); the full campaign is still under testing.
 
 The recommended flow is **your Xbox image → automatic SD import → small app
 installed through DBI → HOME → play**. Users need no console keys, compiler,
@@ -62,7 +61,7 @@ still needs a physical first-install test.
 ## Update later
 
 Keep the imported data. Install only the new small app version through DBI over
-the same title. Back up `sdmc:/switch/halo/` first. Reimport only if changing game
+the same title. Back up `sdmc:/switch/halo/` first. Existing public Build13 users with `maps/shaders.bin` need only the runtime update. Users moving from a private build must run Prepare game data once to add that file from their own complete game image/folder. Reimport only if changing game
 data or a release explicitly requires it. Resume across relaunch/updates is still
 a device acceptance test, not a verified promise.
 

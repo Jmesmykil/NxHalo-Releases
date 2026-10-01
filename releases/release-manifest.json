@@ -1,28 +1,78 @@
 {
   "schema": 1,
-  "version": "0.1.0-preview",
+  "version": "0.1.1-build14",
+  "build": 14,
   "repository": "https://github.com/Jmesmykil/NxHalo-Releases",
+  "title_id": "010048414c4f0000",
   "assets": [
     {
-      "name": "NxHalo-v0.1.0-importer-source.zip",
-      "bytes": 49075,
-      "sha256": "0627d699f7ca112606c019c2bbd0a141b4facac860768bf68b8c7db872530f4f",
-      "archive_records": 16
-    },
-    {
-      "name": "NxHalo-v0.1.0-runtime-source.zip",
-      "bytes": 7103424,
-      "sha256": "17503787efc58c6775dc8b1eb373ed7bc2f1a2fa4eb37a20323ec266b44e4148",
-      "archive_records": 4205
-    },
-    {
       "name": "Halo_CE_Runtime.nsp",
-      "bytes": 7892696,
-      "sha256": "d80c325844dfdef711050c910ef4cc0e177cace9e3573ea29a05feefaa24571a"
+      "bytes": 7894232,
+      "sha256": "21c13ddca82227654dab3048e3274dbc08194cb4a9347572e3e85e5bbbd48393"
+    },
+    {
+      "name": "NxHalo-Setup-darwin-arm64.zip",
+      "bytes": 10008584,
+      "sha256": "f8d758e15ba1b2cd5c74535a1386b7538a824bd2dcc08b2809819046c5054839"
+    },
+    {
+      "name": "NxHalo-Setup-windows-AMD64.zip",
+      "bytes": 11654915,
+      "sha256": "47045229a0ad4fc8cce1f114398ddf40b63c90abbaf993a8bd27b9c341c2a1c9"
+    },
+    {
+      "name": "NxHalo-v0.1.1-importer-source.zip",
+      "bytes": 53419,
+      "sha256": "243a0c67b7f50cd68f7594e82c5594bafc510dc73b92c87cdde6e936f5342055"
+    },
+    {
+      "name": "NxHalo-v0.1.1-runtime-source.zip",
+      "bytes": 7106640,
+      "sha256": "09fbbbd3d5c985f600d587a41bd36489e6c06e51b1ede4585f80e5ddbde37c48"
+    },
+    {
+      "name": "SETUP-APP-SHA256SUMS",
+      "bytes": 193,
+      "sha256": "742e850eb78bca269ff02e38a3a83c28c88fc5e0b32b396fee04dcbaf0825435"
+    },
+    {
+      "name": "release-notes.md",
+      "bytes": 2870,
+      "sha256": "501c49c2c931d5de13478cd6122f26713a11aa0763a51300f846a972f034dedc"
+    },
+    {
+      "name": "runtime-receipt.json",
+      "bytes": 1869,
+      "sha256": "69e59d32d646e3f45f2a17d11010924f492689593ca9b1f59315ff3e69bc124c"
+    },
+    {
+      "name": "setup-app-receipt.json",
+      "bytes": 1693,
+      "sha256": "08589a29cbfff8585fb4b6f8e9d81117037d89392310facf91951f30447a5867"
     }
   ],
-  "guest_sha256": "1233555564029ed63aa9307d47aa1c2c2eb3f51a127bb5fe3345b9c895e27dfe",
-  "host_sha256": "3a3786ca3deae98b50e7c95d832ff0d5027d157f8486b646150688facde1f164",
-  "tests": "54 tests PASS1Tk skip; realretailshaderextractPASS; publicguest ABI andloader fixturesPASS",
-  "physical_public_variant_tested": false
+  "guest_sha256": "7f80ad27228b7224c094e6c7e46b188518f9ef2a3d195cfb7c6269c8c64037e8",
+  "host_sha256": "90c8e5f4ecf5b3940fe0d9346b0d7cfac76051c92f5ac673f488b74e1b78f52f",
+  "physical_public_variant_tested": false,
+  "hardware_private14": {
+    "profiled_frames": 6900,
+    "ram_save_us": [
+      7043,
+      6460,
+      6757,
+      6752
+    ],
+    "restore_events": 0
+  },
+  "source_files": 4205,
+  "generated_source_changes": [
+    "source/saved games/game_state.c",
+    "source/saved games/game_state_xbox.c",
+    "port/switch/host/host_posix.c",
+    "port/switch/host/host_main.c",
+    "port/switch/host/host_checkpoint_profile.h",
+    "tools/android_build.py",
+    "port/switch/Makefile",
+    "BUILD_PUBLIC.md"
+  ]
 }

@@ -2,7 +2,7 @@
 
 A native Halo: Combat Evolved port for the original Nintendo Switch. This repository contains public releases, offline setup tools, and support information. Development stays separate.
 
-**First release: Build13 / v0.1.0 experimental preview.** Download the files attached to the [Build13 preview release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.0-build13). Campaign testing and optimization continue. Multiplayer is unsupported. Build13 is the current public baseline while further fixes are tested privately. Its exact assets are pinned in [the baseline record](releases/build13-baseline.json).
+**Latest release: Build14 / v0.1.1 campaign preview.** Download the runtime and offline setup apps from the [Build14 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.1-build14). Build14 retains the camera/vehicle corrections and adds RAM-backed transient checkpoints. Multiplayer is unsupported; campaign testing and optimization continue. The earlier [Build13 baseline](releases/build13-baseline.json) remains available for comparison.
 
 ## Play with your own game
 
@@ -18,7 +18,7 @@ Start with [the player guide](docs/START_HERE.md). Standalone setup apps are ava
 
 The creator reports substantially smoother Pelican flight and no Warthog trouble in the Build13 scenes tested. Small lag spikes remain during large ground battles. This is a report from tested scenes, not a full-campaign certification or a promise of a locked frame rate.
 
-Full campaign completion, all checkpoint/resume/update cases, audio, shields, animations, and loading display remain under testing. The public package moves game shader data into local import; its separate package/startup acceptance is recorded in release notes.
+Build14 hardware logs recorded four successful 16 MiB RAM checkpoint saves in 6.46–7.04 ms; no restore event appeared in that captured run. Full campaign completion, all checkpoint/resume/update cases, audio, shields, animations, and loading display remain under testing. The public package moves game shader data into local import; its separate package/startup acceptance is recorded in release notes.
 
 ## Updates and support
 
