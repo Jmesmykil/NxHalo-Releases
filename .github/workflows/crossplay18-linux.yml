@@ -31,9 +31,10 @@ jobs:
           git clone -q --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git /tmp/SDL
           test "$(git -C /tmp/SDL rev-parse HEAD)" = fa2c02bb6e21974a89ea9824bc53c9932abe5f9c
           git -C /tmp/SDL rev-parse HEAD > SDL3-source-commit.txt
-          PKG_CONFIG_LIBDIR=/usr/lib/i386-linux-gnu/pkgconfig:/usr/share/pkgconfig cmake -S /tmp/SDL -B /tmp/sdl-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-m32 -DCMAKE_SHARED_LINKER_FLAGS=-m32 -DCMAKE_INSTALL_PREFIX=/usr/local -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+          PKG_CONFIG_LIBDIR=/usr/lib/i386-linux-gnu/pkgconfig:/usr/share/pkgconfig cmake -S /tmp/SDL -B /tmp/sdl-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-m32 -DCMAKE_SHARED_LINKER_FLAGS=-m32 -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=lib -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
           cmake --build /tmp/sdl-build -j 4
           cmake --install /tmp/sdl-build
+          ln -s /usr/local/lib/libSDL3.so /usr/lib/i386-linux-gnu/libSDL3.so
           ldconfig
       - name: Fetch pinned Crossplay18 source
         run: |
