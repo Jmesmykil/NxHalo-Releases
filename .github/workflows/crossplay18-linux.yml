@@ -47,6 +47,10 @@ jobs:
           p=Path('source/source/rasterizer/xbox/rasterizer_xbox_vertex_shaders.h')
           t=p.read_text(); old='#if defined(HALO_ANDROID)'; assert t.count(old)==1
           p.write_text(t.replace(old,'#if defined(HALO_ANDROID) || defined(HALO_LINUX)'))
+          p=Path('source/source/rasterizer/xbox/rasterizer_xbox_vertex_shaders_initialize.c')
+          t=p.read_text(); old='#if defined(HALO_PUBLIC_EXTERNAL_SHADERS)\n\tif (!rasterizer_vertex_shader_assets_load()) return FALSE;'; assert t.count(old)==1
+          replacement='#ifdef HALO_LINUX\n\t/* Headless servers do not create or execute graphics shaders. */\n\t{ extern int halo_dedicated_server(void); if (halo_dedicated_server()) return TRUE; }\n#endif\n\n'+old
+          p.write_text(t.replace(old,replacement))
           p=Path('source/tools/dedicated_control_test.py')
           t=p.read_text(); old='        events = parse_lines(stdout.decode(), "empty maps folder")'; assert t.count(old)==1
           p.write_text(t.replace(old,'        print("EMPTY MAP DIAGNOSTIC:", stderr.decode(errors="replace"))\n'+old))
