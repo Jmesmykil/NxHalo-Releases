@@ -1,6 +1,9 @@
 name: Crossplay18 matching Linux client
 on:
   workflow_dispatch:
+defaults:
+  run:
+    shell: bash
 permissions:
   contents: read
 jobs:
@@ -15,7 +18,7 @@ jobs:
         run: |
           dpkg --add-architecture i386
           apt-get update -q
-          apt-get install -y --no-install-recommends ca-certificates curl gnupg git cmake ninja-build python3 python3-pytest gcc-multilib libc6-dev-i386 libasound2-dev:i386 libpulse-dev:i386 libx11-dev:i386 libxext-dev:i386 libxrandr-dev:i386 libxcursor-dev:i386 libxi-dev:i386 libxfixes-dev:i386 libxss-dev:i386 libegl1-mesa-dev:i386 libgl1-mesa-dev:i386 libudev-dev:i386 libdbus-1-dev:i386 libwayland-dev:i386 libxkbcommon-dev:i386 file unzip zip
+          apt-get install -y --no-install-recommends ca-certificates curl gnupg git cmake ninja-build python3 python3-pytest gcc-multilib libc6-dev-i386 libasound2-dev:i386 libpulse-dev:i386 libx11-dev:i386 libxext-dev:i386 libxrandr-dev:i386 libxcursor-dev:i386 libxi-dev:i386 libxfixes-dev:i386 libxss-dev:i386 libxtst-dev:i386 wayland-protocols libegl1-mesa-dev:i386 libgl1-mesa-dev:i386 libudev-dev:i386 libdbus-1-dev:i386 libwayland-dev:i386 libxkbcommon-dev:i386 file unzip zip
           curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o /tmp/llvm-key.asc
           gpg --dearmor -o /usr/share/keyrings/llvm.gpg /tmp/llvm-key.asc
           echo 'deb [signed-by=/usr/share/keyrings/llvm.gpg] https://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main' > /etc/apt/sources.list.d/llvm19.list
@@ -26,8 +29,9 @@ jobs:
       - name: Build matching SDL3
         run: |
           git clone -q --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git /tmp/SDL
+          test "$(git -C /tmp/SDL rev-parse HEAD)" = fa2c02bb6e21974a89ea9824bc53c9932abe5f9c
           git -C /tmp/SDL rev-parse HEAD > SDL3-source-commit.txt
-          cmake -S /tmp/SDL -B /tmp/sdl-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-m32 -DCMAKE_SHARED_LINKER_FLAGS=-m32 -DCMAKE_INSTALL_PREFIX=/usr/local -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+          PKG_CONFIG_LIBDIR=/usr/lib/i386-linux-gnu/pkgconfig:/usr/share/pkgconfig cmake -S /tmp/SDL -B /tmp/sdl-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-m32 -DCMAKE_SHARED_LINKER_FLAGS=-m32 -DCMAKE_INSTALL_PREFIX=/usr/local -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
           cmake --build /tmp/sdl-build -j 4
           cmake --install /tmp/sdl-build
           ldconfig
