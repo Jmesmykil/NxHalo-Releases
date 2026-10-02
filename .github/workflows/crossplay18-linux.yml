@@ -47,6 +47,9 @@ jobs:
           p=Path('source/source/rasterizer/xbox/rasterizer_xbox_vertex_shaders.h')
           t=p.read_text(); old='#if defined(HALO_ANDROID)'; assert t.count(old)==1
           p.write_text(t.replace(old,'#if defined(HALO_ANDROID) || defined(HALO_LINUX)'))
+          p=Path('source/tools/dedicated_control_test.py')
+          t=p.read_text(); old='        events = parse_lines(stdout.decode(), "empty maps folder")'; assert t.count(old)==1
+          p.write_text(t.replace(old,'        print("EMPTY MAP DIAGNOSTIC:", stderr.decode(errors="replace"))\n'+old))
           PYCODE
       - name: Compile portable Linux client
         run: |
@@ -61,6 +64,7 @@ jobs:
           python3 tools/dedicated_control_test.py --binary build/linux/halo
           python3 tools/variant_overrides_test.py
       - name: Package Linux client and build evidence
+        if: always()
         run: |
           mkdir -p output/lib
           cp source/build/linux/halo output/halo
