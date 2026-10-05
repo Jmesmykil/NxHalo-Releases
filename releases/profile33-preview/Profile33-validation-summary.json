@@ -1,0 +1,29 @@
+{
+  "version": "0.1.11-p33",
+  "network_protocol": 11,
+  "title_id": "010048414C210000",
+  "cnmt": 65556,
+  "nsp_sha256": "297086c652f660d8bb153d733e1ac903d1a4045bc35a5257bc0fa9babe5f10f5",
+  "ums_staged_readback_verified": true,
+  "installed_on_switch_confirmed": false,
+  "physical_switch_hardware_accepted": false,
+  "campaign_accepted_by_current_receipt": false,
+  "multiplayer_accepted_by_current_receipt": false,
+  "public_release_accepted_by_current_receipt": false,
+  "creator_reported_features": [
+    "custom campaign characters",
+    "cross-console multiplayer",
+    "public internet lobbies discoverable through the in-game browser",
+    "approximately 40 players per match as the current approximate limit"
+  ],
+  "observed_public_discovery_populations": [36, 32],
+  "observed_populations_are_simultaneous_match_counts": false,
+  "100_to_128_player_workload_observed": false,
+  "open_acceptance": [
+    "physical Switch performance and visual-effects validation",
+    "full campaign route coverage",
+    "sustained approximately 40-player match validation",
+    "100–128-player workload validation",
+    "physical Profile33 Switch-to-Steam Deck pairing"
+  ]
+}

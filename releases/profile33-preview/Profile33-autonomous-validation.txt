@@ -1,0 +1,65 @@
+Profile33 autonomous validation — 2026-10-03
+
+Purpose
+Close diagnostic gaps exposed by the user's dense public multiplayer logs.
+This is a diagnostic candidate, not a demonstrated 128-player performance fix.
+Switch runtime changes are C. Offline analysis is C++ and shell. Existing
+coordination and packaging utilities use host Python, never Switch Python.
+
+Source / package
+Guest SHA256: 6cbc786b8d37dba144f0327a2e8d3ebd978b0f13a031c28e4ad7d3c285ece4ba
+Final NSP SHA256: 297086c652f660d8bb153d733e1ac903d1a4045bc35a5257bc0fa9babe5f10f5
+NSP bytes: 22763224
+Title: 010048414C210000; CNMT: 65556; display: 0.1.11-p33
+Build marker: native-profile33-full-pipeline-protocol11
+The marker identifies the intended profiling scope; it does not certify that
+every pipeline/workload has been measured. See the explicit coverage contract.
+
+Autonomous public profiling
+One normal client joins the largest compatible open protocol11 game with a
+free slot, then exits after 180 seconds. No public bots, fire automation,
+private crowd fixture, or spawned stress objects. Horizontal camera scanning.
+Snapshot discovery populations are not exact simultaneous on-screen counts.
+Native RTX2060 offscreen rendering works; unrelated desktop and PDZ display
+are untouched. Private Xvfb tests are labeled separately from hardware GPU.
+
+if7LVk: Blood Gulch discovery 36 players, native RTX2060, exit 0. Linux perf
+9205 samples, no reported lost samples; 90-second user-cycle capture. Native
+driver symbols dominate part of the desktop trace, not a Switch cost estimate.
+U2uF8T: Sidewinder discovery 32 players, native RTX2060, exit 0. Captures from
+the game's own backbuffer every 1800 frames; screenshot readback can add a
+stall on those frames and must be excluded from clean timing comparisons.
+Inspected frame10800: recognizable players, weapons, HUD and lit interior.
+This single image does not certify all VFX, blending, or the entire map.
+
+Emulator evidence
+v2: exact HF1 bridge across 3000 presentations with zero rejected/overwritten
+or unmapped IDs. Working audio fills, no rejected or late callbacks observed.
+v3: 3000 frames, render_health reports no missing program/target, shader link
+or source failures, or debug-skipped draws. GPU timer and driver callback paths
+exercise successfully. Emulator zero clock readings are explicitly UNKNOWN.
+The test uses a bounded timeout; forced emulator shutdown is not a game crash
+or natural-exit validation. Final package E8A94a reached 3300 presentations,
+2637 fully supplied audio callbacks, no rejected/overwritten/unmapped frame IDs,
+no lost log batches and zero detected shader/draw/driver errors. 12 cumulative
+open failures were ENOENT, with no failure-table overflow. Their precise asset
+roles remain unclassified; they are not silently waived. No read/write failures
+were recorded by that descriptor counter. Hardware clocks remain unknown.
+
+Remaining acceptance
+Physical instrumentation overhead and actual dense-battle frame times.
+Missing/saturated VFX reproduction and visual comparison on Switch.
+Real 100–128 participant workload (not yet observed in these public runs).
+Allocator/resource limits, packet RTT/loss/corrections, full input-to-present
+causality and campaign route coverage remain incomplete and explicitly unknown.
+Public release is unchanged. UMS remains mounted.
+
+Hardware staging
+Copied final candidate to /Volumes/SWITCH SD/switch/install/Halo_CE_Baseline.nsp
+with temporary-file hash check, rename, sync and final SHA256 readback matching
+297086c652f660d8bb153d733e1ac903d1a4045bc35a5257bc0fa9babe5f10f5.
+USB identity C7C09242F703, UUID 1A8D83ED-FA0C-38D3-A2F0-E6D2AD9606AD,
+volume 65213104128 bytes rechecked before write. Same title/installer slot.
+Baseline32 rollback on Media has verified SHA256
+06c2d4ef3bae0bd911d7c16829386bc9843b86897bcdb7f14483f1a8653655c4.
+This stages an installer; it does not prove installation or hardware execution.
