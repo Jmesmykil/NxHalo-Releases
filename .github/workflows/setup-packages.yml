@@ -1,0 +1,44 @@
+name: Offline desktop setup packages
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'installer/**'
+      - 'tools/build_setup.py'
+      - 'tools/setup_entrypoint.py'
+      - '.github/workflows/setup-packages.yml'
+  pull_request:
+    paths:
+      - 'installer/**'
+      - 'tools/build_setup.py'
+      - 'tools/setup_entrypoint.py'
+      - '.github/workflows/setup-packages.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned build-time packager
+        run: python -m pip install PyInstaller==6.16.0
+      - name: Test, package, and start actual packaged GUI
+        run: python tools/build_setup.py --output setup-output
+      - name: Upload review artifacts (no release publication)
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-setup-${{ matrix.os }}
+          path: |
+            setup-output/*.zip
+            setup-output/build-manifest.json
+            setup-output/*smoke.json
+          if-no-files-found: error
+          retention-days: 14

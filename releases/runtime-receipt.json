@@ -1,0 +1,55 @@
+{
+  "elapsed_seconds": 0.2,
+  "game": null,
+  "generated_asset": null,
+  "installer": {
+    "bytes": 7894232,
+    "contents": [
+      {
+        "bytes": 134144,
+        "name": "2f1d3bb0b047612c20a906d75590d245.nca",
+        "sha256": "2f1d3bb0b047612c20a906d75590d245ffecafb0b67e70304295dbeaeb7d6763"
+      },
+      {
+        "bytes": 19968,
+        "name": "56e1c3d07acd202df9278fa2b785c320.cnmt.nca",
+        "sha256": "56e1c3d07acd202df9278fa2b785c320392565ddd1d609687118a486b9593f7a"
+      },
+      {
+        "bytes": 7739904,
+        "name": "e10f26af148569496dc8a751b6742b1b.nca",
+        "sha256": "e10f26af148569496dc8a751b6742b1b4b1c8a3dc72794e4e49b5cc19a69bfcb"
+      }
+    ],
+    "name": "Halo_CE_Runtime.nsp",
+    "sha256": "21c13ddca82227654dab3048e3274dbc08194cb4a9347572e3e85e5bbbd48393",
+    "verification": "PFS0 bounds and all encrypted NCA hashes; native launch is tested separately."
+  },
+  "maps": [],
+  "privacy": "No game image, private key, save, or absolute input path is included in this receipt.",
+  "runtime_build": "native14-checkpoint-public-candidate",
+  "runtime_files": {
+    "control/control.nacp": {
+      "bytes": 16384,
+      "sha256": "26b0d4a0e324a977a7eb20ad09ea65cf2c8c4d837e03e9cc1ff0f0d40e6c10b3"
+    },
+    "control/icon_AmericanEnglish.dat": {
+      "bytes": 18542,
+      "sha256": "1e4aace26209e08c8dcdf638aa5e783519136b1bb40861827456a4e4eebce21e"
+    },
+    "exefs/main": {
+      "bytes": 3573921,
+      "sha256": "90c8e5f4ecf5b3940fe0d9346b0d7cfac76051c92f5ac673f488b74e1b78f52f"
+    },
+    "exefs/main.npdm": {
+      "bytes": 972,
+      "sha256": "17c182e54d7e7ae531286d6127914609dce269d69289b2d3acdd4cf755858d11"
+    },
+    "romfs/halo_guest.elf": {
+      "bytes": 4052352,
+      "sha256": "7f80ad27228b7224c094e6c7e46b188518f9ef2a3d195cfb7c6269c8c64037e8"
+    }
+  },
+  "schema": 1,
+  "title_id": "010048414c4f0000"
+}

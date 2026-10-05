@@ -1,0 +1,101 @@
+name: Crossplay18 matching Linux client
+on:
+  workflow_dispatch:
+defaults:
+  run:
+    shell: bash
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    container: ubuntu:22.04
+    timeout-minutes: 40
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install 32-bit build toolchain
+        run: |
+          dpkg --add-architecture i386
+          apt-get update -q
+          apt-get install -y --no-install-recommends ca-certificates curl gnupg git cmake ninja-build python3 python3-pytest gcc-multilib libc6-dev-i386 libasound2-dev:i386 libpulse-dev:i386 libx11-dev:i386 libxext-dev:i386 libxrandr-dev:i386 libxcursor-dev:i386 libxi-dev:i386 libxfixes-dev:i386 libxss-dev:i386 libxtst-dev:i386 wayland-protocols libegl1-mesa-dev:i386 libgl1-mesa-dev:i386 libudev-dev:i386 libdbus-1-dev:i386 libwayland-dev:i386 libxkbcommon-dev:i386 file unzip zip
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o /tmp/llvm-key.asc
+          gpg --dearmor -o /usr/share/keyrings/llvm.gpg /tmp/llvm-key.asc
+          echo 'deb [signed-by=/usr/share/keyrings/llvm.gpg] https://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main' > /etc/apt/sources.list.d/llvm19.list
+          apt-get update -q
+          apt-get install -y --no-install-recommends clang-19 lld-19
+          ln -s /usr/bin/clang-19 /usr/local/bin/clang
+          ln -s /usr/bin/ld.lld-19 /usr/local/bin/ld.lld
+      - name: Build matching SDL3
+        run: |
+          git clone -q --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git /tmp/SDL
+          test "$(git -C /tmp/SDL rev-parse HEAD)" = fa2c02bb6e21974a89ea9824bc53c9932abe5f9c
+          git -C /tmp/SDL rev-parse HEAD > SDL3-source-commit.txt
+          PKG_CONFIG_LIBDIR=/usr/lib/i386-linux-gnu/pkgconfig:/usr/share/pkgconfig cmake -S /tmp/SDL -B /tmp/sdl-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-m32 -DCMAKE_SHARED_LINKER_FLAGS=-m32 -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=lib -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+          cmake --build /tmp/sdl-build -j 4
+          cmake --install /tmp/sdl-build
+          ln -s /usr/local/lib/libSDL3.so /usr/lib/i386-linux-gnu/libSDL3.so
+          ldconfig
+      - name: Fetch pinned Crossplay18 source
+        run: |
+          curl -fL https://github.com/Jmesmykil/NxHalo-Releases/releases/download/v0.1.2-crossplay18/NxHalo-Crossplay18-runtime-source.zip -o source.zip
+          echo 'a8ce3219a25ac753cbb94314678dee843f39fa5e48767e3f575a2c916a6d9441  source.zip' | sha256sum -c -
+          unzip -q source.zip
+          mv NxHalo-Crossplay18-runtime-source source
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          p=Path('source/source/rasterizer/xbox/rasterizer_xbox_vertex_shaders.h')
+          t=p.read_text(); old='#if defined(HALO_ANDROID)'; assert t.count(old)==1
+          p.write_text(t.replace(old,'#if defined(HALO_ANDROID) || defined(HALO_LINUX)'))
+          p=Path('source/source/rasterizer/xbox/rasterizer_xbox_vertex_shaders_initialize.c')
+          t=p.read_text(); old='#if defined(HALO_PUBLIC_EXTERNAL_SHADERS)\n\tif (!rasterizer_vertex_shader_assets_load()) return FALSE;'; assert t.count(old)==1
+          replacement='#ifdef HALO_LINUX\n\t/* Headless servers do not create or execute graphics shaders. */\n\t{ extern int halo_dedicated_server(void); if (halo_dedicated_server()) return TRUE; }\n#endif\n\n'+old
+          p.write_text(t.replace(old,replacement))
+          p=Path('source/tools/dedicated_control_test.py')
+          t=p.read_text(); old='        events = parse_lines(stdout.decode(), "empty maps folder")'; assert t.count(old)==1
+          p.write_text(t.replace(old,'        print("EMPTY MAP DIAGNOSTIC:", stderr.decode(errors="replace"))\n'+old))
+          PYCODE
+      - name: Compile portable Linux client
+        run: |
+          cd source
+          python3 configure.py --portable --release --pgo=off
+          ninja -j 4 linux 2>&1 | tee ../linux-build.log
+          test -x build/linux/halo
+      - name: Linux port and dedicated control checks
+        run: |
+          cd source
+          python3 -m pytest -q tools/test_linux_port.py | tee ../linux-tests.log
+          python3 tools/dedicated_control_test.py --binary build/linux/halo
+          python3 tools/variant_overrides_test.py
+      - name: Package Linux client and build evidence
+        if: always()
+        run: |
+          mkdir -p output/lib
+          cp source/build/linux/halo output/halo
+          cp -L /usr/local/lib/libSDL3.so.0 output/lib/
+          cp SDL3-source-commit.txt output/
+          cp -r source/NOTICES output/
+          cp /tmp/SDL/LICENSE.txt output/NOTICES/SDL3-3.4.16-LICENSE.txt
+          cp source/LICENSE.md output/
+          file output/halo > output/binary-info.txt
+          ldd output/halo > output/required-libraries.txt
+          readelf --version-info output/halo > output/symbol-versions.txt
+          readelf --version-info output/lib/libSDL3.so.0 >> output/symbol-versions.txt
+          printf '#!/usr/bin/env bash\nset -euo pipefail\ncd "$(dirname "$(readlink -f "$0")")"\nexport LD_LIBRARY_PATH="$PWD/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"\nexec ./halo "$@"\n' > output/Launch.sh
+          chmod +x output/Launch.sh
+          cd output
+          sha256sum halo lib/libSDL3.so.0 > SHA256SUMS
+          cd ..
+          tar -czf NxHalo-Crossplay18-Linux-test.tar.gz -C output .
+          tar -czf NxHalo-Crossplay18-Linux-matched-source.tar.gz --exclude=build --exclude=build.ninja --exclude=.ninja_log --exclude=.ninja_deps -C source .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crossplay18-linux-build
+          path: |
+            NxHalo-Crossplay18-Linux-test.tar.gz
+            NxHalo-Crossplay18-Linux-matched-source.tar.gz
+            linux-build.log
+            linux-tests.log
+            SDL3-source-commit.txt
+          retention-days: 7

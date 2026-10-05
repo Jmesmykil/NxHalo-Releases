@@ -1,0 +1,7 @@
+{
+  "installed_package": "newlib4.6.0.20260123-4",
+  "copyright_text_commit": "820dd5009b1b83788bf278912359af3a8e9239ad",
+  "copyright_text_url": "https://raw.githubusercontent.com/mirror/newlib-cygwin/820dd5009b1b83788bf278912359af3a8e9239ad/COPYING.NEWLIB",
+  "copyright_text_sha256": "fcfb5ec69b6ab52676dcc4dab7cf4338c8000ef97812dadd35b8592a640a8419",
+  "exact_installed_SDK_source_pin": "Unresolved; this text is the pinned upstream copyright notice, not an exact toolchain-source match."
+}

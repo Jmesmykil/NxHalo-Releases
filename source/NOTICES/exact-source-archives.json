@@ -1,0 +1,14 @@
+[
+  {
+    "version": "Mesa-20.1.0-rc3",
+    "source_url": "https://archive.mesa3d.org/older-versions/20.x/mesa-20.1.0-rc3.tar.xz",
+    "archive_sha256": "c90b75ea34302ebde9b81b87c5642fa864c40fe9c4ad34ce0793170c1413168d",
+    "notice_files": 1
+  },
+  {
+    "version": "libdrm_nouveau-1.0.1",
+    "source_url": "https://codeload.github.com/devkitPro/libdrm_nouveau/tar.gz/refs/tags/v1.0.1",
+    "archive_sha256": "b069bf8029abb120294bd2dd988dc4d6ce2be3f1016c88c26c73c87b6f312136",
+    "notice_files": 5
+  }
+]
