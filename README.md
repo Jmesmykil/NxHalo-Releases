@@ -2,7 +2,7 @@
 
 A native Halo: Combat Evolved port for the original Nintendo Switch. This repository contains public releases, offline setup tools, and support information. Development stays separate.
 
-**Latest release: Build14 / v0.1.1 campaign preview.** Download the runtime and offline setup apps from the [Build14 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.1-build14). Build14 retains the camera/vehicle corrections and adds RAM-backed transient checkpoints. Multiplayer is unsupported; campaign testing and optimization continue. The earlier [Build13 baseline](releases/build13-baseline.json) remains available for comparison.
+**Latest Switch release: Build14 / v0.1.1 campaign preview.** Download the runtime and offline setup apps from the [Build14 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.1-build14). The release package contains `Halo_CE_Runtime.nsp`, Windows x64 and Apple Silicon macOS setup ZIPs, importer and runtime source archives, receipts, manifest, and SHA-256 checksums. Build14 retains the camera/vehicle corrections and adds RAM-backed transient checkpoints. Multiplayer is unsupported; campaign testing and optimization continue. The earlier [Build13 baseline](releases/build13-baseline.json) remains available for comparison.
 
 **Steam Deck preview 1 (pre-release).** [NxHalo for the Steam Deck](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.0-steamdeck-preview1) is a native Linux build on network version 11 with local and internet multiplayer and experimental campaign characters. It needs your own prepared game data; see its [release notes](releases/steamdeck-preview1/release-notes.md) for what has and has not been tested. Build14 remains the Switch campaign build.
 
