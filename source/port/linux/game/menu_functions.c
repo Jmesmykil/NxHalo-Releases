@@ -3700,16 +3700,16 @@ static void lobby_overlay_render(struct network_game const *game, short seconds)
 	ui_overlay_rect(-margin, 432, (float)width, 1, 0, 0x3D8BFFFF);
 	if (game->variant.universal_variant.teams)
 	{
-		ui_overlay_rect(250, 414, 128, 26, 4, 0x153765FF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 314, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "SWITCH TEAM");
+		ui_overlay_rect(250 + margin, 414, 128, 26, 4, 0x153765FF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 314 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "SWITCH TEAM");
 	}
 	if (global_network_game_server_get())
 	{
-		ui_overlay_rect(380, 414, 128, 26, 4, 0x1B5C42FF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 444, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "START NOW");
+		ui_overlay_rect(380 + margin, 414, 128, 26, 4, 0x1B5C42FF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 444 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "START NOW");
 	}
-	ui_overlay_rect(510, 414, 128, 26, 4, 0x612F3AFF);
-	ui_overlay_text(UI_FONT_BOLD, 8, 574, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "LEAVE LOBBY");
+	ui_overlay_rect(510 + margin, 414, 128, 26, 4, 0x612F3AFF);
+	ui_overlay_text(UI_FONT_BOLD, 8, 574 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "LEAVE LOBBY");
 	ui_overlay_text(UI_FONT_REGULAR, 8, 320, 453, UI_ALIGN_CENTER, 0xAFC4E0FF,
 		"D-PAD SCROLLS  |  LEFT/RIGHT CHANGES TEAM  |  A SELECTS  |  B BACK");
 }
