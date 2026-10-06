@@ -14,7 +14,7 @@
   "deck_hardware_tested": true,
   "physical_deck_boot_smoke": true,
   "hands_on_played": false,
-  "render_health_clean_through_frame": 900,
+  "render_health_clean_through_frame": 5400,
   "resolution_sweep_tested": false,
   "lobby_live_match_tested": false,
   "128_player_match_tested": false,
@@ -31,8 +31,11 @@
       "sha256": "6f6cee223b742428ad210ab767d2435bca3ffc16b69f1ea030d68fa2457175f6"
     },
     "release-notes.md": {
-      "bytes": 2357,
-      "sha256": "9304e673f91eddb1991cdd33d9a9b2cecf5467c8f5e150175fd120173e2f01d2"
+      "bytes": 2311,
+      "sha256": "6a373939c0f76efa75be56fb2ba88a02942cd1ca53d47b85ec74c538e8f8af1a"
     }
-  }
+  },
+  "deck_acceptance_level": "launch-and-render-loop-smoke",
+  "visible_output_verified": false,
+  "main_menu_visible_verified": false
 }
