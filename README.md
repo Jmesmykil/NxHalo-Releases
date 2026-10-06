@@ -26,7 +26,7 @@ Preview 2.3 completed a physical Deck install and 12-second process smoke. Visib
 
 ## Source
 
-The [`source/`](source) tree contains the public game source with the Preview 2 lobby and map-browser changes; [build guidance](source/RELEASE-SOURCE.md) describes the native Linux target. The exact Profile33 package source is `NxHalo-Profile33-runtime-source.zip` in the [Profile33 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.11-p33). These sources omit game data, shader instruction tokens and console keys.
+The [`source/`](source) tree contains the shared game source with the Steam Deck Preview 2.3 responsive lobby, selected-player inspection and map-browser changes; [build guidance](source/RELEASE-SOURCE.md) describes the native Linux target. The exact Profile33 package source is `NxHalo-Profile33-runtime-source.zip` in the [Profile33 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.11-p33). These sources omit game data, shader instruction tokens and console keys.
 
 ## Updates and support
 
