@@ -11,7 +11,11 @@
   "client_max_glibc_symbol": "GLIBC_2.38",
   "bundled_sdl3_max_glibc_symbol": "GLIBC_2.34",
   "steam_os_version": "3.8.28",
-  "deck_install_sha_verified": false,
+  "deck_hardware_tested": true,
+  "deck_install_sha_verified": true,
+  "process_smoke_seconds": 12,
+  "main_menu_log": true,
+  "clean_render_health_through_frame": 600,
   "visible_output_verified": false,
   "lobby_moderation_interaction_tested": false,
   "resolution_sweep_tested": false,
@@ -30,8 +34,8 @@
       "sha256": "82038c278e45c056c3f3de66113927e3b3c4ba37dfa7e7c18db2457d1e86418b"
     },
     "release-notes.md": {
-      "bytes": 1677,
-      "sha256": "2005473953c9697519405ec68944834645b341f816bd077cdb774cc2ecb9d2ea"
+      "bytes": 2119,
+      "sha256": "6c8f1d6eba3ef446ed75dd762b1cacbbdcb99ee73505d7b71b20d30bfff884b5"
     }
   }
 }

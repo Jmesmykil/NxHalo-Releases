@@ -10,7 +10,8 @@ Native 32-bit Linux pre-release, network protocol 11. Built on the Omarchy Linux
 
 ## Build and device evidence
 
-- `ninja linux` completed on Omarchy Linux from the included source snapshot with the portable i686 Linux configuration and bundled-SDL-compatible GLIBC symbol wrappers.
+- `ninja linux` completed on Omarchy Linux from the included source snapshot with the portable i686 Linux configuration and bundled-SDL-compatible GLIBC symbol wrappers. The binary was installed over the existing Deck shortcut target after preserving the previous executable in `/home/deck/Games/HaloCE-before-preview2.4-20261005/`; the on-device SHA-256 matched the build.
+- A 12-second Deck process smoke reached the main menu and frame 600. Render-health logs through frame 600 reported zero missing programs or targets, link failures, skipped debug draws, or source failures. Visible output is not verified.
 - Lobby moderation, live multiplayer, resolution coverage, 128-player matches, and in-game map download-and-join have not been exercised on this preview. A roster display capacity of 128 does not establish a playable 128-player match. The creator's approximate current match-size estimate remains about 40.
 - No game maps, game executable, shader instruction data, console keys, or saves are included.
 
