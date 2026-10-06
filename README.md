@@ -8,7 +8,7 @@ NxHalo is a native Halo: Combat Evolved port with separate Nintendo Switch and S
 
 **Stable Switch build: Build14 / v0.1.1.** [Build14](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.1-build14) remains the stable campaign baseline and latest non-prerelease. It is a separate title from Profile33 and remains available for rollback.
 
-**Newest Steam Deck/Linux feature build: Preview 2.2 / v0.2.2 (pre-release, network protocol 11).** The [Preview 2.2 release](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.2-steamdeck-preview2) adds the resolution-aware multiplayer lobby, a complete scrollable roster display for up to 128 lobby entries, explicit **Co-op Campaign** labeling, and download-and-join for missing Custom Edition maps. It retains the public internet/cross-console lobby browser and experimental campaign characters. About 40 players is the current practical match-size estimate; 128 describes roster capacity only. On SteamOS 3.8.28, the Preview 2.2 process ran through frame 5400 with clean render-health logs. The available X11 capture showed a black frame, so visible output and reaching the main menu remain unverified. The lobby, aspect-ratio sweep, live match and map-download join still need gameplay verification.
+**Newest Steam Deck/Linux feature build: Preview 2.3 / v0.2.3 (pre-release, network protocol 11).** The [Preview 2.3 release](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.3-steamdeck-preview3) adds selected-player inspection to the responsive multiplayer waiting lobby. It retains public cross-console browsing, Co-op Campaign labeling, the scrollable 128-entry roster, and opt-in Custom Edition map download-and-join. About 40 players remains the creator's practical match-size estimate; 128 is display capacity, not a tested match size. Preview 2.3 was installed on SteamOS 3.8.28 and process-smoked for 12 seconds; logs reached main-menu music and frame 626, but visible output was not verified.
 
 The Deck build is native Linux, not Proton. It needs your own prepared compatible Halo CE maps and support files. No game maps, executable, ROM, shader instruction data, console keys or saves are supplied. See the release notes for precise installation and verification status.
 
@@ -22,7 +22,7 @@ The Switch must already be configured to run this homebrew title. Setup apps are
 
 ## Validation status
 
-Read the release-specific notes and validation records before installing. Profile33's receipt proves the published NSP checksum and the UMS staging/readback record, not installation or physical Switch gameplay. Preview 2.2 completed a physical Deck launch/render-loop smoke on SteamOS 3.8.28, but visible output was not verified because the available X11 capture showed a black frame. This is not a hands-on gameplay or multiplayer acceptance test. Full campaign coverage, 128-player sessions and sustained roughly-40-player match performance are not claimed.
+Preview 2.3 completed a physical Deck install and 12-second process smoke. Visible output, lobby interaction, multiplayer, resolution coverage and map-download joining remain unverified.
 
 ## Source
 
