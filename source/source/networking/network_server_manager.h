@@ -65,6 +65,10 @@ void network_game_server_port_set_settings(
 	long maximum_players);
 boolean network_game_server_ban_player(
 	char const *text);
+/* port: ban every player on the selected remote console without resolving
+the player's display name (names may be duplicated). */
+boolean network_game_server_ban_machine(
+	long machine_index);
 short network_game_server_matching_player_names(
 	char const *text,
 	char (*names)[NETWORK_GAME_SERVER_NAME_TEXT_SIZE],

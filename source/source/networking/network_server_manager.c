@@ -1028,6 +1028,42 @@ boolean network_game_server_ban_player(
 	return TRUE;
 }
 
+/* port: the lobby's selected-player action. Unlike the text console command,
+this targets the selected remote machine directly, so duplicate or long
+player names cannot make the ban ambiguous. */
+boolean network_game_server_ban_machine(
+	long machine_index)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	char names[96] = "";
+	long index;
+
+	if (!server || !VALID_INDEX(machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) ||
+		!network_game_server_client_machine_is_joined_to_game(server, &server->client_machines[machine_index]) ||
+		network_game_server_client_machine_is_local(server, &server->client_machines[machine_index]))
+	{
+		return FALSE;
+	}
+	for (index = 0; index < MAXIMUM_NETWORK_PLAYER_COUNT; index++)
+	{
+		struct network_player const *player = &server->game.players[index];
+		char name[NETWORK_GAME_SERVER_NAME_TEXT_SIZE];
+
+		if (!network_player_is_valid(player) || player->machine_index != machine_index)
+			continue;
+		network_game_server_player_name_text(player, name, sizeof(name));
+		if (names[0] && csstrlen(names) + 2 < sizeof(names))
+			csstrcat(names, ", ");
+		if (csstrlen(names) + csstrlen(name) < sizeof(names))
+			csstrcat(names, name);
+	}
+	if (!names[0])
+		return FALSE;
+	network_distributed_ban(machine_index, network_game_server_client_machine_addresses[machine_index], names);
+	network_game_server_kick_pending[machine_index] = TRUE;
+	return TRUE;
+}
+
 /* port: a client machine's hardware id as it told it joining (its join
 request: network_server_message_handler.c), kept as hex only */
 void network_game_server_set_machine_hardware_id(
@@ -4781,4 +4817,3 @@ unsigned long network_game_server_machine_ipv4_address(
 	return 0;
 }
 #endif
-

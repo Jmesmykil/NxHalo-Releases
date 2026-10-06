@@ -73,6 +73,7 @@ their handlers open opens.
 #include "interface/ui_widget.h"
 #include "main/main.h"
 #include "networking/network_game_manager.h"
+#include "networking/network_server_manager.h"
 #include "saved games/player_profile.h"
 #include "tag_files/tag_groups.h"
 #include "text/text_group.h"
@@ -3548,6 +3549,10 @@ gametype, the countdown */
 
 static struct network_player *lobby_players[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 static short lobby_player_count;
+enum { _lobby_action_none = 0, _lobby_action_kick, _lobby_action_ban };
+static short lobby_confirm_action;
+static long lobby_confirm_machine = NONE;
+static long lobby_selected_machine = NONE;
 
 static void lobby_row_text(short row, wchar_t *text)
 {
@@ -3716,24 +3721,67 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
 		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 333, UI_ALIGN_LEFT, 0xAFC4E0FF,
 			"Select a roster row to inspect its player.");
 
-	/* Keep prompts over the same hit boxes as the existing lobby widgets. */
+	/* Keep prompts over the lobby's focusable controls. Host actions require
+	selecting a remote console, then confirming the same action once more. */
 	ui_overlay_rect(-margin, 432, (float)width, 1, 0, 0x3D8BFFFF);
 	if (game->variant.universal_variant.teams)
 	{
-		ui_overlay_rect(250 + margin, 414, 128, 26, 4, 0x153765FF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 314 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "SWITCH TEAM");
+		ui_overlay_rect(12 + margin, 414, 112, 26, 4, 0x153765FF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 68 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "TEAM");
 	}
 	if (global_network_game_server_get())
 	{
-		ui_overlay_rect(380 + margin, 414, 128, 26, 4, 0x1B5C42FF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 444 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "START NOW");
+		ui_overlay_rect(136 + margin, 414, 112, 26, 4, 0x612F3AFF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 192 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF,
+			lobby_confirm_action == _lobby_action_kick ? "CONFIRM KICK" : "KICK CONSOLE");
+		ui_overlay_rect(260 + margin, 414, 112, 26, 4, 0x612F3AFF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 316 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF,
+			lobby_confirm_action == _lobby_action_ban ? "CONFIRM BAN" : "BAN CONSOLE");
+		ui_overlay_rect(384 + margin, 414, 112, 26, 4, 0x1B5C42FF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 440 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "START");
 	}
-	ui_overlay_rect(510 + margin, 414, 128, 26, 4, 0x612F3AFF);
-	ui_overlay_text(UI_FONT_BOLD, 8, 574 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "LEAVE LOBBY");
+	ui_overlay_rect(508 + margin, 414, 112, 26, 4, 0x612F3AFF);
+	ui_overlay_text(UI_FONT_BOLD, 8, 564 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "LEAVE");
 	ui_overlay_text(UI_FONT_REGULAR, 8, 320, 453, UI_ALIGN_CENTER, 0xAFC4E0FF,
-		"D-PAD SCROLLS  |  LEFT/RIGHT CHANGES TEAM  |  A SELECTS  |  B BACK");
+		"UP/DOWN BROWSE  |  SELECT A REMOTE PLAYER  |  CONFIRM KICK/BAN  |  B BACK");
 }
 #endif
+
+/* A kick/ban targets a whole console because CE permits local split-screen
+players. Requiring a second activation on the same selected console prevents
+accidental destructive actions from controller focus movement. */
+static boolean lobby_machine_action(struct widget_instance *widget, short action)
+{
+	struct widget_instance *list = widget && widget->parent && widget->parent->parent ?
+		widget->parent->parent : NULL;
+	long machine = lobby_selected_machine;
+	short index;
+
+	if (!list || !global_network_game_server_get())
+		return campaign_fail();
+	for (index = 0; machine != NONE && index < lobby_player_count; index++)
+	{
+		if (lobby_players[index]->machine_index == machine)
+			break;
+	}
+	if (index == lobby_player_count || machine == network_game_client_get_local_machine_index())
+		return campaign_fail();
+	if (lobby_confirm_action != action || lobby_confirm_machine != machine)
+	{
+		lobby_confirm_action = action;
+		lobby_confirm_machine = machine;
+		ui_play_audio_feedback_sound(SOUND_FORWARD);
+		return TRUE;
+	}
+	lobby_confirm_action = _lobby_action_none;
+	lobby_confirm_machine = NONE;
+	if (action == _lobby_action_kick)
+		network_game_server_kick_machine(machine);
+	else if (!network_game_server_ban_machine(machine))
+		return campaign_fail();
+	ui_play_audio_feedback_sound(SOUND_FORWARD);
+	return TRUE;
+}
 
 /* ---- text boxes' own colours: a text box given one shows its text in it
 in place of its definition's (ui_widget.c asks, for each text box it draws:
@@ -3855,7 +3903,7 @@ static void lobby_update(struct widget_instance *list)
 	struct network_game *game = client ? network_game_client_get_game(client) : NULL;
 	short state_data, state = client ? network_game_client_get_state(client, &state_data) : NONE;
 	wchar_t text[LOBBY_TEXT_LENGTH];
-	short index;
+	short index, selected = focused_row(list);
 
 	lobby_player_count = 0;
 	for (index = 0; game && state >= _client_state_pregame && index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; index++)
@@ -3868,7 +3916,33 @@ static void lobby_update(struct widget_instance *list)
 		multiplayer.lobby_first = (short)MAX(0, lobby_player_count - LOBBY_ROWS);
 	rows_update(list, (short)MIN(lobby_player_count, LOBBY_ROWS), lobby_row_text);
 	lobby_rows_color(list, game);
+	if (selected >= 0 && selected < LOBBY_ROWS && multiplayer.lobby_first + selected < lobby_player_count)
+	{
+		long selected_machine = lobby_players[multiplayer.lobby_first + selected]->machine_index;
+		if (lobby_confirm_machine != NONE && lobby_confirm_machine != selected_machine)
+		{
+			lobby_confirm_action = _lobby_action_none;
+			lobby_confirm_machine = NONE;
+		}
+		lobby_selected_machine = selected_machine;
+	}
 	visible_set(named(list, "lobby_button_team", 0), game && game->variant.universal_variant.teams);
+	visible_set(named(list, "lobby_button_start", 0), global_network_game_server_get() != NULL);
+	{
+		boolean remote_selected = FALSE;
+		long index;
+		for (index = 0; lobby_selected_machine != NONE && index < lobby_player_count; index++)
+		{
+			if (lobby_players[index]->machine_index == lobby_selected_machine &&
+				lobby_selected_machine != network_game_client_get_local_machine_index())
+			{
+				remote_selected = TRUE;
+				break;
+			}
+		}
+		visible_set(named(list, "lobby_button_kick", 0), global_network_game_server_get() != NULL && remote_selected);
+		visible_set(named(list, "lobby_button_ban", 0), global_network_game_server_get() != NULL && remote_selected);
+	}
 	/* (the buttons' focus, off Switch Team when it is hidden) */
 	focus_off_hidden(named(list, "lobby_button_bar", 0));
 	visible_set(named(description, "lobby_right_item", 0), game != NULL && state >= _client_state_pregame);
@@ -3902,7 +3976,18 @@ static void lobby_update(struct widget_instance *list)
 			usnprintf(text + length, NUMBEROF(text) - 1 - length, L"\r\n\r\nInvite link copied:\r\npaste it to friends");
 		}
 		text_set_length(named(description, "lobby_game_data", 0), text, LOBBY_TEXT_LENGTH);
-		lobby_overlay_render(game, seconds, focused_row(list));
+		if (selected == NONE)
+		{
+			for (index = 0; index < LOBBY_ROWS && multiplayer.lobby_first + index < lobby_player_count; index++)
+			{
+				if (lobby_players[multiplayer.lobby_first + index]->machine_index == lobby_selected_machine)
+				{
+					selected = index;
+					break;
+				}
+			}
+		}
+		lobby_overlay_render(game, seconds, selected);
 	}
 	profile_name_show(description);
 }
@@ -4781,6 +4866,14 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port lobby preview join"))
 		{
 			return preview_join(widget, controller, widget_deleted);
+		}
+		else if (!strcmp(name, "port lobby kick console"))
+		{
+			return lobby_machine_action(widget, _lobby_action_kick);
+		}
+		else if (!strcmp(name, "port lobby ban console"))
+		{
+			return lobby_machine_action(widget, _lobby_action_ban);
 		}
 		else if (!strcmp(name, "gamespy screen dispose"))
 		{

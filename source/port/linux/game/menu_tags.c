@@ -355,6 +355,7 @@ static char const *const port_function_names[] =
 	/* (Settings' OK: the Xbox's fails when the profile has no changes, the
 	settings' screens having written theirs to config.toml) */
 	"player profile save changes",
+	"port lobby kick console", "port lobby ban console",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from

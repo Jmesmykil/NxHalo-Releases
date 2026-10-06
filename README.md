@@ -8,7 +8,7 @@ NxHalo is a native Halo: Combat Evolved port with separate Nintendo Switch and S
 
 **Stable Switch build: Build14 / v0.1.1.** [Build14](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.1-build14) remains the stable campaign baseline and latest non-prerelease. It is a separate title from Profile33 and remains available for rollback.
 
-**Newest Steam Deck/Linux feature build: Preview 2.3 / v0.2.3 (pre-release, network protocol 11).** The [Preview 2.3 release](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.3-steamdeck-preview3) adds selected-player inspection to the responsive multiplayer waiting lobby. It retains public cross-console browsing, Co-op Campaign labeling, the scrollable 128-entry roster, and opt-in Custom Edition map download-and-join. About 40 players remains the creator's practical match-size estimate; 128 is display capacity, not a tested match size. Preview 2.3 was installed on SteamOS 3.8.28 and process-smoked for 12 seconds; logs reached main-menu music and frame 626, but visible output was not verified.
+**Newest Steam Deck/Linux feature build: Preview 2.4 / v0.2.4 (pre-release, network protocol 11).** The [Preview 2.4 release](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.4-steamdeck-preview4) adds host-only, two-step Kick Console and Ban Console actions to the selected-player lobby view. It retains public cross-console and browser lobby discovery, Co-op Campaign listings, the scrollable 128-entry roster, responsive waiting-lobby panels and opt-in Custom Edition map download-and-join from the HaloNet map catalog. About 40 players remains the creator's practical match-size estimate; 128 is roster display capacity, not a tested match size. The Preview 2.4 binary was built on Omarchy Linux and installed at the existing Steam Deck game path; actual lobby actions, multiplayer, map download-and-join and resolution coverage still need live play verification.
 
 The Deck build is native Linux, not Proton. It needs your own prepared compatible Halo CE maps and support files. No game maps, executable, ROM, shader instruction data, console keys or saves are supplied. See the release notes for precise installation and verification status.
 
@@ -26,7 +26,7 @@ Preview 2.3 completed a physical Deck install and 12-second process smoke. Visib
 
 ## Source
 
-The [`source/`](source) tree contains the shared game source with the Steam Deck Preview 2.3 responsive lobby, selected-player inspection and map-browser changes; [build guidance](source/RELEASE-SOURCE.md) describes the native Linux target. The exact Profile33 package source is `NxHalo-Profile33-runtime-source.zip` in the [Profile33 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.11-p33). These sources omit game data, shader instruction tokens and console keys.
+The [`source/`](source) tree contains the shared game source with the Steam Deck Preview 2.4 responsive lobby, selected-player inspection and console moderation actions, public lobby browser and map download-and-join flow; [build guidance](source/RELEASE-SOURCE.md) describes the native Linux target. The exact Profile33 package source is `NxHalo-Profile33-runtime-source.zip` in the [Profile33 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.11-p33). These sources omit game data, shader instruction tokens and console keys.
 
 ## Updates and support
 
