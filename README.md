@@ -1,39 +1,37 @@
-# NxHalo — Halo: Combat Evolved for Nintendo Switch
+# NxHalo — Halo: Combat Evolved for Switch and Steam Deck
 
-NxHalo is a native Halo: Combat Evolved port for the original Nintendo Switch. This repository publishes runtime packages, offline game-data setup tools, source snapshots and player support.
+NxHalo is a native Halo: Combat Evolved port with separate Nintendo Switch and Steam Deck/Linux builds. Releases include offline setup tools and player support. Supply your own legally obtained game data; no game content or console keys are included.
 
 ## Current builds
 
-**Newest Switch build: Profile33 / v0.1.11-p33 (pre-release, network version 11).** Download the [Profile33 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.11-p33) for the Switch runtime, matching source snapshot, setup apps, manifest, validation records and checksums. Profile33 includes cross-console multiplayer, in-game public-lobby browsing and custom campaign characters. The creator's current approximate match limit is roughly 40 players. That estimate is not a measured acceptance result: recent public discovery runs saw lobby populations of 32 and 36, which do not establish simultaneous players or sustained match performance. A 128-player workload has not been validated.
+**Newest published Switch build: Profile33 / v0.1.11-p33 (pre-release, network protocol 11).** The [Profile33 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.11-p33) contains the Switch runtime, matching source, setup apps, checksums and validation records. It includes cross-console multiplayer, public internet lobby browsing and custom campaign characters. The creator's current practical match-size estimate is about 40 players. That is not a measured simultaneous-player acceptance result: public runs discovered lobbies listing 32 and 36 players. Profile33 was staged/read back through UMS; that alone does not establish physical Switch install or runtime acceptance.
 
-**Stable Switch build: Build14 / v0.1.1.** The [Build14 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.1-build14) remains the stable campaign baseline and GitHub's latest non-prerelease. It retains the camera/vehicle corrections and RAM-backed transient checkpoints. Multiplayer is unsupported in Build14; use Profile33 for the newer network code. Build14 remains available as a rollback. Profile33 uses a different title ID (`010048414C210000`) from Build14 (`010048414C4F0000`), so it is a separate title, not an in-place update.
+**Stable Switch build: Build14 / v0.1.1.** [Build14](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.1-build14) remains the stable campaign baseline and latest non-prerelease. It is a separate title from Profile33 and remains available for rollback.
 
-**Steam Deck / Linux: v0.2.0 preview 1 (pre-release, network version 11).** The [current Deck release](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.0-steamdeck-preview1) is the newest published Deck package. It has local and internet multiplayer and experimental campaign characters. Its package has not been replaced; see its release notes for the measured tests and remaining gaps. The Deck and Profile33 Switch builds share network version 11. A physical Switch-to-Deck match on Profile33 has not yet been verified.
+**Newest Steam Deck/Linux feature build: Preview 2 / v0.2.1 (pre-release, network protocol 11).** The [Preview 2 release](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.1-steamdeck-preview2) adds the resolution-aware multiplayer lobby, a complete scrollable roster display for up to 128 lobby entries, explicit **Co-op Campaign** labeling, and download-and-join for missing Custom Edition maps. It retains the public internet/cross-console lobby browser and experimental campaign characters. About 40 players is the current practical match-size estimate; 128 describes roster capacity only. Preview 2 has compiled successfully, but the new UI, map-download flow and live match have not yet been accepted on a physical Deck.
+
+The Deck build is native Linux, not Proton. It needs your own prepared compatible Halo CE maps and support files. No game maps, executable, ROM, shader instruction data, console keys or saves are supplied. See the release notes for precise installation and verification status.
 
 ## Play with your own game
 
-1. Download the Profile33 runtime and offline importer from [Releases](https://github.com/Jmesmykil/NxHalo-Releases/releases).
+1. Download the setup app from [Releases](https://github.com/Jmesmykil/NxHalo-Releases/releases).
 2. Run the importer with your own compatible original Xbox Halo image or extracted game folder and select your mounted Switch SD root. It prepares the required game data locally.
-3. Install the runtime NSP through DBI and launch Halo CE from HOME. Profile33 is a separate title from Build14; keep Build14 installed if you want the stable rollback available.
+3. Install the Switch runtime through DBI and launch Halo CE from HOME. Profile33 is a separate title from Build14; keep Build14 installed if you want the stable rollback available.
 
-The Switch must already be configured to run this homebrew title. No ROM, game maps, executable, console keys or personal saves are included. The recommended player flow needs no keys, compiler or packaging tool.
-
-Start with [the player guide](docs/START_HERE.md). Setup apps are available for **Windows x64** and **Apple Silicon macOS**. These preview apps are unsigned. Other computers can use the importer source with **Python 3.10 or newer with Tk**. Halo PC, Custom Edition, Anniversary, MCC and Switch 2 are outside this release.
+The Switch must already be configured to run this homebrew title. Setup apps are available for **Windows x64** and **Apple Silicon macOS**. These preview apps are unsigned. Other computers can use the importer source with Python 3.10 or newer with Tk. Halo PC, Custom Edition, Anniversary, MCC and Switch 2 are outside the Switch release.
 
 ## Validation status
 
-Profile33's matching NSP is SHA-256 verified and its release carries the validation receipt. The receipt records that the installer was staged and read back from SD; it does **not** establish installation or physical runtime acceptance. Physical performance, visual-effects correctness, campaign-route coverage and real 100–128-player workload remain open. See the Profile33 release notes and validation files for the exact evidence and limits.
-
-Build14 hardware records cover selected scenes and checkpoint writes, not a full-campaign certification or fixed frame rate. Shader compilation can cause first-use stutter; battle performance, loading display, audio, shields and animation remain under test.
+Read the release-specific notes and validation records before installing. Profile33's receipt proves the published NSP checksum and the UMS staging/readback record, not installation or physical Switch gameplay. Preview 2's successful Linux build proves compilation, not Steam Deck acceptance. Full campaign coverage, 128-player sessions and sustained roughly-40-player match performance are not claimed.
 
 ## Source
 
-The [`source/`](source) folder contains the public Build14 source snapshot. The exact Profile33 source is included as `NxHalo-Profile33-runtime-source.zip` in the [Profile33 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.11-p33). Both omit game data, shader instruction tokens and console keys. Supply those from your own copy of the game.
+The [`source/`](source) tree contains the public game source with the Preview 2 lobby and map-browser changes; [build guidance](source/RELEASE-SOURCE.md) describes the native Linux target. The exact Profile33 package source is `NxHalo-Profile33-runtime-source.zip` in the [Profile33 release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.11-p33). These sources omit game data, shader instruction tokens and console keys.
 
 ## Updates and support
 
-Keep your imported game data, saves and settings. Back up your SD game folder before installing another build. Review the selected release notes for title-ID and compatibility details before installing.
+Keep your imported game data, saves and settings. Back up the SD game folder before installing another build. Review the selected release notes for title ID and compatibility details.
 
-For a bug report, include the release version, mission, checkpoint or encounter, handheld/docked mode and reproducible steps. Remove personal information from logs before posting. Do not upload game images, maps, executables, keys or saves.
+For a bug report, include the release version, map or mission, player count, wired or Wi-Fi connection and reproducible steps. Remove personal information from logs before posting. Do not upload game images, maps, executables, keys or saves.
 
 This is an independent community project and is not endorsed by the original game or console publishers.

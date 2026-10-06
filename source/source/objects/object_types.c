@@ -143,6 +143,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicles.h"
 #ifdef HALO_64BIT
+#include "game/game.h" /* game_time_get */
 #include "game/game_engine.h" /* port: game_engine_vehicle_placement_begin, _allowed */
 #endif
 

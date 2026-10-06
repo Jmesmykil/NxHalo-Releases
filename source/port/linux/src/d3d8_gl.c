@@ -169,6 +169,7 @@ BYTE D3D__StateBlockDirty[1024];
 
 #define VERTEX_SHADER_SIGNATURE 0x76736864UL /* 'vshd' */
 #define VERTEX_PROGRAM_SLOTS 136
+#define VERTEX_SHADER_HANDLE_SLOTS 32768
 
 struct vertex_element
 {
@@ -330,6 +331,7 @@ struct gl_device
 
 	struct vertex_shader_object *vertex_shader;
 	struct vertex_shader_object *program_slots[VERTEX_PROGRAM_SLOTS];
+	struct vertex_shader_object *shader_handles[VERTEX_SHADER_HANDLE_SLOTS];
 	unsigned long program_address;
 	float constants[XGPU_VERTEX_CONSTANT_COUNT][4];
 	float viewport_scale[4];
@@ -591,9 +593,9 @@ static void state_attribute_pointer(GLuint index, GLuint buffer, GLint size, GLe
 	}
 	state_array_buffer(buffer);
 	if (integer)
-		glVertexAttribIPointer(index, size, type, stride, (const void *)offset);
+		glVertexAttribIPointer(index, size, type, stride, (const void *)(uintptr_t)offset);
 	else
-		glVertexAttribPointer(index, size, type, normalized, stride, (const void *)offset);
+		glVertexAttribPointer(index, size, type, normalized, stride, (const void *)(uintptr_t)offset);
 	pointer->buffer = buffer;
 	pointer->size = size;
 	pointer->type = type;
@@ -1906,7 +1908,14 @@ HRESULT WINAPI D3DDevice_CreateVertexShader(CONST DWORD *declaration, CONST DWOR
 	if (!object)
 		return E_OUTOFMEMORY;
 	object->signature = VERTEX_SHADER_SIGNATURE;
+	if (device.next_vertex_shader_id >= VERTEX_SHADER_HANDLE_SLOTS)
+	{
+		free(object->instructions);
+		free(object);
+		return E_OUTOFMEMORY;
+	}
 	object->id = device.next_vertex_shader_id++;
+	device.shader_handles[object->id] = object;
 	if (function)
 	{
 		/* header: program type in the low word, instruction count in the high */
@@ -1916,15 +1925,19 @@ HRESULT WINAPI D3DDevice_CreateVertexShader(CONST DWORD *declaration, CONST DWOR
 	}
 	parse_declaration(object, declaration);
 	/* odd values are FVF codes; programmable shader handles are even */
-	*handle = (DWORD)object;
+	*handle = (DWORD)(object->id << 1);
 	return S_OK;
 }
 
 static struct vertex_shader_object *vertex_shader_from_handle(DWORD handle)
 {
-	struct vertex_shader_object *object = (struct vertex_shader_object *)handle;
+	unsigned long id = handle >> 1;
+	struct vertex_shader_object *object;
 
-	if (!handle || (handle & 1) || object->signature != VERTEX_SHADER_SIGNATURE)
+	if (!handle || (handle & 1) || id >= VERTEX_SHADER_HANDLE_SLOTS)
+		return NULL;
+	object = device.shader_handles[id];
+	if (!object || object->signature != VERTEX_SHADER_SIGNATURE)
 		return NULL;
 	return object;
 }
@@ -3146,14 +3159,14 @@ static BOOL mirror_refresh(unsigned long first, unsigned long last)
 		{
 			host_gl_buffer_write(GL_COPY_WRITE_BUFFER,
 				(unsigned int)(address - PLATFORM_CONTIGUOUS_BASE - segment * MIRROR_SEGMENT_SIZE),
-				(unsigned int)size, (const void *)address);
+				(unsigned int)size, (const void *)(uintptr_t)address);
 			continue;
 		}
 #else
 		(void)unused;
 #endif
 		glBufferSubData(GL_COPY_WRITE_BUFFER, (GLintptr)(address - PLATFORM_CONTIGUOUS_BASE - segment * MIRROR_SEGMENT_SIZE),
-			(GLsizeiptr)size, (const void *)address);
+			(GLsizeiptr)size, (const void *)(uintptr_t)address);
 	}
 	return TRUE;
 }
@@ -3162,11 +3175,11 @@ static BOOL mirror_refresh(unsigned long first, unsigned long last)
 that holds it, the range's offset in that buffer and the newest upload
 generation of its pages (which changes whenever its contents do); FALSE if
 the range is outside the window, spans two segments or is volatile */
-static BOOL mirror_range(unsigned long address, unsigned long size, GLuint *buffer, unsigned long *offset,
+static BOOL mirror_range(uintptr_t address, unsigned long size, GLuint *buffer, unsigned long *offset,
 	unsigned long *generation)
 {
-	unsigned long start = address - PLATFORM_CONTIGUOUS_BASE;
-	unsigned long segment, first, last, page, oldest = ~0UL, newest = 0;
+	uintptr_t start = address - PLATFORM_CONTIGUOUS_BASE;
+	unsigned long segment, first, last, page, oldest = 0xFFFFFFFFUL, newest = 0;
 	BOOL present = TRUE;
 
 	if (!size || address < PLATFORM_CONTIGUOUS_BASE || start + size > PLATFORM_CONTIGUOUS_SIZE)
@@ -3220,7 +3233,7 @@ same ranges are drawn frame after frame */
 
 static struct
 {
-	unsigned long address;
+	uintptr_t address;
 	unsigned long count;
 	unsigned long generation;
 	WORD minimum;
@@ -3230,10 +3243,10 @@ static struct
 static void index_extent(const WORD *indices, unsigned long count, unsigned long generation, BOOL cached,
 	unsigned long *minimum, unsigned long *maximum)
 {
-	unsigned long slot = (((unsigned long)indices >> 1) ^ (count * 2654435761UL)) % INDEX_RANGE_SLOTS;
+	unsigned long slot = (((uintptr_t)indices >> 1) ^ (count * 2654435761UL)) % INDEX_RANGE_SLOTS;
 	unsigned long index, low = 0xffff, high = 0;
 
-	if (cached && index_ranges[slot].address == (unsigned long)indices && index_ranges[slot].count == count &&
+	if (cached && index_ranges[slot].address == (uintptr_t)indices && index_ranges[slot].count == count &&
 		index_ranges[slot].generation == generation)
 	{
 		*minimum = index_ranges[slot].minimum;
@@ -3249,7 +3262,7 @@ static void index_extent(const WORD *indices, unsigned long count, unsigned long
 	}
 	if (cached)
 	{
-		index_ranges[slot].address = (unsigned long)indices;
+		index_ranges[slot].address = (uintptr_t)indices;
 		index_ranges[slot].count = count;
 		index_ranges[slot].generation = generation;
 		index_ranges[slot].minimum = (WORD)low;
@@ -3464,13 +3477,13 @@ static void setup_streams(unsigned long first, unsigned long count)
 		unsigned long stream = element->stream;
 		unsigned long stride = device.streams[stream].stride;
 		unsigned long bytes = stride ? stride * count : 64;
-		unsigned long base;
+		uintptr_t base;
 
 		if (!device.streams[stream].data || element->type == D3DVSDT_NONE || placed[stream])
 			continue;
 		placed[stream] = TRUE;
 		stream_buffers[stream] = 0;
-		base = (unsigned long)PLATFORM_PHYSICAL_TO_VIRTUAL(device.streams[stream].data) + first * stride;
+		base = (uintptr_t)PLATFORM_PHYSICAL_TO_VIRTUAL(device.streams[stream].data) + first * stride;
 #ifdef HALO_ANDROID
 		if (!stream_has_colors(declaration, stream))
 #endif
@@ -3576,7 +3589,7 @@ void WINAPI D3DDevice_SetStreamSource(UINT stream_number, D3DVertexBuffer *strea
 void WINAPI D3DDevice_SetIndices(D3DIndexBuffer *index_data, UINT base_vertex_index)
 {
 	(void)base_vertex_index;
-	D3D__IndexData = index_data ? (WORD *)index_data->Data : NULL;
+	D3D__IndexData = index_data ? (WORD *)xbox_pointer(index_data->Data) : NULL;
 }
 
 void WINAPI D3DDevice_DrawVertices(D3DPRIMITIVETYPE primitive_type, UINT start_vertex, UINT vertex_count)
@@ -3591,7 +3604,7 @@ void WINAPI D3DDevice_DrawVertices(D3DPRIMITIVETYPE primitive_type, UINT start_v
 		WORD *indices = quad_indices(NULL, vertex_count, &count);
 
 		glDrawElements(GL_TRIANGLES, (GLsizei)count, GL_UNSIGNED_SHORT,
-			(const void *)index_upload(indices, count * sizeof(WORD)));
+			(const void *)(uintptr_t)index_upload(indices, count * sizeof(WORD)));
 		free(indices);
 	}
 	else
@@ -3616,7 +3629,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 #ifdef HALO_ANDROID
 		xgpu_capabilities.base_vertex &&
 #endif
-		mirror_range((unsigned long)index_data, vertex_count * sizeof(WORD), &index_buffer, &index_offset, &generation);
+		mirror_range((uintptr_t)index_data, vertex_count * sizeof(WORD), &index_buffer, &index_offset, &generation);
 	index_extent(index_data, vertex_count, generation, mirrored, &minimum, &maximum);
 	trace_draw("indexed", primitive_type, vertex_count, NULL);
 	setup_streams(minimum, maximum - minimum + 1);
@@ -3625,7 +3638,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 		/* the attributes start at vertex minimum */
 		state_element_array_buffer(index_buffer);
 		glDrawElementsBaseVertex(primitive_mode(primitive_type), (GLsizei)vertex_count, GL_UNSIGNED_SHORT,
-			(const void *)index_offset, -(GLint)minimum);
+			(const void *)(uintptr_t)index_offset, -(GLint)minimum);
 		return;
 	}
 	stats.streamed_bytes += vertex_count * sizeof(WORD);
@@ -3652,7 +3665,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 #endif
 	(void)index;
 	glDrawElementsBaseVertex(primitive_mode(primitive_type), (GLsizei)count, GL_UNSIGNED_SHORT,
-		(const void *)index_upload(source, count * sizeof(WORD)), -(GLint)minimum);
+		(const void *)(uintptr_t)index_upload(source, count * sizeof(WORD)), -(GLint)minimum);
 	free(indices);
 }
 
@@ -3701,7 +3714,7 @@ void WINAPI D3DDevice_End(void)
 		WORD *indices = quad_indices(NULL, count, &index_count);
 
 		glDrawElements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_SHORT,
-			(const void *)index_upload(indices, index_count * sizeof(WORD)));
+			(const void *)(uintptr_t)index_upload(indices, index_count * sizeof(WORD)));
 		free(indices);
 	}
 	else

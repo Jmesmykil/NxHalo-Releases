@@ -92,6 +92,15 @@ def generate_linux64_build(n: Writer, sln: Any) -> None:
     # objects)
     lto_cflags, lto_ldflags = lto_flags(sln, build_dir / "thinlto-cache")
     objects = lp64.objects(host, generated_sources, build_dir / "obj", lto_cflags)
+    compat_source = Path("port/linux/glibc_compat.c")
+    compat_object = build_dir / "obj" / "port/linux/glibc_compat.o"
+    n.build(
+        outputs=compat_object,
+        rule=f"{lp64.name}_cc",
+        inputs=compat_source,
+        variables={"cflags": f"{LINUX64_TARGET} -O2 -fno-builtin-sqrtf"},
+    )
+    objects.append(compat_object)
     n.build(
         outputs=output,
         rule="linux64_link",
@@ -100,7 +109,7 @@ def generate_linux64_build(n: Writer, sln: Any) -> None:
             # (not position-independent, as the 32-bit build: the addresses
             # of a crash report's calls, in debug.txt, are the executable's
             # own, the same from run to run)
-            "ldflags": " ".join([LINUX64_TARGET, "-g", "-no-pie", *lto_ldflags]),
+            "ldflags": " ".join([LINUX64_TARGET, "-g", "-no-pie", "-Wl,--wrap=sqrtf", *lto_ldflags]),
             "libs": " ".join(f"-l{lib}" for lib in config.get("libraries", [])),
         },
         implicit=[Path("tools/linux_link_check.py")],

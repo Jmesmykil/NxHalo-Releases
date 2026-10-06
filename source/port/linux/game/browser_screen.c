@@ -52,6 +52,7 @@ profile it was typed for, to confirm with A or refuse with B (browser.c).
 #include "../src/browser.h"
 #include "../src/ui_overlay.h"
 #include "halo_ui_map_list.h"
+#include "community_map_download.h"
 
 /* ---------- constants */
 
@@ -62,6 +63,7 @@ enum
 	BROWSER_EVENT_BUTTON = 3,
 
 	ROWS_PER_PAGE = 9,
+	ROSTER_PAGE_SIZE = 14,
 	ROW_HEIGHT = 26,
 	LIST_TOP = 112,
 	STATUS_DURATION = 6000,
@@ -100,7 +102,7 @@ enum
 /* the game's engines, short (as players say them) to fit the column */
 static char const *const engine_names[] =
 {
-	"", "CTF", "Slayer", "Oddball", "King", "Race",
+	"Co-op Campaign", "CTF", "Slayer", "Oddball", "King", "Race",
 };
 
 /* the multiplayer maps' names in the menus */
@@ -131,6 +133,7 @@ static struct
 {
 	boolean active;
 	short selected;
+	short roster_page;
 	short count;
 	struct browser_game games[BROWSER_MAXIMUM_GAMES];
 	char status[96];
@@ -148,6 +151,7 @@ static struct
 	char ce_map[BROWSER_MAP_LENGTH];
 	short ce_map_answer;
 	unsigned long ce_map_time;
+	char map_download_invite[BROWSER_INVITE_LENGTH + 1];
 	/* Link Profile's panel up, and what it shows (browser.c's, each frame);
 	when it last opened, closed or asked for a code */
 	boolean connect_open;
@@ -256,6 +260,7 @@ void game_connection_set(short connection);
 this machine's, as its Y makes one) */
 boolean ui_online_games_start_network(void);
 boolean ui_widget_online_games_create_game(void);
+char const *cache_files_map_directory(void);
 
 static void utf8_name(unsigned short const *name, char *text, long size);
 
@@ -302,10 +307,26 @@ static void join_selected(
 		set_status("That game is not accepting players.");
 		return;
 	}
-	/* (a Custom Edition map's game, only with the map: a join without it
-	would fail at its loading; the list's footer says what is missing) */
+	/* Download a missing Custom Edition map before joining. */
 	if (ce_map_state(game, TRUE) >= _ce_map_missing)
+	{
+		char file[BROWSER_MAP_LENGTH], target[512];
+		short family = map_file(game->map, file, sizeof(file));
+		if (ce_map_state(game, FALSE) == _ce_map_missing && family == _map_family_custom_edition)
+		{
+			snprintf(target, sizeof(target), "%sce\\%s.map", cache_files_map_directory(), file);
+			if (community_map_download_start(file, target))
+			{
+				csstrncpy(browser_screen.map_download_invite, game->invite,
+					sizeof(browser_screen.map_download_invite) - 1);
+				browser_screen.map_download_invite[sizeof(browser_screen.map_download_invite) - 1] = 0;
+				set_status("Downloading the map before joining.");
+			}
+			else
+				set_status("A map download is already running or could not start.");
+		}
 		return;
+	}
 	/* a network client searching, as System Link's (the advertisement comes
 	to it: browser_screen_open started it) */
 	if (!global_network_game_client_get())
@@ -569,8 +590,29 @@ void browser_screen_process(
 {
 	struct event_record event;
 	short move = 0;
+	char download_message[160] = "";
+	int download_state = community_map_download_status(download_message, sizeof(download_message));
 
 	fetch_games();
+	if (download_state == COMMUNITY_MAP_DOWNLOAD_RUNNING && download_message[0] &&
+		strcmp(browser_screen.status, download_message))
+		set_status(download_message);
+	else if (download_state == COMMUNITY_MAP_DOWNLOAD_READY)
+	{
+		boolean same_game = browser_screen.selected >= 0 && browser_screen.selected < browser_screen.count &&
+			!strcmp(browser_screen.games[browser_screen.selected].invite, browser_screen.map_download_invite);
+		community_map_download_clear();
+		browser_screen.map_download_invite[0] = 0;
+		set_status("Map verified and ready.");
+		if (same_game)
+			join_selected();
+	}
+	else if (download_state == COMMUNITY_MAP_DOWNLOAD_FAILED)
+	{
+		set_status(download_message[0] ? download_message : "Map download failed.");
+		community_map_download_clear();
+		browser_screen.map_download_invite[0] = 0;
+	}
 	if (browser_screen.connecting)
 		wait_for_host();
 	if (browser_screen.connect_open)
@@ -608,6 +650,14 @@ void browser_screen_process(
 			case _gamepad_binary_button_dpad_down: move = 1; break;
 			case _gamepad_binary_button_dpad_left: move = -ROWS_PER_PAGE; break;
 			case _gamepad_binary_button_dpad_right: move = ROWS_PER_PAGE; break;
+			case _gamepad_binary_button_right_thumb:
+				if (browser_screen.selected < browser_screen.count)
+				{
+					short players = browser_screen.games[browser_screen.selected].roster_count;
+					short pages = (short)MAX(1, (players + ROSTER_PAGE_SIZE - 1) / ROSTER_PAGE_SIZE);
+					browser_screen.roster_page = (short)((browser_screen.roster_page + 1) % pages);
+				}
+				break;
 			case _gamepad_analog_button_a:
 				if (!browser_screen.connecting && system_milliseconds() - browser_screen.opened_time > OPEN_SETTLE)
 					join_selected();
@@ -652,8 +702,11 @@ void browser_screen_process(
 		}
 		if (move)
 		{
+			short previous = browser_screen.selected;
 			browser_screen.selected = (short)PIN(browser_screen.selected + move, 0,
 				MAX(0, browser_screen.count - 1));
+			if (browser_screen.selected != previous)
+				browser_screen.roster_page = 0;
 			move = 0;
 		}
 	}
@@ -1249,12 +1302,15 @@ void browser_screen_render(
 		{
 			long kept = selected->roster_count < BROWSER_LISTED_ROSTER ? selected->roster_count : BROWSER_LISTED_ROSTER;
 			long places = ROSTER_COLUMNS * ROSTER_ROWS;
-			long shown = selected->roster_count > places ? places - 1 : kept;
+			long pages = MAX(1, (kept + places - 1) / places);
+			long page = PIN(browser_screen.roster_page, 0, pages - 1);
+			long first = page * places;
+			long shown = MIN(places, kept - first);
 			long index;
 
 			for (index = 0; index < shown; index++)
 			{
-				struct browser_roster_player const *player = &selected->roster[index];
+				struct browser_roster_player const *player = &selected->roster[first + index];
 				unsigned long color = !selected->teams || player->team < 0 ? COLOR_TEXT :
 					player->team == 0 ? COLOR_RED_TEAM : COLOR_BLUE_TEAM;
 
@@ -1262,11 +1318,12 @@ void browser_screen_render(
 				ui_overlay_text(UI_FONT_REGULAR, 8.5f, 453 + (index / ROSTER_ROWS) * 85,
 					DETAIL_Y + 27 + (index % ROSTER_ROWS) * 11, UI_ALIGN_LEFT, color, name);
 			}
-			if (selected->roster_count > shown)
+			if (pages > 1)
 			{
-				snprintf(text, sizeof(text), "+%d more", selected->roster_count - (int)shown);
-				ui_overlay_text(UI_FONT_REGULAR, 8.5f, 453 + (shown / ROSTER_ROWS) * 85,
-					DETAIL_Y + 27 + (shown % ROSTER_ROWS) * 11, UI_ALIGN_LEFT, COLOR_DIM, text);
+				snprintf(text, sizeof(text), "Players %ld-%ld of %ld  (RS click: next)",
+					first + 1, first + shown, selected->roster_count);
+				ui_overlay_text(UI_FONT_REGULAR, 7.5f, 453, DETAIL_Y + DETAIL_HEIGHT - 11,
+					UI_ALIGN_LEFT, COLOR_DIM, text);
 			}
 		}
 	}
@@ -1279,8 +1336,11 @@ void browser_screen_render(
 		prompt_width(UI_BUTTON_LEFT_TRIGGER, "") + prompt_width(UI_BUTTON_RIGHT_TRIGGER, "=SORT") +
 		prompt_width(UI_BUTTON_RIGHT_SHOULDER, "=LINK PROFILE") - 20 - 3;
 	x = 320 - width / 2;
-	/* (A greyed for a game on a Custom Edition map that can't be played here) */
-	if (selected && ce_map_state(selected, FALSE) >= _ce_map_missing)
+	/* A downloads a missing Custom Edition map before joining. */
+	if (selected && ce_map_state(selected, FALSE) == _ce_map_missing &&
+		map_family(selected->map) == _map_family_custom_edition)
+		x = prompt(UI_BUTTON_A, "=GET MAP & JOIN", x);
+	else if (selected && ce_map_state(selected, FALSE) >= _ce_map_missing)
 		x = prompt_off(UI_BUTTON_A, "=JOIN", x);
 	else
 		x = prompt(UI_BUTTON_A, "=JOIN", x);

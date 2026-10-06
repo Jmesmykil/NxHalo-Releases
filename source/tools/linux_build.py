@@ -503,13 +503,16 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # (port/include/halo_math.h)
         for source in musl_math_sources():
             add_object(source, musl_math_cflags(abi))
+        # Bind math calls to the SteamOS-compatible GLIBC_2.0 symbols.
+        add_object(Path("port/linux/glibc_compat.c"),
+                   "-m32 -O2 -fno-builtin-fmod -fno-builtin-sqrtf", posix=True)
 
         n.build(
             outputs=output,
             rule="linux_link",
             inputs=objects,
             variables={
-                "ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *extra_ldflags]),
+                "ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", "-Wl,--wrap=fmod,--wrap=sqrtf", *extra_ldflags]),
                 "libs": libs,
             },
             implicit=[Path("tools/linux_link_check.py")],

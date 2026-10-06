@@ -83,6 +83,7 @@ their handlers open opens.
 #include "../src/p2p.h"
 #ifdef HALO_GAME_BROWSER
 #include "../src/browser.h"
+#include "../src/ui_overlay.h"
 #endif
 /* (its games on Halo PC maps: server_browser.c) */
 #include "halo_map_families.h"
@@ -1864,7 +1865,7 @@ void platform_text_field(int typing);
 int config_boolean(char const *name);
 void ui_widget_port_post_button(short controller_index, short button_index);
 
-static wchar_t const *const engine_names[] = { L"", L"CTF", L"SLAYER", L"ODDBALL", L"KING OF THE HILL", L"RACE" };
+static wchar_t const *const engine_names[] = { L"CO-OP CAMPAIGN", L"CTF", L"SLAYER", L"ODDBALL", L"KING OF THE HILL", L"RACE" };
 static short const maximum_players[] = { 2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128 };
 
 static struct
@@ -2940,7 +2941,7 @@ static void lobby_browser_listed_map(struct browser_game const *game, char *map,
 static void lobby_browser_add_listed(void)
 {
 	/* (its gametypes as a listing names them) */
-	static char const *const gametypes[] = { "Game", "CTF", "Slayer", "Oddball", "King", "Race" };
+	static char const *const gametypes[] = { "Co-op Campaign", "CTF", "Slayer", "Oddball", "King", "Race" };
 	short index;
 
 	lobby_browser_listed.count = 0;
@@ -3563,6 +3564,157 @@ static void lobby_row_text(short row, wchar_t *text)
 	text[ROW_TEXT_LENGTH - 1] = 0;
 }
 
+#ifdef HALO_GAME_BROWSER
+extern long halo_screen_width(void);
+
+static void lobby_utf8(wchar_t const *wide, char *text, size_t size)
+{
+	size_t used = 0;
+	long index;
+	for (index = 0; wide[index] && used + 5 < size; index++)
+	{
+		unsigned long c = (unsigned short)wide[index];
+		if (c >= 0xD800 && c <= 0xDBFF && wide[index + 1] >= 0xDC00 && wide[index + 1] <= 0xDFFF)
+			c = 0x10000 + ((c - 0xD800) << 10) + ((unsigned short)wide[++index] - 0xDC00);
+		if (c < 0x80) text[used++] = (char)c;
+		else if (c < 0x800)
+		{
+			text[used++] = (char)(0xC0 | (c >> 6));
+			text[used++] = (char)(0x80 | (c & 0x3F));
+		}
+		else if (c < 0x10000)
+		{
+			text[used++] = (char)(0xE0 | (c >> 12));
+			text[used++] = (char)(0x80 | ((c >> 6) & 0x3F));
+			text[used++] = (char)(0x80 | (c & 0x3F));
+		}
+		else
+		{
+			text[used++] = (char)(0xF0 | (c >> 18));
+			text[used++] = (char)(0x80 | ((c >> 12) & 0x3F));
+			text[used++] = (char)(0x80 | ((c >> 6) & 0x3F));
+			text[used++] = (char)(0x80 | (c & 0x3F));
+		}
+	}
+	text[used] = 0;
+}
+
+/* Replace the legacy boxed team-selection art with a responsive lobby view.
+The original list and widgets still own focus, scrolling, team changes and
+start/leave actions; this only presents their live state. */
+static void lobby_overlay_render(struct network_game const *game, short seconds)
+{
+	float margin, left, usable, list_width, right, right_width;
+	long width, index;
+	char text[160], title[96];
+	wchar_t wide[80];
+
+	if (!ui_overlay_available() || !game)
+		return;
+	width = halo_screen_width();
+	margin = (float)(width - 640) / 2.0f;
+	left = 28.0f - margin;
+	usable = (float)width - 56.0f;
+	list_width = usable * 0.56f;
+	right = left + list_width + 14.0f;
+	right_width = usable - list_width - 14.0f;
+
+	ui_overlay_gradient(-margin, 0, (float)width, 480, 0, 0x06101EFF, 0x02060CFF);
+	ui_overlay_gradient(-margin, 0, (float)width, 72, 0, 0x112E57FF, 0x08172AFF);
+	ui_overlay_rect(-margin, 71, (float)width, 1, 0, 0x3D8BFFFF);
+	ui_overlay_text(UI_FONT_BOLD, 25, left, 15, UI_ALIGN_LEFT, 0x70B5FFFF, "MULTIPLAYER LOBBY");
+	snprintf(text, sizeof(text), "%s  |  %d/%d PLAYERS",
+		global_network_game_server_get() ? "HOST" : "CONNECTED",
+		lobby_player_count, game->maximum_players);
+	ui_overlay_text(UI_FONT_BOLD, 9, left + usable, 35, UI_ALIGN_RIGHT, 0xD9E8FFFF, text);
+
+	/* Roster: 11 rows at once, with the existing up/down list scrolling all
+	128 slots. This remains usable at 4:3, 16:9, ultrawide and Deck sizes. */
+	ui_overlay_rect(left, 88, list_width, 332, 7, 0x0B1B31F4);
+	ui_overlay_outline(left, 88, list_width, 332, 7, 1, 0x2E5F9FFF);
+	ui_overlay_text(UI_FONT_BOLD, 10, left + 14, 101, UI_ALIGN_LEFT, 0x85B8FFFF, "PLAYERS IN THIS LOBBY");
+	snprintf(text, sizeof(text), "%d TOTAL  |  UP TO %d", lobby_player_count, game->maximum_players);
+	ui_overlay_text(UI_FONT_BOLD, 8, left + list_width - 12, 103, UI_ALIGN_RIGHT, 0xAFC4E0FF, text);
+	ui_overlay_rect(left + 10, 121, list_width - 20, 1, 0, 0x254263FF);
+	for (index = 0; index < LOBBY_ROWS; index++)
+	{
+		long player_index = multiplayer.lobby_first + index;
+		struct network_player *player;
+		unsigned long color;
+		if (player_index >= lobby_player_count)
+			break;
+		player = lobby_players[player_index];
+		if (index & 1)
+			ui_overlay_rect(left + 7, 126 + index * 24, list_width - 14, 23, 3, 0x10243AE8);
+		ustrncpy(wide, player->name, NUMBEROF(wide) - 1);
+		wide[NUMBEROF(wide) - 1] = 0;
+		lobby_utf8(wide, title, sizeof(title));
+		color = game->variant.universal_variant.teams ?
+			(player->team_index ? 0x79B5FFFF : 0xFF8585FF) : 0xF0F4FAFF;
+		snprintf(text, sizeof(text), "%03ld", player_index + 1);
+		ui_overlay_text(UI_FONT_REGULAR, 8, left + 17, 132 + index * 24, UI_ALIGN_LEFT, 0x7892B2FF, text);
+		ui_overlay_text(UI_FONT_BOLD, 10, left + 52, 130 + index * 24, UI_ALIGN_LEFT, color, title);
+		if (game->variant.universal_variant.teams)
+			ui_overlay_text(UI_FONT_REGULAR, 8, left + list_width - 15, 132 + index * 24,
+				UI_ALIGN_RIGHT, color, player->team_index ? "BLUE" : "RED");
+	}
+	ui_overlay_rect(left + 10, 397, list_width - 20, 1, 0, 0x254263FF);
+	if (lobby_player_count)
+		snprintf(text, sizeof(text), "SHOWING %d-%d OF %d  |  UP/DOWN TO SCROLL",
+			multiplayer.lobby_first + 1, MIN(lobby_player_count, multiplayer.lobby_first + LOBBY_ROWS), lobby_player_count);
+	else
+		snprintf(text, sizeof(text), "WAITING FOR PLAYERS TO JOIN");
+	ui_overlay_text(UI_FONT_REGULAR, 8, left + list_width / 2, 402, UI_ALIGN_CENTER, 0xAFC4E0FF, text);
+
+	/* Session information, with the full map name and status kept readable. */
+	ui_overlay_rect(right, 88, right_width, 332, 7, 0x0B1B31F4);
+	ui_overlay_outline(right, 88, right_width, 332, 7, 1, 0x2E5F9FFF);
+	ui_overlay_text(UI_FONT_BOLD, 10, right + 14, 101, UI_ALIGN_LEFT, 0x85B8FFFF, "MATCH DETAILS");
+	ui_overlay_rect(right + 10, 121, right_width - 20, 1, 0, 0x254263FF);
+	ustrncpy(wide, game->variant.human_readable_game_description, NUMBEROF(wide) - 1);
+	wide[NUMBEROF(wide) - 1] = 0;
+	lobby_utf8(wide, title, sizeof(title));
+	ui_overlay_text(UI_FONT_BOLD, 13, right + 14, 136, UI_ALIGN_LEFT, 0xF0F4FAFF, title);
+	snprintf(text, sizeof(text), "MODE  %s", engine_names[PIN(game->variant.game_engine_index, 0, 5)]);
+	ui_overlay_text(UI_FONT_REGULAR, 10, right + 14, 164, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+	snprintf(text, sizeof(text), "MAP  %s", game->map.name);
+	ui_overlay_text(UI_FONT_REGULAR, 10, right + 14, 186, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+	snprintf(text, sizeof(text), "CAPACITY  %d PLAYERS", game->maximum_players);
+	ui_overlay_text(UI_FONT_REGULAR, 10, right + 14, 208, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+	if (seconds > 0)
+		snprintf(text, sizeof(text), "STARTING IN  %d SECONDS", seconds);
+	else if (game->machine_count < 2)
+		snprintf(text, sizeof(text), "WAITING FOR ANOTHER CONSOLE OR PLAYER");
+	else
+		snprintf(text, sizeof(text), "LOBBY OPEN  |  READY WHEN YOU ARE");
+	ui_overlay_rect(right + 12, 242, right_width - 24, 48, 5, 0x123266FF);
+	ui_overlay_text(UI_FONT_BOLD, 10, right + right_width / 2, 258, UI_ALIGN_CENTER, 0x87C6FFFF, text);
+	if (global_network_game_server_get())
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 313, UI_ALIGN_LEFT, 0xAFC4E0FF,
+			"Public and cross-console players can join this lobby.");
+	else
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 313, UI_ALIGN_LEFT, 0xAFC4E0FF,
+			"The host controls when this match begins.");
+
+	/* Keep prompts over the same hit boxes as the existing lobby widgets. */
+	ui_overlay_rect(-margin, 432, (float)width, 1, 0, 0x3D8BFFFF);
+	if (game->variant.universal_variant.teams)
+	{
+		ui_overlay_rect(250, 414, 128, 26, 4, 0x153765FF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 314, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "SWITCH TEAM");
+	}
+	if (global_network_game_server_get())
+	{
+		ui_overlay_rect(380, 414, 128, 26, 4, 0x1B5C42FF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 444, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "START NOW");
+	}
+	ui_overlay_rect(510, 414, 128, 26, 4, 0x612F3AFF);
+	ui_overlay_text(UI_FONT_BOLD, 8, 574, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "LEAVE LOBBY");
+	ui_overlay_text(UI_FONT_REGULAR, 8, 320, 453, UI_ALIGN_CENTER, 0xAFC4E0FF,
+		"D-PAD SCROLLS  |  LEFT/RIGHT CHANGES TEAM  |  A SELECTS  |  B BACK");
+}
+#endif
+
 /* ---- text boxes' own colours: a text box given one shows its text in it
 in place of its definition's (ui_widget.c asks, for each text box it draws:
 pc_menu_text_color), while the one who gave it keeps giving it (a widget
@@ -3730,6 +3882,7 @@ static void lobby_update(struct widget_instance *list)
 			usnprintf(text + length, NUMBEROF(text) - 1 - length, L"\r\n\r\nInvite link copied:\r\npaste it to friends");
 		}
 		text_set_length(named(description, "lobby_game_data", 0), text, LOBBY_TEXT_LENGTH);
+		lobby_overlay_render(game, seconds);
 	}
 	profile_name_show(description);
 }

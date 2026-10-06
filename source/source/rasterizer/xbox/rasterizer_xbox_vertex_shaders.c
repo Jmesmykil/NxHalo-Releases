@@ -11,6 +11,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "rasterizer_xbox_vertex_shaders.h"
 
 /* ---------- constants */

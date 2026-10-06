@@ -53,7 +53,8 @@ enum
 	/* (asked again this long after a failure) */
 	RETRY_INTERVAL = 15000,
 	THREAD_INTERVAL = 250,
-	RESPONSE_SIZE = 32768,
+	/* 64 listings can each carry 128 names; leave room for their encoded rows. */
+	RESPONSE_SIZE = 1048576,
 	/* the player key (game_list_player.key in the save root) */
 	PLAYER_KEY_SIZE = 32,
 	/* the public player ID: the first bytes of the key's hash */

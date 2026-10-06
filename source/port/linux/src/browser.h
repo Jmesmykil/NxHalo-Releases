@@ -21,7 +21,7 @@ game reached through an invite. See browser.c.
 /* a host's roster: the players it announces (as many as a game takes), and
 those a listed game keeps (as many as the Online Games screen shows) */
 #define BROWSER_HOSTED_ROSTER 128
-#define BROWSER_LISTED_ROSTER 16
+#define BROWSER_LISTED_ROSTER BROWSER_HOSTED_ROSTER
 
 /* a player of a game's roster */
 struct browser_roster_player
