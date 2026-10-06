@@ -3602,12 +3602,13 @@ static void lobby_utf8(wchar_t const *wide, char *text, size_t size)
 /* Replace the legacy boxed team-selection art with a responsive lobby view.
 The original list and widgets still own focus, scrolling, team changes and
 start/leave actions; this only presents their live state. */
-static void lobby_overlay_render(struct network_game const *game, short seconds)
+static void lobby_overlay_render(struct network_game const *game, short seconds, short selected_row)
 {
 	float margin, left, usable, list_width, right, right_width;
 	long width, index;
 	char text[160], title[96];
 	wchar_t wide[80];
+	struct network_player const *selected_player = NULL;
 
 	if (!ui_overlay_available() || !game)
 		return;
@@ -3644,7 +3645,9 @@ static void lobby_overlay_render(struct network_game const *game, short seconds)
 		if (player_index >= lobby_player_count)
 			break;
 		player = lobby_players[player_index];
-		if (index & 1)
+		if (index == selected_row)
+			ui_overlay_rect(left + 7, 126 + index * 24, list_width - 14, 23, 3, 0x2052B0E8);
+		else if (index & 1)
 			ui_overlay_rect(left + 7, 126 + index * 24, list_width - 14, 23, 3, 0x10243AE8);
 		ustrncpy(wide, player->name, NUMBEROF(wide) - 1);
 		wide[NUMBEROF(wide) - 1] = 0;
@@ -3665,6 +3668,8 @@ static void lobby_overlay_render(struct network_game const *game, short seconds)
 	else
 		snprintf(text, sizeof(text), "WAITING FOR PLAYERS TO JOIN");
 	ui_overlay_text(UI_FONT_REGULAR, 8, left + list_width / 2, 402, UI_ALIGN_CENTER, 0xAFC4E0FF, text);
+	if (selected_row >= 0 && selected_row < LOBBY_ROWS && multiplayer.lobby_first + selected_row < lobby_player_count)
+		selected_player = lobby_players[multiplayer.lobby_first + selected_row];
 
 	/* Session information, with the full map name and status kept readable. */
 	ui_overlay_rect(right, 88, right_width, 332, 7, 0x0B1B31F4);
@@ -3689,12 +3694,27 @@ static void lobby_overlay_render(struct network_game const *game, short seconds)
 		snprintf(text, sizeof(text), "LOBBY OPEN  |  READY WHEN YOU ARE");
 	ui_overlay_rect(right + 12, 242, right_width - 24, 48, 5, 0x123266FF);
 	ui_overlay_text(UI_FONT_BOLD, 10, right + right_width / 2, 258, UI_ALIGN_CENTER, 0x87C6FFFF, text);
-	if (global_network_game_server_get())
-		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 313, UI_ALIGN_LEFT, 0xAFC4E0FF,
-			"Public and cross-console players can join this lobby.");
+	ui_overlay_text(UI_FONT_BOLD, 9, right + 14, 310, UI_ALIGN_LEFT, 0x85B8FFFF, "SELECTED PLAYER");
+	if (selected_player)
+	{
+		ustrncpy(wide, selected_player->name, NUMBEROF(wide) - 1);
+		wide[NUMBEROF(wide) - 1] = 0;
+		lobby_utf8(wide, title, sizeof(title));
+		ui_overlay_text(UI_FONT_BOLD, 11, right + 14, 328, UI_ALIGN_LEFT, 0xF0F4FAFF, title);
+		snprintf(text, sizeof(text), "PLAYER SLOT  %d", (int)selected_player->player_list_index + 1);
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 350, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+		if (game->variant.universal_variant.teams)
+			snprintf(text, sizeof(text), "TEAM  %s", selected_player->team_index ? "BLUE" : "RED");
+		else
+			snprintf(text, sizeof(text), "TEAM  FREE-FOR-ALL");
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 368, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+		snprintf(text, sizeof(text), "CONSOLE  %d  |  %s", (int)selected_player->machine_index + 1,
+			selected_player->machine_index == network_game_client_get_local_machine_index() ? "LOCAL" : "REMOTE");
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 386, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+	}
 	else
-		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 313, UI_ALIGN_LEFT, 0xAFC4E0FF,
-			"The host controls when this match begins.");
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 333, UI_ALIGN_LEFT, 0xAFC4E0FF,
+			"Select a roster row to inspect its player.");
 
 	/* Keep prompts over the same hit boxes as the existing lobby widgets. */
 	ui_overlay_rect(-margin, 432, (float)width, 1, 0, 0x3D8BFFFF);
@@ -3882,7 +3902,7 @@ static void lobby_update(struct widget_instance *list)
 			usnprintf(text + length, NUMBEROF(text) - 1 - length, L"\r\n\r\nInvite link copied:\r\npaste it to friends");
 		}
 		text_set_length(named(description, "lobby_game_data", 0), text, LOBBY_TEXT_LENGTH);
-		lobby_overlay_render(game, seconds);
+		lobby_overlay_render(game, seconds, focused_row(list));
 	}
 	profile_name_show(description);
 }
