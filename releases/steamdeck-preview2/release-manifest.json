@@ -1,0 +1,35 @@
+{
+  "name": "NxHalo Steam Deck preview 2",
+  "tag": "v0.2.1-steamdeck-preview2",
+  "prerelease": true,
+  "network_version": 11,
+  "source_commit": "b8e77a9",
+  "build_target": "i686 Linux, native SDL3",
+  "build_host": "Omarchy Linux",
+  "client_binary_sha256": "b0e297b83e7788fa17488ca98dbce4f4c78e8f19585f092e433bf7bcf7433208",
+  "bundled_sdl3_sha256": "11ec5a3d6f6cdb99a68b283d7f5aac6c1f2b83d50e30c8e8636a10e321b316d9",
+  "deck_hardware_tested": false,
+  "hands_on_played": false,
+  "lobby_live_match_tested": false,
+  "128_player_match_tested": false,
+  "map_download_join_tested": false,
+  "game_data_included": false,
+  "console_keys_included": false,
+  "assets": {
+    "NxHalo-SteamDeck-preview2.tar.gz": {
+      "bytes": 19634606,
+      "sha256": "7619a049733d2043b4c0375d8400c5ece28d655c04ac44c8fbe4f3a7e6fe5ea0"
+    },
+    "NxHalo-runtime-source.zip": {
+      "bytes": 17426189,
+      "sha256": "ed648390f06672812d8b8e8ff88a89ed488f18569948b4ec50cacdc2fada2718"
+    },
+    "release-notes.md": {
+      "bytes": 1945,
+      "sha256": "cd488c646eda6e8d36c6eca3f42006cdabc7ea199700671d7e1dac5ec7955ed3"
+    }
+  },
+  "client_max_glibc_symbol": "GLIBC_2.38",
+  "bundled_sdl3_max_glibc_symbol": "GLIBC_2.34",
+  "steam_os_3_8_glibc": "GLIBC_2.41"
+}
