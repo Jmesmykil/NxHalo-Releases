@@ -188,7 +188,10 @@ class Machine:
                 time.sleep(0.001)
 
     def joined(self):
-        self.send(message(CLIENT_JOIN_GAME_REQUEST, wide(self.name, 32) + JOIN_TOKEN))
+        # The current wire request includes a 32-byte hexadecimal hardware ID.
+        hardware_id = ("%032x" % self.index).encode("ascii")
+        self.send(message(CLIENT_JOIN_GAME_REQUEST,
+                          wide(self.name, 32) + JOIN_TOKEN + hardware_id))
         self.state = "joining"
 
     def receive(self):
