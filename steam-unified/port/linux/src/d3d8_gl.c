@@ -31,6 +31,7 @@ Conventions carried over from the Xbox:
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 void d3d8_surface_initialize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
@@ -82,6 +83,22 @@ is presented (halo_screen_commit). */
 render target the size of the screen has per unit of it */
 static long screen_width;
 static float screen_scale[2] = { 1.0f, 1.0f };
+#ifndef HALO_ANDROID
+/* The game's logical scene is rendered at screen_scale. A Deck upscale frame
+   first uses a reduced scale, then switches to this output scale at the 3D/HUD
+   boundary so the HUD and menus are drawn at display resolution. */
+static float screen_output_scale[2] = { 1.0f, 1.0f };
+static GLuint deck_upscale_program;
+static GLint deck_upscale_source_location = -1;
+static GLint deck_upscale_metrics_location = -1;
+static GLint deck_upscale_output_location = -1;
+static GLint deck_upscale_sharpness_location = -1;
+static BOOL deck_upscale_available;
+static BOOL deck_upscale_eligible;
+static BOOL deck_upscale_hardware_checked;
+static BOOL deck_upscale_hardware;
+static int deck_upscale_logged_mode = -1;
+#endif
 static long ui_offset;
 #define UI_OFFSET ((GLint)ui_offset)
 
@@ -139,6 +156,10 @@ static int anti_aliasing_samples;
 static GLint anti_aliasing_maximum_samples, maximum_target_size;
 
 static void anti_aliasing_prepare(void);
+#ifndef HALO_ANDROID
+static float deck_upscale_factor(void);
+static void deck_upscale_prepare(void);
+#endif
 
 /* display.anti_aliasing's value (none of them: the first, off) */
 static void anti_aliasing_read(void)
@@ -217,6 +238,17 @@ static void screen_mode_choose(long *width, float scale[2])
 				scale[0] *= factor;
 				scale[1] *= factor;
 			}
+		}
+	}
+	screen_output_scale[0] = scale[0];
+	screen_output_scale[1] = scale[1];
+	{
+		float factor = deck_upscale_factor();
+		if (deck_upscale_eligible && factor > 0.0f && maximum_target_size > 0 &&
+			*width * scale[0] <= maximum_target_size && SCREEN_HEIGHT * scale[1] <= maximum_target_size)
+		{
+			scale[0] *= factor;
+			scale[1] *= factor;
 		}
 	}
 #endif
@@ -1576,11 +1608,220 @@ static void gl_initialize(void)
 	}
 	xgpu_gl_state_invalidate();
 	device.gl_ready = TRUE;
+#ifndef HALO_ANDROID
+	deck_upscale_prepare();
+#endif
 	if (anti_aliasing_value < 0)
 		anti_aliasing_read();
 	else
 		anti_aliasing_prepare();
 }
+
+#ifndef HALO_ANDROID
+/* Linear spatial reconstruction with a mild unsharp mask; this is not FSR. */
+static const char deck_upscale_vertex_source[] =
+	"#version 450 core\n"
+	"void main() { gl_Position = vec4(float((gl_VertexID & 1) << 2) - 1.0, float((gl_VertexID & 2) << 1) - 1.0, 0.0, 1.0); }\n";
+static const char deck_upscale_fragment_source[] =
+	"#version 450 core\n"
+	"uniform sampler2D source_texture;\n"
+	"uniform vec2 source_texel;\n"
+	"uniform vec2 output_size;\n"
+	"uniform float sharpness;\n"
+	"out vec4 result;\n"
+	"void main() {\n"
+	"  vec2 uv = gl_FragCoord.xy / output_size;\n"
+	"  vec4 center = texture(source_texture, uv);\n"
+	"  vec3 neighbors = texture(source_texture, uv + vec2(source_texel.x, 0.0)).rgb +\n"
+	"    texture(source_texture, uv - vec2(source_texel.x, 0.0)).rgb +\n"
+	"    texture(source_texture, uv + vec2(0.0, source_texel.y)).rgb +\n"
+	"    texture(source_texture, uv - vec2(0.0, source_texel.y)).rgb;\n"
+	"  result = vec4(clamp(center.rgb + (center.rgb - neighbors * 0.25) * sharpness, 0.0, 1.0), center.a);\n"
+	"}\n";
+
+static int deck_upscale_mode(void)
+{
+	const char *setting, *role;
+	char vendor[128] = "", product[128] = "";
+	FILE *file;
+	int mode = 0;
+	if (!deck_upscale_hardware_checked)
+	{
+		deck_upscale_hardware_checked = TRUE;
+		role = getenv("HALO_DEVICE_ROLE");
+		if (role && !strcmp(role, "steam_deck"))
+			deck_upscale_hardware = TRUE;
+		else
+		{
+			file = fopen("/sys/class/dmi/id/sys_vendor", "r");
+			if (file) { fgets(vendor, sizeof(vendor), file); fclose(file); }
+			file = fopen("/sys/class/dmi/id/product_name", "r");
+			if (file) { fgets(product, sizeof(product), file); fclose(file); }
+			vendor[strcspn(vendor, "\r\n")] = 0;
+			product[strcspn(product, "\r\n")] = 0;
+			deck_upscale_hardware = !strcasecmp(vendor, "Valve") &&
+				(!strcasecmp(product, "Jupiter") || !strcasecmp(product, "Galileo"));
+		}
+	}
+	if (!deck_upscale_hardware || !deck_upscale_available)
+		return 0;
+	setting = config_string("display.deck_upscaling");
+	if (!strcmp(setting, "quality")) mode = 1;
+	else if (!strcmp(setting, "performance")) mode = 2;
+	if (mode != deck_upscale_logged_mode)
+	{
+		deck_upscale_logged_mode = mode;
+		if (mode) platform_log("Deck upscaling: %s (linear spatial upscale + unsharp mask)", setting);
+		else if (*setting && strcmp(setting, "off"))
+			platform_log("Deck upscaling: unsupported mode '%s'; off", setting);
+	}
+	return mode;
+}
+
+static float deck_upscale_factor(void)
+{
+	int mode = deck_upscale_mode();
+	return mode == 1 ? (2.0f / 3.0f) : mode == 2 ? 0.5f : 0.0f;
+}
+
+static GLuint deck_upscale_compile(GLenum type, const char *source)
+{
+	GLuint shader = glCreateShader(type);
+	GLint compiled = GL_FALSE;
+	if (!shader) return 0;
+	glShaderSource(shader, 1, &source, NULL);
+	glCompileShader(shader);
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+	if (!compiled)
+	{
+		GLchar log[1024] = "";
+		glGetShaderInfoLog(shader, sizeof(log), NULL, log);
+		platform_log("Deck upscaling shader compile failed: %s", log);
+		glDeleteShader(shader);
+		return 0;
+	}
+	return shader;
+}
+
+static void deck_upscale_prepare(void)
+{
+	GLuint vertex, fragment;
+	GLint linked = GL_FALSE;
+	if (!device.gl_ready || deck_upscale_available) return;
+	vertex = deck_upscale_compile(GL_VERTEX_SHADER, deck_upscale_vertex_source);
+	fragment = deck_upscale_compile(GL_FRAGMENT_SHADER, deck_upscale_fragment_source);
+	if (!vertex || !fragment)
+	{
+		if (vertex) glDeleteShader(vertex);
+		if (fragment) glDeleteShader(fragment);
+		return;
+	}
+	deck_upscale_program = glCreateProgram();
+	glAttachShader(deck_upscale_program, vertex);
+	glAttachShader(deck_upscale_program, fragment);
+	glLinkProgram(deck_upscale_program);
+	glDeleteShader(vertex);
+	glDeleteShader(fragment);
+	glGetProgramiv(deck_upscale_program, GL_LINK_STATUS, &linked);
+	if (!linked)
+	{
+		GLchar log[1024] = "";
+		glGetProgramInfoLog(deck_upscale_program, sizeof(log), NULL, log);
+		platform_log("Deck upscaling shader link failed: %s", log);
+		glDeleteProgram(deck_upscale_program);
+		deck_upscale_program = 0;
+		return;
+	}
+	deck_upscale_source_location = glGetUniformLocation(deck_upscale_program, "source_texture");
+	deck_upscale_metrics_location = glGetUniformLocation(deck_upscale_program, "source_texel");
+	deck_upscale_output_location = glGetUniformLocation(deck_upscale_program, "output_size");
+	deck_upscale_sharpness_location = glGetUniformLocation(deck_upscale_program, "sharpness");
+	deck_upscale_available = deck_upscale_source_location >= 0 &&
+		deck_upscale_metrics_location >= 0 && deck_upscale_output_location >= 0 &&
+		deck_upscale_sharpness_location >= 0;
+	platform_log("Deck upscaling shader %s", deck_upscale_available ? "ready" : "disabled: uniforms missing");
+	xgpu_gl_state_invalidate();
+}
+
+static BOOL deck_upscale_scene(void)
+{
+	struct render_target_entry *low_color, *low_depth, *high_color, *high_depth;
+	float low_scale[2] = { screen_scale[0], screen_scale[1] };
+	int mode = deck_upscale_mode();
+	GLuint source_framebuffer, destination_framebuffer;
+	GLenum error;
+
+	if (!mode) return FALSE;
+	low_color = render_target_get(&device.back_buffer);
+	low_depth = render_target_get(&device.depth_buffer);
+	if (!low_color || !low_depth) return FALSE;
+	render_target_multisample(&low_color->target, 0);
+	render_target_multisample(&low_depth->target, 0);
+	screen_scale[0] = screen_output_scale[0];
+	screen_scale[1] = screen_output_scale[1];
+	high_color = render_target_get(&device.back_buffer);
+	high_depth = render_target_get(&device.depth_buffer);
+	if (!high_color || !high_depth || high_color == low_color || high_depth == low_depth ||
+		high_color->target.gl_width > (unsigned long)maximum_target_size ||
+		high_color->target.gl_height > (unsigned long)maximum_target_size)
+		goto unsupported;
+	source_framebuffer = framebuffer_get(0, low_depth->target.texture);
+	destination_framebuffer = framebuffer_get(0, high_depth->target.texture);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, source_framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination_framebuffer);
+	if (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE ||
+		glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		goto unsupported;
+	glBlitFramebuffer(0, 0, (GLint)low_depth->target.gl_width, (GLint)low_depth->target.gl_height,
+		0, 0, (GLint)high_depth->target.gl_width, (GLint)high_depth->target.gl_height,
+		GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+	source_framebuffer = framebuffer_get(low_color->target.texture, 0);
+	destination_framebuffer = framebuffer_get(high_color->target.texture, 0);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, source_framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination_framebuffer);
+	if (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE ||
+		glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		goto unsupported;
+	glBindTexture(GL_TEXTURE_2D, low_color->target.texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glViewport(0, 0, (GLsizei)high_color->target.gl_width, (GLsizei)high_color->target.gl_height);
+	glDisable(GL_SCISSOR_TEST);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_STENCIL_TEST);
+	glDisable(GL_BLEND);
+	glDisable(GL_CULL_FACE);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glUseProgram(deck_upscale_program);
+	glBindVertexArray(device.vertex_array);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, low_color->target.texture);
+	glBindSampler(0, 0);
+	glUniform1i(deck_upscale_source_location, 0);
+	glUniform2f(deck_upscale_metrics_location, 1.0f / low_color->target.gl_width,
+		1.0f / low_color->target.gl_height);
+	glUniform2f(deck_upscale_output_location, (float)high_color->target.gl_width,
+		(float)high_color->target.gl_height);
+	glUniform1f(deck_upscale_sharpness_location, mode == 1 ? 0.18f : 0.28f);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+	if ((error = glGetError()) != GL_NO_ERROR)
+	{
+		platform_log("Deck upscaling GL error 0x%04x; this frame remains at render resolution", error);
+		goto unsupported;
+	}
+	xgpu_gl_state_invalidate();
+	return TRUE;
+
+unsupported:
+	screen_scale[0] = low_scale[0];
+	screen_scale[1] = low_scale[1];
+	platform_log("Deck upscaling: unsupported target or GL operation; this frame remains at render resolution");
+	xgpu_gl_state_invalidate();
+	return FALSE;
+}
+#endif
 
 /* what display.anti_aliasing's value needs of the GL context, once there is
 one: multisampling's samples, at most the GPU's, and the passes' programs,
@@ -4571,14 +4812,28 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 	struct render_target_entry *target;
 	GLint corners[4];
 	int mode = anti_aliasing();
-
-	if (!device.gl_ready || (mode != _anti_aliasing_fxaa && mode != _anti_aliasing_smaa))
+#ifndef HALO_ANDROID
+	float upscale = deck_upscale_factor();
+	BOOL full_view = x0 == 0 && y0 == 0 && x1 == halo_screen_width() && y1 == SCREEN_HEIGHT;
+#endif
+	if (!device.gl_ready)
 		return;
-	/* (the primary target's view: the back buffer's) */
+	if (mode != _anti_aliasing_fxaa && mode != _anti_aliasing_smaa)
+	{
+#ifndef HALO_ANDROID
+		if (upscale > 0.0f)
+		{
+			deck_upscale_eligible = full_view;
+			if (fabsf(screen_scale[0] - screen_output_scale[0]) > 0.001f ||
+				fabsf(screen_scale[1] - screen_output_scale[1]) > 0.001f)
+				deck_upscale_scene();
+		}
+#endif
+		return;
+	}
 	target = render_target_get(&device.back_buffer);
 	if (!target)
 		return;
-	/* (no longer multisampled, if it was before the setting changed) */
 	render_target_multisample(&target->target, 0);
 	corners[0] = scaled_pixel(x0, target->target.scale[0]);
 	corners[1] = scaled_pixel(y0, target->target.scale[1]);
@@ -4588,6 +4843,15 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 		target->target.gl_width, target->target.gl_height, corners);
 	glBindVertexArray(device.vertex_array);
 	xgpu_gl_state_invalidate();
+#ifndef HALO_ANDROID
+	if (upscale > 0.0f)
+	{
+		deck_upscale_eligible = full_view;
+		if (fabsf(screen_scale[0] - screen_output_scale[0]) > 0.001f ||
+			fabsf(screen_scale[1] - screen_output_scale[1]) > 0.001f)
+			deck_upscale_scene();
+	}
+#endif
 }
 
 /* ---------- presentation */

@@ -207,6 +207,15 @@ typedef char verify_widget_instance_number_of_items_offset[
 typedef char verify_widget_instance_animation_offset[
 	offsetof(struct widget_instance, animation) == 0x50 ? 1 : -1];
 
+static boolean content_widget_named(struct widget_instance const *widget, char const *name)
+{
+	return widget && widget->name && name && !strcmp(widget->name, name);
+}
+
+static boolean content_widget_name_starts_with(struct widget_instance const *widget, char const *prefix)
+{
+	return widget && widget->name && prefix && !strncmp(widget->name, prefix, strlen(prefix));
+}
 /* menu_tags.c's */
 struct pc_menu_setting
 {
@@ -2190,6 +2199,8 @@ static void text_field_begin_masked(struct widget_instance *row, char const *tex
 	text_field_begin(row, text, maximum, done);
 	text_field.masked = TRUE;
 }
+
+static void content_catalog_search_done(char const *text) { extern void content_setup_catalog_set_query(const char *); content_setup_catalog_set_query(text); }
 
 static void text_field_end(boolean keep)
 {
@@ -5664,9 +5675,33 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "port campaign character")) { extern void ui_widget_port_character_open_context(boolean); ui_widget_port_character_open_context(FALSE); return TRUE; }
 		else if (!strcmp(name, "port host character")) { extern void ui_widget_port_character_open_context(boolean); ui_widget_port_character_open_context(TRUE); return TRUE; }
-		else if (!strcmp(name, "port content import")) { extern void content_setup_import_local(void); content_setup_import_local(); return TRUE; }
-		else if (!strcmp(name, "port content folder")) { extern void content_setup_open_folder(void); content_setup_open_folder(); return TRUE; }
-		else if (!strcmp(name, "port content download")) { extern void content_setup_download_clipboard(void); content_setup_download_clipboard(); return TRUE; }
+		else if (!strcmp(name, "port content import")) {
+            extern void content_setup_import_local(void), content_setup_catalog_page_move(int); extern const char *content_setup_catalog_query(void);
+            if (content_widget_named(widget, "mods_import")) {
+                extern void content_setup_texture_pack_import(void); content_setup_texture_pack_import();
+            } else if (content_widget_named(widget, "browser_search")) {
+                if (text_field_editing(widget)) text_field_end(TRUE);
+                else text_field_begin(widget, content_setup_catalog_query(), 47, content_catalog_search_done);
+            } else if (content_widget_named(widget, "browser_prev")) content_setup_catalog_page_move(-1);
+            else if (content_widget_named(widget, "browser_next")) content_setup_catalog_page_move(1);
+            else content_setup_import_local();
+            return TRUE;
+        }
+		else if (!strcmp(name, "port content folder")) {
+            extern void content_setup_open_folder(void); extern int content_setup_texture_pack_toggle(void);
+            if (content_widget_named(widget, "mods_toggle")) content_setup_texture_pack_toggle();
+            else if (content_widget_named(widget, "mods_upscale")) {
+                const char *value=config_string("display.deck_upscaling");
+                config_write("display.deck_upscaling",!strcmp(value,"off")?"quality":!strcmp(value,"quality")?"performance":"off");
+            } else content_setup_open_folder();
+            return TRUE;
+        }
+		else if (!strcmp(name, "port content download")) {
+            extern void content_setup_download_clipboard(void), content_setup_catalog_download_row(int);
+            if (content_widget_name_starts_with(widget, "browser_map_")) { const char *last=strrchr(widget->name,'_'); if(last)content_setup_catalog_download_row(atoi(last+1)); }
+            else content_setup_download_clipboard();
+            return TRUE;
+        }
 		else if (!strcmp(name, "port host profile")) {
 			int profile=network_profile_host_version();
 			return config_write("network.compatibility_version",profile==21?"20":profile==20?"11":"21");
@@ -5834,10 +5869,58 @@ void pc_menu_game_data_function_invoke(
 			text_to_wide(line,text,NUMBEROF(text));text_set_length(widget,text,NUMBEROF(text));return;
 		}
 		else if (!strcmp(name, "port content status")) {
-			extern const char *content_setup_status(void); wchar_t message[512]; char line[512];
-			snprintf(line,sizeof(line),"Host network profile: V%d\r\n%s",network_profile_host_version(),content_setup_status());
-			text_to_wide(line,message,NUMBEROF(message)); text_set_length(widget,message,NUMBEROF(message)); return;
-		}
+            extern const char *content_setup_status(void), *content_setup_catalog_status(void), *content_setup_catalog_query(void);
+            extern void content_setup_catalog_poll(void);
+            extern int content_setup_catalog_result(int,char *,size_t,char *,size_t), content_setup_catalog_installed(const char *);
+            wchar_t message[512]; char line[512],map[64],type[16]; int row;
+            if (content_widget_name_starts_with(widget, "mods_")) {
+                extern int content_setup_deck_upscaling_available(void), content_setup_texture_pack_count(void), content_setup_texture_pack_name(int,char *,size_t);
+                extern const char *content_setup_texture_pack_status(void);
+                extern int texture_pack_enabled(void); extern const char *texture_pack_selected(void);
+                if (content_widget_named(widget, "mods_upscale")) {
+                    widget->visible=content_setup_deck_upscaling_available(); widget->disabled=!widget->visible;
+                    snprintf(line,sizeof(line),"Deck upscaling: %s (A: next mode)",config_string("display.deck_upscaling"));
+                    text_to_wide(line,message,NUMBEROF(message));text_set(widget,message);return;
+                }
+                if (content_widget_named(widget, "mods_toggle")) {
+                    snprintf(line,sizeof(line),"Texture pack overrides: %s",texture_pack_enabled()?"ON":"OFF");
+                    text_to_wide(line,message,NUMBEROF(message));text_set(widget,message);return;
+                }
+                if (content_widget_name_starts_with(widget, "mods_pack_")) {
+                    const char *last=strrchr(widget->name,'_');int index=last?atoi(last+1):-1;
+                    if(content_setup_texture_pack_name(index,map,sizeof(map))) {
+                        const char *selected=texture_pack_selected(); const char *selected_leaf=strrchr(selected,'/'); if(!strcmp(selected_leaf?selected_leaf+1:selected,map))snprintf(line,sizeof(line),"%.46s  [SELECTED]",map);
+                        else snprintf(line,sizeof(line),"%.56s",map);
+                        text_to_wide(line,message,NUMBEROF(message));text_set(widget,message);widget->disabled=FALSE;
+                    } else { text_set(widget,L"");widget->disabled=TRUE; }
+                    return;
+                }
+                content_setup_texture_pack_count();
+                { const char *selected=texture_pack_selected(); const char *leaf=strrchr(selected,'/');
+                snprintf(line,sizeof(line),"Textures: %s | Pack: %.28s | Upscaling: %.12s\r\nImport native PNG / TGA / DDS pack folders.",texture_pack_enabled()?"ON":"OFF",selected[0]?(leaf?leaf+1:selected):"none",config_string("display.deck_upscaling")); }
+                text_to_wide(line,message,NUMBEROF(message));text_set_length(widget,message,NUMBEROF(message));return;
+            }
+            if (content_widget_name_starts_with(widget, "browser_")) {
+                content_setup_catalog_poll();
+                if (content_widget_named(widget, "browser_search")) {
+                    snprintf(line,sizeof(line),"SEARCH MAPS: %s",content_setup_catalog_query());
+                    text_field_show(widget,line,text_field_editing(widget)); return;
+                }
+                if (content_widget_name_starts_with(widget, "browser_map_")) {
+                    const char *last=strrchr(widget->name,'_'); row=last?atoi(last+1):-1;
+                    if (content_setup_catalog_result(row,map,sizeof(map),type,sizeof(type))) {
+                        if(content_setup_catalog_installed(map))snprintf(line,sizeof(line),"%-38.38s  %s  [INSTALLED]",map,type);
+                        else snprintf(line,sizeof(line),"%-38.38s  %s",map,type);
+                        text_to_wide(line,message,NUMBEROF(message));text_set(widget,message);widget->disabled=FALSE;
+                    } else { text_set(widget,L"");widget->disabled=TRUE; }
+                    return;
+                }
+                snprintf(line,sizeof(line),"%.105s\r\nSelect a map to download. CE resources are imported separately.",content_setup_catalog_status());
+                text_to_wide(line,message,NUMBEROF(message));text_set_length(widget,message,NUMBEROF(message));return;
+            }
+            snprintf(line,sizeof(line),"Host network profile: V%d\r\n%s",network_profile_host_version(),content_setup_status());
+            text_to_wide(line,message,NUMBEROF(message)); text_set_length(widget,message,NUMBEROF(message)); return;
+        }
 		else if (!strcmp(name, "port lobby update"))
 		lobby_update(widget);
 	else if (!strcmp(name, "port settings help"))

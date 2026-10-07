@@ -104,6 +104,12 @@ static const struct config_setting config_settings[] =
 		"sharp); \"ssaa2x\" draws at twice the resolution each way (four times\n"
 		"the work); \"msaa2x\", \"msaa4x\" or \"msaa8x\" draw with that many samples\n"
 		"a pixel. Android has \"fxaa\" for \"smaa\", and no \"ssaa2x\"." },
+	{ "display.deck_upscaling", _config_string, "\"off\"", "HALO_DECK_UPSCALING", _environment_value, _platform_desktop,
+		"Steam Deck spatial upscaling: off, quality or performance. Other devices retain normal rendering." },
+	{ "display.texture_pack_enabled", _config_boolean, "false", "HALO_TEXTURE_PACK_ENABLED", _environment_value, _platform_desktop,
+		"Enable optional local texture overrides; originals remain the fallback." },
+	{ "display.texture_pack_path", _config_string, "\"\"", "HALO_TEXTURE_PACK_PATH", _environment_value, _platform_desktop,
+		"Directory of the selected native texture pack. Empty disables overrides." },
 	{ "display.interpolation", _config_boolean, "true", "HALO_INTERPOLATION", _environment_value, _platform_all,
 		"Draw a frame for every display refresh, blending between the game's 30\n"
 		"ticks a second; false keeps the original 30 frames a second." },

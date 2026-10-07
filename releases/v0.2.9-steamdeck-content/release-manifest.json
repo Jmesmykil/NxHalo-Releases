@@ -1,0 +1,65 @@
+{
+  "name": "NxHalo Unified Content Preview 2.9",
+  "tag": "v0.2.9-steamdeck-content",
+  "prerelease": true,
+  "platform": "Steam Deck/Linux",
+  "binary_sha256": "68e6da65bfd7533d2b13431087b0658e480748057d6e75ca663824956b04da13",
+  "source_sha256": "b03a1e786bf12887f9d78c6cd2f918eaae48db8039417290c7e719a60eca1dea",
+  "deck_install_verified": true,
+  "running_process_binary_sha256": "68e6da65bfd7533d2b13431087b0658e480748057d6e75ca663824956b04da13",
+  "rollback_binary": "halo.before-content29-20261007",
+  "acceptance": {
+    "native_deck_catalog_capture_reviewed": true,
+    "catalog_matching_entries": 5020,
+    "catalog_pages": 558,
+    "dynamic_search_label_visible": true,
+    "physical_search_entry_verified": false,
+    "parser_query_unit_tested": true,
+    "texture_overrides_off_visible": true,
+    "deck_upscaling_off_visible": true,
+    "native_upscale_modes": [
+      "Off",
+      "Quality",
+      "Performance"
+    ],
+    "software_gl_output": "1280x800",
+    "deck_performance_measured": false,
+    "upscale_is_fsr": false,
+    "native_texture_upload_trace": "synthetic TGA identity/decode/GL upload trace for sky\\sky_x10\\bitmaps\\space bitmap 0",
+    "visible_texture_pixel_proof": false,
+    "full_128_player_acceptance": false,
+    "live_preset_matches": false,
+    "friends_voice": false
+  },
+  "excluded_content": [
+    "game maps",
+    "owner resource companions",
+    "shader instruction tokens",
+    "console keys",
+    "personal saves"
+  ],
+  "assets": {
+    "NxHalo-SteamDeck-unified-content-preview2.9.tar.gz": {
+      "bytes": 22103969,
+      "sha256": "b5b95d75cfbc028067828cdd011b7f09979bc3b7b2f9e93acdbd54509ec392d9"
+    },
+    "NxHalo-Unified-source-2.9.zip": {
+      "bytes": 17887123,
+      "sha256": "b03a1e786bf12887f9d78c6cd2f918eaae48db8039417290c7e719a60eca1dea"
+    },
+    "NATIVE-CONTENT.md": {
+      "bytes": 3308,
+      "sha256": "783c086c08170ef1ab845a385d5ab67e64d4e7673cc2055491dd5167180255a4"
+    },
+    "SUPPORTED-MODS.md": {
+      "bytes": 2211,
+      "sha256": "bfc7c9beb983af52c9f28926afec9fb0b6c517cbd0b90ed7c6cb439ba32a893d"
+    },
+    "release-notes.md": {
+      "bytes": 2118,
+      "sha256": "335c5f821d90eeb51fe4c3888d3510b60d50c8c9b9f2ff8c9c72effa35535c14"
+    }
+  },
+  "deck_installed_binary_sha256": "68e6da65bfd7533d2b13431087b0658e480748057d6e75ca663824956b04da13",
+  "running_process_is_release_binary": true
+}

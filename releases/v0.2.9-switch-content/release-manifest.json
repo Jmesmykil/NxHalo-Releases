@@ -1,0 +1,57 @@
+{
+  "name": "NxHalo Unified Switch Content Preview 2.9",
+  "tag": "v0.2.9-switch-content",
+  "prerelease": true,
+  "platform": "Nintendo Switch",
+  "artifact_type": "standalone NRO",
+  "nro_sha256": "2a60465f0c928ed8007bfbe4e5b6fce7c1bad2c6713261515fb5e1158523d646",
+  "sanitized_source_sha256": "13fa0fbcf4a4991951cabf0adb80caa18e86d03c7f85807e460471a24e1b631f",
+  "source_hash_manifest_sha256": "38dc3a634b0e8c71f3284857a305b83ff896f75cfabf0b48e7b2e2eb9560ccdd",
+  "embedded_guest_elf_sha256": "11b240f14b8765f48ba654832952bfba6d44865c6124031a44355ef96b6316f6",
+  "title_id": "010048414C210000",
+  "nacp_title": "HALO: CE Content Preview 2.9",
+  "nacp_version": "2.9-preview",
+  "switch_sd_staging_verified": false,
+  "physical_install_verified": false,
+  "physical_runtime_verified": false,
+  "rollback_preserved": true,
+  "deck_upscaling_enabled": false,
+  "source_archive_entries": 2313,
+  "build_warnings": [
+    "vendored miniupnpc miniwget.c char-subscript warning"
+  ],
+  "excluded_content": [
+    "game maps",
+    "owner resource companions",
+    "generated shader microcode and all .inc files",
+    "console keys",
+    "personal saves",
+    "generated NRO/ELF/NSO/NACP from source archive"
+  ],
+  "features": [
+    "SD message-box file browsing for .map/.zip imports and texture-pack folders",
+    "Deck upscaling compile-time disabled for Switch"
+  ],
+  "assets": {
+    "halo.nro": {
+      "bytes": 26573198,
+      "sha256": "2a60465f0c928ed8007bfbe4e5b6fce7c1bad2c6713261515fb5e1158523d646"
+    },
+    "halo-ce-switch-content-preview-2.9-source.zip": {
+      "bytes": 18281205,
+      "sha256": "13fa0fbcf4a4991951cabf0adb80caa18e86d03c7f85807e460471a24e1b631f"
+    },
+    "BUILD-EVIDENCE.txt": {
+      "bytes": 2264,
+      "sha256": "f992e2cbc91064a287c536113e519f48f1283bb164b05211e5d5ba5669f1c424"
+    },
+    "SOURCE-HASHES.sha256": {
+      "bytes": 2297,
+      "sha256": "38dc3a634b0e8c71f3284857a305b83ff896f75cfabf0b48e7b2e2eb9560ccdd"
+    },
+    "RELEASE-NOTES.md": {
+      "bytes": 1085,
+      "sha256": "4d3fec0fbf8949a083c6c3add52e20c40dc034ac961e72a42758545142165c3e"
+    }
+  }
+}

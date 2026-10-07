@@ -3024,9 +3024,14 @@ static boolean server_debug_solo_allowed(void)
     extern char const *config_string(char const *);
     extern int config_boolean(char const *);
     char const *flag=getenv("HALO_NETWORK_TEST_SOLO");
+    unsigned int a,b,c,d;
+    char extra;
+    char const *address=config_string("network.address");
+    boolean loopback=sscanf(address,"%u.%u.%u.%u%c",&a,&b,&c,&d,&extra)==4 &&
+        a==127 && b<=255 && c<=255 && d<=255;
+    /* Private probes may use distinct loopback IPs to avoid socket TIME_WAIT. */
     return flag && !strcmp(flag,"1") && !config_boolean("network.online") &&
-        !strcmp(config_string("network.address"),"127.0.0.1") &&
-        !strncmp(config_string("debug.network_test"),"host:",5);
+        loopback && !strncmp(config_string("debug.network_test"),"host:",5);
 #else
     return FALSE;
 #endif

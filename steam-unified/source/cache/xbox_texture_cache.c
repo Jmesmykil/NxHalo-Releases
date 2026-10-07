@@ -258,6 +258,7 @@ static boolean texture_cache_locked_block_proc(
 	long block_index);
 static void texture_cache_delete_block_proc(
 	long block_index);
+
 static const char *texture_cache_name_block_proc(
 	long block_index);
 long bitmap_format_to_d3d_format(
@@ -332,6 +333,36 @@ static const long bitmap_d3d_format_tables
  * listing's cached bitmaps */
 static struct bitmap_data *texture_cache_debug_bitmaps[XBOX_TEXTURE_CACHE_PAGE_COUNT];
 static struct xbox_texture_cache_globals xbox_texture_cache_globals;
+
+/* Map the active native cache allocation back to a stable bitmap key. */
+boolean texture_cache_bitmap_identity(unsigned long address, const char **tag, long *bitmap_index)
+{
+	struct data_iterator iterator;
+	struct xbox_texture_cache_texture *texture;
+	if (!tag || !bitmap_index || !xbox_texture_cache_globals.textures ||
+		!xbox_texture_cache_globals.textures->valid || !xbox_texture_cache_globals.textures->data)
+		return FALSE;
+	data_iterator_new(&iterator, xbox_texture_cache_globals.textures);
+	while ((texture = (struct xbox_texture_cache_texture *)data_iterator_next(&iterator)) != NULL)
+	{
+		struct bitmap_group *group;
+		long index;
+		if (!texture->loaded || !texture->bitmap || (unsigned long)texture->bitmap->base_address != address)
+			continue;
+		group = bitmap_group_get(texture->bitmap->tag_index);
+		if (!group || !group->bitmaps.address)
+			continue;
+		for (index = 0; index < group->bitmaps.count; index++)
+			if ((struct bitmap_data *)group->bitmaps.address + index == texture->bitmap)
+			{
+				*tag = tag_get_name(texture->bitmap->tag_index);
+				*bitmap_index = index;
+				return *tag != NULL;
+			}
+	}
+	return FALSE;
+}
+
 struct texture_cache_debug_options texture_cache_debug_options = {0};
 boolean debug_texture_cache = FALSE;
 static unsigned long texture_cache_last_failure_time = 0;

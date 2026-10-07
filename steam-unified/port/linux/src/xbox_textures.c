@@ -19,6 +19,8 @@ memory_watch.c detects that by write-protecting the pages.
 #include "menu_files.h"
 #include "text_hires.h"
 #include "port_config.h"
+#include "texture_pack.h"
+#include "cache/texture_cache.h"
 
 #include <stdio.h>
 #ifdef HALO_ANDROID
@@ -730,6 +732,10 @@ struct texture_entry
 	unsigned long last_used_frame;
 	/* the high-res HUD texture drawn in its place (hud_hires.h), or -1 */
 	long override;
+	char bitmap_tag[256];
+	long bitmap_index;
+	BOOL bitmap_identity_checked;
+	unsigned long bitmap_identity_retry_frame;
 	/* the newest generation of its pages (memory_watch_generation) as of the
 	memory watch serial read before it was found: the same while no watched
 	page has been written since (0: never found) */
@@ -786,8 +792,66 @@ one, with the bitmap's own size (which its coordinates are in) */
 static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 	struct xgpu_texture_description *description)
 {
+	static int trace_settings_logged;
+	static unsigned int trace_identity_hits, trace_identity_misses;
+	int pack_enabled = texture_pack_enabled();
+	const char *trace = getenv("HALO_TEXTURE_PACK_TRACE");
 	*target = entry->target;
 	*description = entry->description;
+	if (trace && trace[0] && !trace_settings_logged)
+	{
+		fprintf(stderr, "texture pack trace settings: enabled=%d path=%s\n",
+			pack_enabled, texture_pack_selected());
+		trace_settings_logged = 1;
+	}
+	/* A user pack is keyed by the active Xbox bitmap's stable tag path and
+	bitmap ordinal. This lookup runs even on a cached texture bind, so changing
+	the selected pack or enable setting takes effect without flushing the map. */
+	if (pack_enabled && !entry->description.cube_map && entry->description.depth == 1 &&
+		entry->description.format != 0x0b)
+	{
+		unsigned long levels = 0;
+		if (!entry->bitmap_identity_checked && texture_frame >= entry->bitmap_identity_retry_frame)
+		{
+			const char *tag_path = NULL;
+			long bitmap_index = -1;
+			if (texture_cache_bitmap_identity(entry->address, &tag_path, &bitmap_index) && tag_path)
+			{
+				strncpy(entry->bitmap_tag, tag_path, sizeof(entry->bitmap_tag)-1);
+				entry->bitmap_tag[sizeof(entry->bitmap_tag)-1] = 0;
+				entry->bitmap_index = bitmap_index;
+				entry->bitmap_identity_checked = TRUE;
+				if (trace && trace[0] && trace_identity_hits < 16)
+				{
+					fprintf(stderr, "texture pack identity hit: address=0x%lx data=0x%lx tag=%s bitmap=%ld size=%lux%lu\n",
+						entry->address, (unsigned long)entry->data, entry->bitmap_tag,
+						entry->bitmap_index, entry->description.width, entry->description.height);
+					trace_identity_hits++;
+				}
+			}
+			else
+			{
+				if (trace && trace[0] && trace_identity_misses < 16)
+				{
+					fprintf(stderr, "texture pack identity miss: address=0x%lx data=0x%lx size=%lux%lu format=0x%x\n",
+						entry->address, (unsigned long)entry->data,
+						entry->description.width, entry->description.height, entry->description.format);
+					trace_identity_misses++;
+				}
+				entry->bitmap_identity_retry_frame = texture_frame + 60;
+			}
+		}
+		if (entry->bitmap_index >= 0)
+		{
+			GLuint replacement = texture_pack_override(entry->bitmap_tag, entry->bitmap_index, &levels);
+			if (replacement)
+			{
+				description->levels = levels;
+				description->hires = TRUE;
+				return replacement;
+			}
+		}
+	}
 	/* (the high-res text's atlas, for its placeholder bitmap: text_hires.h) */
 	{
 		GLuint atlas = text_hires_atlas_texture(entry->data);
@@ -934,6 +998,9 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 			entry->generation = 1;
 		/* (which bitmap is here may have changed with the pixels) */
 		entry->override = -1;
+		entry->bitmap_identity_checked = FALSE;
+		entry->bitmap_identity_retry_frame = 0;
+		entry->bitmap_index = -1;
 		if (entry->size && !palettized && !entry->description.cube_map && entry->description.depth == 1)
 		{
 			unsigned long levels;

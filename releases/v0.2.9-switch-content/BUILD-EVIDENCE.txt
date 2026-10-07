@@ -1,0 +1,25 @@
+HALO CE Switch Content Preview 2.9 candidate - final UI build
+
+Build results
+- Recompiled guest ELF after syncing final menu_functions.c and main_menu.content.xml; `ninja -f build.ninja build/android/halo_guest.elf` succeeded.
+- Repackaged with `DEVKITPRO=/opt/devkitpro make host`; emitted halo.nro successfully.
+- NACP title HALO: CE Content Preview 2.9; version 2.9-preview; existing title ID 010048414C210000 retained. NRO strings verify title.
+- Final browser search and texture toggle/upscale widget XML has no static text attributes; callbacks provide live state. Root reports final Steam UI validation passed with dynamic state and readable two-line footers.
+- Switch content pickers use SD message-box browsing for maps and texture-pack folders. Deck upscaling returns unavailable and stays off under HALO_SWITCH_GUEST.
+- Source ZIP scan: 2,313 entries; excludes all `.inc` files including rasterizer_xbox_vertex_shaders_data.inc, build and dependency symlinks, generated NRO/ELF/NSO/NACP, and embedded guest ELF. Audit found no .map/.yelo/.key/.tik/.nsp/.xci files or instructions.inc.
+- Host build warning only: vendored miniupnpc miniwget.c char-subscript warning from prior host build.
+
+Assets
+NRO: /Users/astral/Documents/Codex/2026-10-05/i-need-you-to-do-this/work/switch-content-candidate/source/port/switch/halo.nro
+Source ZIP: /Volumes/Media/GamePorts/HaloCE-task-builds/20261007/switch-build/content-candidate/release/halo-ce-switch-content-preview-2.9-source.zip
+Source hash manifest: /Volumes/Media/GamePorts/HaloCE-task-builds/20261007/switch-build/content-candidate/release/SOURCE-HASHES.sha256
+
+SHA256
+2a60465f0c928ed8007bfbe4e5b6fce7c1bad2c6713261515fb5e1158523d646  halo.nro
+11b240f14b8765f48ba654832952bfba6d44865c6124031a44355ef96b6316f6  embedded-guest-elf
+13fa0fbcf4a4991951cabf0adb80caa18e86d03c7f85807e460471a24e1b631f  sanitized-source-zip
+38dc3a634b0e8c71f3284857a305b83ff896f75cfabf0b48e7b2e2eb9560ccdd  source-hash-manifest
+f6c8afa18f12720a3e4be79ad9a8445a8f976cc1adc301a6a48dba3bc9adcf0e  candidate-menu_functions.c (includes Switch-only upscaling-off guard)
+9a2795fe4a9772965ca9282d8d1baafa30efdc85b2f9b1c03769127155ed0eb2  main_menu.content.xml
+
+No SD staging, install, publication, or physical-device acceptance is claimed.

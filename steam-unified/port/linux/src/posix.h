@@ -48,6 +48,7 @@ struct posix_file_information
 /* stat()/fstat(); return 0 on success or -1 with errno set */
 int posix_stat(const char *path, struct posix_file_information *information);
 int posix_fstat(int descriptor, struct posix_file_information *information);
+int posix_file_is_regular(int descriptor);
 
 /* set access and modification times; a zero seconds value leaves it alone */
 int posix_set_file_times(const char *path,

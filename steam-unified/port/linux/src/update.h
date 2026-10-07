@@ -26,6 +26,10 @@ int update_download(const char *url, const char *path, update_progress_proc prog
 int update_download_limited(const char *url, const char *path, unsigned long long maximum_bytes,
 	update_progress_proc progress, void *context, char *error, int error_size);
 
+/* Linux catalog text fetch; HTML/JSON allowed, HTTPS verified, body capped at 8 MiB. */
+int update_fetch_text_limited(const char *url, const char *path, unsigned long long maximum_bytes,
+	update_progress_proc progress, void *context, char *error, int error_size);
+
 /* the full path of this executable; 1 on success */
 int update_executable_path(char *path, int size);
 
