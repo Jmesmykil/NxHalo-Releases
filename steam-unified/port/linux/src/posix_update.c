@@ -393,6 +393,7 @@ static int https_get(const char *url, struct download *download, char *location,
 	char host[256], port[16], path[2048];
 	char request[3072];
 	char line[MAXIMUM_HEADER_SIZE];
+	char content_type[128] = "";
 	unsigned long long length = 0;
 	int have_length = 0, chunked = 0, status = 0;
 
@@ -456,15 +457,35 @@ static int https_get(const char *url, struct download *download, char *location,
 		{
 			snprintf(location, location_size, "%s", value);
 		}
+		else if (!strcasecmp(line, "Content-Type"))
+		{
+			snprintf(content_type, sizeof(content_type), "%s", value);
+		}
 	}
 	if (status == 200)
 	{
-		download->total = have_length && !chunked ? length : 0;
-		if (!read_body(&connection, download, chunked, length, have_length && !chunked))
+		if (strcasestr(content_type, "text/html") || strcasestr(content_type, "application/json"))
 		{
-			snprintf(error, (size_t)error_size, "the download from %s broke off", host);
+			snprintf(error, (size_t)error_size, "%s returned a non-file response (%s)", host,
+				content_type[0] ? content_type : "HTML or JSON");
 			status = 0;
 		}
+		else
+		{
+			download->total = have_length && !chunked ? length : 0;
+			if (!read_body(&connection, download, chunked, length, have_length && !chunked))
+			{
+				snprintf(error, (size_t)error_size, "the download from %s broke off", host);
+				status = 0;
+			}
+		}
+	}
+	else if (!(status >= 300 && status < 400 && location[0]))
+	{
+		snprintf(error, (size_t)error_size, "%s answered HTTP %d%s%s%s", host, status,
+			content_type[0] ? " (Content-Type: " : "",
+			content_type[0] ? content_type : "",
+			content_type[0] ? ")" : "");
 	}
 	connection_free(&connection);
 	return status;
@@ -536,7 +557,7 @@ int update_download_limited(const char *url, const char *path, unsigned long lon
 			}
 			continue;
 		}
-		if (status)
+		if (status && !error[0])
 			snprintf(error, (size_t)error_size, "the server answered %d", status);
 		break;
 	}

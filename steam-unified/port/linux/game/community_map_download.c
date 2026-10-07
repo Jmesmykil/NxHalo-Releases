@@ -7,7 +7,13 @@
 #include "../src/update.h"
 #include "community_map_download.h"
 
+#include <errno.h>
 #include <stdio.h>
+/* SDL file dialogs and pref paths are native paths, never Xbox d:\ paths.
+ * The game stdio shim otherwise translates these a second time. */
+#ifdef fopen
+#undef fopen
+#endif
 #include <string.h>
 
 enum
@@ -588,10 +594,16 @@ static int map_local_install(struct map_download_job *job, char *error, int erro
 	return result;
 }
 
+static void map_download_log_failure(char const *name, char const *error)
+{
+	fprintf(stderr, "halo-linux: CE map download %s failed: %s\n",
+		name && name[0] ? name : "(unknown)", error && error[0] ? error : "unspecified failure");
+}
+
 static int SDLCALL map_download_worker(void *context)
 {
 	struct map_download_job *job = context;
-	char url[256], error[256] = "Map download failed.";
+	char url[256], error[256] = "";
 	char *directory, expected[80], *slash;
 	FILE *zip;
 	int index, result = 0;
@@ -608,6 +620,8 @@ static int SDLCALL map_download_worker(void *context)
 			{ CloseHandle(existing); DeleteFileA(probe); }
 		}
 		result = map_local_install(job, message, sizeof(message));
+		if (!result)
+			map_download_log_failure(job->source, message);
 		SDL_LockMutex(job->lock);
 		job->state = result ? COMMUNITY_MAP_DOWNLOAD_READY : COMMUNITY_MAP_DOWNLOAD_FAILED;
 		snprintf(job->message, sizeof(job->message), "%s", message);
@@ -619,26 +633,78 @@ static int SDLCALL map_download_worker(void *context)
 			(job->name[index] >= 'A' && job->name[index] <= 'Z') ||
 			(job->name[index] >= '0' && job->name[index] <= '9') ||
 			job->name[index] == '_' || job->name[index] == '-' || job->name[index] == '.'))
+		{
+			snprintf(error, sizeof(error), "Map name contains unsupported characters.");
 			goto failed;
-	if (!job->name[0]) goto failed;
+		}
+	if (!job->name[0])
+	{
+		snprintf(error, sizeof(error), "Map name is empty.");
+		goto failed;
+	}
+	if (map_target_exists(job->target))
+	{
+		snprintf(error, sizeof(error), "The target map already exists; existing content was preserved.");
+		goto failed;
+	}
 	directory = SDL_GetPrefPath("NxHalo", "map-download");
-	if (!directory) goto failed;
+	if (!directory)
+	{
+		snprintf(error, sizeof(error), "Could not open the map-download cache directory: %s", SDL_GetError());
+		goto failed;
+	}
 	snprintf(job->archive, sizeof(job->archive), "%s%s.zip", directory, job->name);
 	SDL_free(directory);
 	snprintf(url, sizeof(url), "https://maps.halonet.net/halonet/locator.php?map=%s&type=ce&format=zip", job->name);
 	if (!update_download_limited(url, job->archive, MAP_DOWNLOAD_MAX_ARCHIVE, map_download_progress, job, error, sizeof(error)))
 		goto failed;
 	zip = fopen(job->archive, "rb");
-	if (!zip) goto failed;
+	if (!zip)
+	{
+		snprintf(error, sizeof(error), "Downloaded archive could not be reopened: %s", strerror(errno));
+		goto failed;
+	}
+	{
+		unsigned char signature[4];
+		if (fread(signature, 1, sizeof(signature), zip) != sizeof(signature) ||
+			signature[0] != 'P' || signature[1] != 'K' || signature[2] != 3 || signature[3] != 4)
+		{
+			fclose(zip);
+			snprintf(error, sizeof(error), "HaloNet returned a non-ZIP response; check the endpoint response and map name.");
+			update_delete_file(job->archive);
+			goto failed;
+		}
+		rewind(zip);
+	}
 	snprintf(expected, sizeof(expected), "%s.map", job->name);
 	/* The game path is trusted and constructed by the caller; create only its CE directory. */
 	snprintf(url, sizeof(url), "%s", job->target);
 	slash = strrchr(url, '\\');
-	if (slash) { *slash = 0; CreateDirectoryA(url, NULL); }
+	if (slash)
+	{
+		DWORD attributes;
+		*slash = 0;
+		if (!CreateDirectoryA(url, NULL))
+		{
+			attributes = GetFileAttributesA(url);
+			if (attributes == (DWORD)-1 || !(attributes & FILE_ATTRIBUTE_DIRECTORY))
+			{
+				fclose(zip);
+				snprintf(error, sizeof(error), "Could not create the CE map folder; no map was installed.");
+				goto failed;
+			}
+		}
+	}
 	result = map_zip_extract(zip, expected, job->target);
 	fclose(zip);
 	update_delete_file(job->archive);
-	if (!result) { snprintf(error, sizeof(error), "Map archive was invalid or failed its size/CRC check."); goto failed; }
+	if (!result)
+	{
+		snprintf(error, sizeof(error),
+			"Map ZIP did not contain a safe %s with a valid cache header, size, and CRC; no target was replaced.",
+			expected);
+		goto failed;
+	}
 	SDL_LockMutex(job->lock);
 	job->state = COMMUNITY_MAP_DOWNLOAD_READY;
 	snprintf(job->message, sizeof(job->message), "Map downloaded and verified.");
@@ -646,9 +712,11 @@ static int SDLCALL map_download_worker(void *context)
 	return 0;
 failed:
 	update_delete_file(job->archive);
+	map_download_log_failure(job->name, error);
 	SDL_LockMutex(job->lock);
 	job->state = COMMUNITY_MAP_DOWNLOAD_FAILED;
-	snprintf(job->message, sizeof(job->message), "%s", error);
+	snprintf(job->message, sizeof(job->message), "Map %s failed: %.120s",
+		job->name[0] ? job->name : "(unknown)", error[0] ? error : "unspecified failure");
 	SDL_UnlockMutex(job->lock);
 	return 0;
 }

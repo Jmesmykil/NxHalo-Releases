@@ -12668,13 +12668,17 @@ static boolean hs_scenario_syntax_data_valid(
 	long const syntax_data_size =
 		sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node);
 	byte const *tag_cache = (byte const *)physical_memory_get_tag_cache_base_address();
+	long tag_cache_size=TAG_CACHE_SIZE;
 	byte const *address = (byte const *)scenario->hs_syntax_data.address;
 	struct data_array const *data = (struct data_array const *)address;
+#ifdef HALO_CUSTOM_EDITION
+	{ extern boolean cache_file_is_ce; if(cache_file_is_ce) { tag_cache=(byte const *)0x40440000U; tag_cache_size=0x01700000; } }
+#endif
 
 	if (scenario->hs_syntax_data.size != syntax_data_size ||
 		!tag_cache ||
 		address < tag_cache ||
-		address > tag_cache+TAG_CACHE_SIZE-syntax_data_size ||
+		address > tag_cache+tag_cache_size-syntax_data_size ||
 		((unsigned long)address & 3))
 	{
 		return FALSE;
@@ -12701,14 +12705,18 @@ static boolean hs_scenario_string_constants_valid(
 	struct scenario const *scenario)
 {
 	byte const *tag_cache = (byte const *)physical_memory_get_tag_cache_base_address();
+	long tag_cache_size=TAG_CACHE_SIZE;
 	byte const *address = (byte const *)scenario->hs_string_constants.address;
 	long size = scenario->hs_string_constants.size;
+#ifdef HALO_CUSTOM_EDITION
+	{ extern boolean cache_file_is_ce; if(cache_file_is_ce) { tag_cache=(byte const *)0x40440000U; tag_cache_size=0x01700000; } }
+#endif
 
 	return tag_cache &&
 		size >= 0x400 &&
 		size <= TAG_CACHE_SIZE &&
 		address >= tag_cache &&
-		address <= tag_cache+TAG_CACHE_SIZE-size;
+		address <= tag_cache+tag_cache_size-size;
 }
 
 /* port: the scenario runs no scripts, its script data not being sound: a

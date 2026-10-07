@@ -30,6 +30,9 @@ static boolean initialized;
 static unsigned long settings_serial;
 static long chief_definition=NONE;
 static boolean chord_held;
+static long faction_biped_cache[3][4];
+static short faction_biped_count[3];
+static boolean faction_biped_cache_valid[3];
 
 static long native_character(void) { return selected_character; }
 static void native_status(long status) { (void)status; }
@@ -219,6 +222,40 @@ long nxhalo_campaign_character_definition(long fallback_definition)
 long nxhalo_multiplayer_character_definition(long fallback_definition)
 {
     return nxhalo_character_definition_for_context(TRUE, fallback_definition);
+}
+
+/* Only these existing, humanoid-control bipeds are eligible. Infection forms
+ * are omitted until their movement/combat controls are separately verified. */
+short nxhalo_character_faction_bipeds(short faction, long *definitions, short capacity)
+{
+	static short const candidates[3][4] = {
+		{ _character_grunt, _character_jackal, _character_elite, _character_hunter },
+		{ _character_master_chief, _character_marine, _character_keyes, 0 },
+		{ _character_flood_human, _character_flood_elite, 0, 0 }
+	};
+	short index, count;
+	long definition;
+	if (faction < NXHALO_FACTION_COVENANT || faction > NXHALO_FACTION_FLOOD || capacity < 0)
+		return 0;
+	index = faction - NXHALO_FACTION_COVENANT;
+	if (!faction_biped_cache_valid[index])
+	{
+		faction_biped_count[index] = 0;
+		for (count = 0; count < 4 && candidates[index][count]; count++)
+		{
+			short found;
+			definition = character_biped_definition(candidates[index][count]);
+			if (definition == NONE) continue;
+			for (found = 0; found < faction_biped_count[index]; found++)
+				if (faction_biped_cache[index][found] == definition) break;
+			if (found == faction_biped_count[index])
+				faction_biped_cache[index][faction_biped_count[index]++] = definition;
+		}
+		faction_biped_cache_valid[index] = TRUE;
+	}
+	count = faction_biped_count[index] < capacity ? faction_biped_count[index] : capacity;
+	for (index = 0; index < count; index++) definitions[index] = faction_biped_cache[faction - NXHALO_FACTION_COVENANT][index];
+	return count;
 }
 
 /* the actor variant of the level that uses a biped, for its weapon */
@@ -412,6 +449,8 @@ static void update_character(
 void nxhalo_custom_reset(void)
 {
     chief_definition=NONE;
+    csmemset(faction_biped_count, 0, sizeof(faction_biped_count));
+    csmemset(faction_biped_cache_valid, 0, sizeof(faction_biped_cache_valid));
     custom_globals.looked_up_character=NONE;
     custom_globals.character_definition_index=NONE;
     custom_globals.reported_character=NONE;

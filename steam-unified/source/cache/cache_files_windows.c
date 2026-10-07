@@ -541,6 +541,20 @@ static boolean ce_map_open(
 	CloseHandle(file);
 	return FALSE;
 }
+
+/* Validate content before a menu commits to a network map transition. */
+boolean ce_map_preflight(char const *name, char *message, long size)
+{
+    extern char const *ce_map_last_refusal(void);
+    extern void ce_map_clear_refusal(void);
+    ce_refused_map_name[0]=0;
+    ce_map_clear_refusal();
+    if(ce_map_open(name)) return TRUE;
+    if(message && size>0) snprintf(message,(size_t)size,"%s",ce_map_last_refusal()[0] ?
+        ce_map_last_refusal() : "The map could not be opened or validated.");
+    return FALSE;
+}
+
 #endif
 
 /* ---------- public code */

@@ -1417,6 +1417,7 @@ boolean network_game_client_game_settings_updated(
 		message_packet->player_count,
 		message_packet->machine_count,
 		message_packet->difficulty);
+	network_event("rejected settings detail: maximum=%d map=%.*s valid_name=%d", message_packet->maximum_players, (int)sizeof(message_packet->map.name), message_packet->map.name, network_game_client_map_name_is_valid(message_packet->map.name,sizeof(message_packet->map.name)));
 
 	return FALSE;
 }
@@ -2424,14 +2425,27 @@ static boolean network_game_client_map_name_is_valid(
 	otherwise) */
 	char const *character;
 	char const *leaf;
+	char const *family;
 
 	if (!memchr(map_name, '\0', size))
 		return FALSE;
+	leaf = strrchr(map_name, '\\');
+	leaf = leaf ? leaf+1 : map_name;
+	family = strchr(map_name, '@');
+	if(family) {
+#ifdef HALO_CUSTOM_EDITION
+        if(family<leaf || family==leaf || (_stricmp(family,"@ce") && _stricmp(family,"@md"))) return FALSE;
+        for(character=leaf;character<family && (*character=='.' || *character==' ');character++) {}
+        if(character==family) return FALSE;
+#else
+        return FALSE;
+#endif
+    }
 	for (character = map_name; *character; character++)
 	{
 		if (!((*character >= 'a' && *character <= 'z') || (*character >= 'A' && *character <= 'Z') ||
 			(*character >= '0' && *character <= '9') || *character == '_' || *character == '-' ||
-			*character == '.' || *character == ' ' || *character == '\\'))
+			*character == '.' || *character == ' ' || *character == '\\' || (*character=='@' && character==family)))
 		{
 			return FALSE;
 		}

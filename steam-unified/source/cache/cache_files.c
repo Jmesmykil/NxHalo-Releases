@@ -492,10 +492,14 @@ static boolean cache_file_structure_bsp_reference_verify(
 	long tag_data_size = cache_file_globals.header.tag_data_size;
 	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(reference->structure_bsp.index);
 	long read_size;
+	long tag_cache_size=TAG_CACHE_SIZE;
+#ifdef HALO_CUSTOM_EDITION
+	if(cache_file_is_ce) { tag_cache_base_address=xbox_pointer(CE_TAG_CACHE_BASE); tag_cache_size=CE_TAG_CACHE_SIZE; }
+#endif
 
 	if (reference->file_offset < 0 ||
 		reference->file_size < (long)sizeof(struct cache_file_structure_bsp_header) ||
-		reference->file_size > TAG_CACHE_SIZE ||
+		reference->file_size > tag_cache_size ||
 		reference->file_offset > cache_file_globals.header.file_length - reference->file_size)
 	{
 		error(
@@ -511,7 +515,7 @@ static boolean cache_file_structure_bsp_reference_verify(
 	read_size = (reference->file_size + CACHE_FILE_SECTOR_SIZE - 1) & ~(CACHE_FILE_SECTOR_SIZE - 1);
 	if (!cache_file_region_contains(
 		tag_cache_base_address + tag_data_size,
-		TAG_CACHE_SIZE - tag_data_size,
+		tag_cache_size - tag_data_size,
 		reference->base_address,
 		read_size,
 		1))
@@ -1339,7 +1343,13 @@ boolean scenario_structure_bsp_load(
 	(cache_file_header_verify); the bsp's reference is the map's, and is
 	checked before anything is read where it says */
 	if (cache_file_globals.header.tag_data_size < 0 ||
-		cache_file_globals.header.tag_data_size > TAG_CACHE_SIZE ||
+		cache_file_globals.header.tag_data_size >
+#ifdef HALO_CUSTOM_EDITION
+		(cache_file_is_ce ? CE_TAG_CACHE_SIZE : TAG_CACHE_SIZE)
+#else
+		TAG_CACHE_SIZE
+#endif
+		||
 		!cache_file_structure_bsp_reference_verify(reference))
 	{
 		return FALSE;
@@ -1411,7 +1421,13 @@ boolean scenario_structure_bsp_load(
 
 	/* port: and checked against its schema, as the map's tags were
 	(port/linux/game/tag_validate.c) */
-	if (!tag_validate_structure_bsp(
+	/* CE BSPs are checked by ce_bsp_check before admission; the Xbox
+	 * validator still holds the previous Xbox map header and schema. */
+	if (
+#ifdef HALO_CUSTOM_EDITION
+		!cache_file_is_ce &&
+#endif
+		!tag_validate_structure_bsp(
 		reference->structure_bsp.index,
 		reference->base_address,
 		reference->file_size))

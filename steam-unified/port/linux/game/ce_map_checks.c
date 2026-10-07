@@ -613,6 +613,9 @@ boolean ce_refuse(
 	return FALSE;
 }
 
+char const *ce_map_last_refusal(void) { return ce_refusal; }
+void ce_map_clear_refusal(void) { ce_refusal[0]=0; }
+
 boolean ce_map_checking(
 	void)
 {

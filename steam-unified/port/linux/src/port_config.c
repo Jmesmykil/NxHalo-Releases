@@ -244,6 +244,11 @@ static const struct config_setting config_settings[] =
 	{ "mods.multiplayer_character", _config_integer, "0", "HALO_MULTIPLAYER_CHARACTER", _environment_value, _platform_all,
 		"Host multiplayer biped preset: 0 is the map's normal multiplayer character. The selected biped must be loaded by the current multiplayer map; clients follow the host." },
 
+	{ "mods.match_preset", _config_integer, "0", "HALO_MATCH_PRESET", _environment_value, _platform_all,
+		"Host match preset: Standard, faction teams, SWAT, Tower of Power, grenade Dodgeball, Zombies or native Race." },
+	{ "mods.faction_matchup", _config_integer, "0", "HALO_FACTION_MATCHUP", _environment_value, _platform_all,
+		"Faction pairing: 0 Covenant/USMC, 1 USMC/Flood, 2 Flood/Covenant. Models must be loaded by the map." },
+
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"
 		"working directory and its assets folder. Windows paths are easiest in\n"
@@ -432,6 +437,8 @@ static const struct config_setting config_settings[] =
 		"Pixel shaders show their vertex colour." },
 	{ "debug.screenshot_directory", _config_string, "\"\"", "HALO_SCREENSHOT_DIR", _environment_value, _platform_all,
 		"A folder to save frames to (with screenshot_every); empty none." },
+	{ "debug.screenshot_composed", _config_boolean, "false", "HALO_SCREENSHOT_COMPOSED", _environment_value, _platform_all,
+		"Capture the final composed frame when screenshot capture is enabled." },
 	{ "debug.screenshot_every", _config_integer, "0", "HALO_SCREENSHOT_EVERY", _environment_value, _platform_all,
 		"Save every this many frames to screenshot_directory; 0 none." },
 	{ "debug.texture_dump_directory", _config_string, "\"\"", "HALO_TEXTURE_DUMP", _environment_value, _platform_all,

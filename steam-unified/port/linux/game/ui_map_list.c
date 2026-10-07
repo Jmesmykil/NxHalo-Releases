@@ -789,8 +789,30 @@ void ui_map_list_family_name(
 	ce_ui_read();
 	if (index < ce_ui.name_count && ce_ui.names[index][0])
 		known = ce_ui.names[index];
+
 #endif
 	for (length = 0; length < size - 1 && known[length]; length++)
 		name[length] = known[length];
 	name[length] = 0;
 }
+
+
+boolean ui_map_list_preflight(char const *map_name)
+{
+#ifdef HALO_CUSTOM_EDITION
+    char file[64], reason[512], message[768];
+    short family=map_family_parse(map_name,file,sizeof(file));
+    extern boolean ce_map_preflight(char const *,char *,long);
+    extern void platform_show_message(char const *,char const *);
+    if(family!=_map_family_custom_edition && family!=_map_family_halomd) return TRUE;
+    if(!ce_map_preflight(map_name,reason,sizeof(reason))) {
+        snprintf(message,sizeof(message),"%s",reason);
+        if(strstr(reason,"bitmaps.map") || strstr(reason,"sounds.map") || strstr(reason,"loc.map"))
+            snprintf(message,sizeof(message),"%s\r\n\r\nImport the required Custom Edition resource maps through Custom Maps & Mods. The downloaded map is retained.",reason);
+        platform_show_message("Map content required",message);
+        return FALSE;
+    }
+#endif
+    return TRUE;
+}
+

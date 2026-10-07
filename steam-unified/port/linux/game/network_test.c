@@ -32,6 +32,7 @@ Called from the main loop every frame (main.c).
 */
 
 #include "cseries.h"
+#include "halo_map_families.h"
 #include "main/main.h"
 #include "interface/player_ui.h"
 #include "interface/ui_widget.h"
@@ -934,6 +935,9 @@ void network_test_update(
 
 				struct game_variant variant;
 
+				if(map_family_parse(network_test.map_name,NULL,0)!=_map_family_xbox)
+					snprintf(path,sizeof(path),"%s",network_test.map_name);
+				else
 				snprintf(path, sizeof(path), "levels\\test\\%s\\%s", network_test.map_name, network_test.map_name);
 				network_game_server_change_map_name(global_network_game_server_get(), path);
 				/* the variant, as picking the game settings does */

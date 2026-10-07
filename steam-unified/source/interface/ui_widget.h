@@ -13,6 +13,11 @@ header included in hcex build.
 #include "integer_math.h"
 #include "real_math.h"
 
+#if defined(__linux__) && !defined(HALO_ANDROID)
+struct widget_instance;
+boolean ui_widget_port_lobby_bounds(struct widget_instance *widget, rectangle2d *bounds);
+#endif
+
 /* ---------- constants */
 
 enum

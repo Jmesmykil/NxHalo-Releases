@@ -1,4 +1,5 @@
 #include "cseries.h"
+#include "match_rules.h"
 #include "halo_network_profile.h"
 #include "halo_map_families.h"
 #include "halo_ui_map_list.h"
@@ -1078,6 +1079,7 @@ static boolean level_choose(short controller)
 		{
 			return campaign_fail();
 		}
+		if(!ui_map_list_preflight(level_list.map_names[level_list.chosen])) return FALSE;
 		campaign_start(level_list.map_names[level_list.chosen], main_get_difficulty(), controller);
 		return FALSE;
 	}
@@ -3359,7 +3361,8 @@ static void lobby_browser_update(struct widget_instance *list)
 			short chosen=lobby_browser.chosen; boolean same=chosen>=0 && chosen<lobby_browser.count && !strcmp(lobby_browser.games[chosen].invite,map_download_invite);
 			csstrncpy(map_ready_invite,map_download_invite,sizeof(map_ready_invite)-1);
 			community_map_download_clear(); map_download_invite[0]=0; ui_widget_port_multiplayer_maps_refresh();
-			if (same) ui_widget_port_post_button(map_download_controller,BUTTON_A);
+			if (same && ui_map_list_preflight(lobby_browser.games[chosen].map)) ui_widget_port_post_button(map_download_controller,BUTTON_A);
+            else { map_ready_invite[0]=0; network_profile_clear_room(); }
 		}
 		else if (state==COMMUNITY_MAP_DOWNLOAD_FAILED) { map_download_invite[0]=0; network_profile_clear_room(); }
 	}
@@ -3624,6 +3627,7 @@ static boolean lobby_browser_select(struct widget_instance *widget, short contro
 			return TRUE;
 		}
 	}
+	if(!ui_map_list_preflight(game->map)) { network_profile_clear_room(); return FALSE; }
 	/* (a game with a password: its screen asks for it, then joins) */
 	if (game->locked)
 	{
@@ -3969,6 +3973,32 @@ static void lobby_utf8(wchar_t const *wide, char *text, size_t size)
 /* Replace the legacy boxed team-selection art with a responsive lobby view.
 The original list and widgets still own focus, scrolling, team changes and
 start/leave actions; this only presents their live state. */
+static int lobby_button_slot(char const *name)
+{
+    static char const *names[]={"lobby_button_team","lobby_button_kick","lobby_button_ban","lobby_button_start","lobby_button_add","lobby_button_leave"};
+    int i; for(i=0;i<6;i++) if(!strcmp(name,names[i])) return i; return -1;
+}
+
+boolean ui_widget_port_lobby_bounds(struct widget_instance *widget, rectangle2d *bounds)
+{
+    struct widget_instance *screen=screen_of(widget);
+    int slot=lobby_button_slot(widget->name), row=-1;
+    float width=(float)halo_screen_width();
+    if(!screen || strcmp(screen->name,"lobby_screen") || !ui_overlay_available()) return FALSE;
+    if(!strncmp(widget->name,"list_item_",10)) {
+        char *end; long value=strtol(widget->name+10,&end,10);
+        if(!*end && value>=0 && value<LOBBY_ROWS) row=(int)value;
+    }
+    if(row>=0) {
+        bounds->x0=35; bounds->x1=(short)(35+(width-56)*0.56f-14);
+        bounds->y0=(short)(126+row*24); bounds->y1=(short)(bounds->y0+23);
+    } else if(slot>=0) {
+        bounds->x0=(short)((width-640)/2+10+104*slot);bounds->x1=(short)(bounds->x0+100);
+        bounds->y0=414;bounds->y1=440;
+    } else return FALSE;
+    return TRUE;
+}
+
 static void lobby_overlay_render(struct network_game const *game, short seconds, short selected_row,
 	struct widget_instance *list)
 {
@@ -4039,6 +4069,10 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
 	if (selected_row >= 0 && selected_row < LOBBY_ROWS && multiplayer.lobby_first + selected_row < lobby_player_count)
 		selected_player = lobby_players[multiplayer.lobby_first + selected_row];
 
+    /* Preserve selected console details when focus moves into the toolbar. */
+    if(!selected_player) for(index=0;index<lobby_player_count;index++)
+        if(lobby_players[index]->machine_index==lobby_selected_machine) { selected_player=lobby_players[index]; break; }
+
 	/* Session information, with the full map name and status kept readable. */
 	ui_overlay_rect(right, 88, right_width, 332, 7, 0x0B1B31F4);
 	ui_overlay_outline(right, 88, right_width, 332, 7, 1, 0x2E5F9FFF);
@@ -4090,36 +4124,24 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
 	/* Keep prompts over the lobby's focusable controls. Host actions require
 	selecting a remote console, then confirming the same action once more. */
 	ui_overlay_rect(-margin, 432, (float)width, 1, 0, 0x3D8BFFFF);
-	if (game->variant.universal_variant.teams)
-	{
-		ui_overlay_rect(10, 414, 100, 26, 4, 0x153765FF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 60, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "TEAM");
-	}
-	if (global_network_game_server_get() && selected_player &&
-		selected_player->machine_index != network_game_client_get_local_machine_index())
-	{
-		ui_overlay_rect(114, 414, 100, 26, 4, 0x612F3AFF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 164, 423, UI_ALIGN_CENTER, 0xEAF3FFFF,
-			lobby_confirm_action == _lobby_action_kick ? "CONFIRM KICK" : "KICK CONSOLE");
-		ui_overlay_rect(218, 414, 100, 26, 4, 0x612F3AFF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 268, 423, UI_ALIGN_CENTER, 0xEAF3FFFF,
-			lobby_confirm_action == _lobby_action_ban ? "CONFIRM BAN" : "BAN CONSOLE");
-	}
-	if (global_network_game_server_get())
-	{
-		ui_overlay_rect(322, 414, 100, 26, 4, 0x1B5C42FF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 372, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "START");
-	}
-	ui_overlay_rect(426, 414, 100, 26, 4, 0x153765FF);
-	ui_overlay_text(UI_FONT_BOLD, 8, 476, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "ADD PLAYER");
-	ui_overlay_rect(530, 414, 100, 26, 4, 0x612F3AFF);
-	ui_overlay_text(UI_FONT_BOLD, 8, 580, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "LEAVE");
-	/* Keep controller/keyboard focus visible over the covered legacy art. */
-	{
-		struct widget_instance *bar = named(list, "lobby_button_bar", 0);
-		if (bar && list->focused_child == bar && bar->focused_child && bar->focused_child->visible)
-			ui_overlay_outline(bar->focused_child->horizontal_offset, 414, 100, 26, 4, 2, 0xEAF3FFFF);
-	}
+    {
+        static char const *names[]={"lobby_button_team","lobby_button_kick","lobby_button_ban","lobby_button_start","lobby_button_add","lobby_button_leave"};
+        static char const *labels[]={"TEAM","KICK CONSOLE","BAN CONSOLE","START","ADD PLAYER","LEAVE"};
+        struct widget_instance *bar=named(list,"lobby_button_bar",0);
+        int slot;
+        for(slot=0;bar && slot<6;slot++) {
+            struct widget_instance *button=named(bar,names[slot],0);
+            unsigned long color=(slot==1 || slot==2 || slot==5) ? 0x612F3AFF : slot==3 ? 0x1B5C42FF : 0x153765FF;
+            char const *label=labels[slot]; float x=(float)(10+104*slot);
+            if(!button || !button->visible) continue;
+            if(slot==1 && lobby_confirm_action==_lobby_action_kick) label="CONFIRM KICK";
+            if(slot==2 && lobby_confirm_action==_lobby_action_ban) label="CONFIRM BAN";
+            ui_overlay_rect(x,414,100,26,4,color);
+            ui_overlay_text(UI_FONT_BOLD,8,x+50,423,UI_ALIGN_CENTER,0xEAF3FFFF,label);
+            if(list->focused_child==bar && bar->focused_child==button)
+                ui_overlay_outline(x,414,100,26,4,2,0xEAF3FFFF);
+        }
+    }
 	ui_overlay_text(UI_FONT_REGULAR, 8, 320, 453, UI_ALIGN_CENTER, 0xAFC4E0FF,
 		"UP/DOWN BROWSE  |  SELECT A REMOTE PLAYER  |  CONFIRM KICK/BAN  |  B BACK");
 }
@@ -4449,6 +4471,7 @@ static void lobby_update(struct widget_instance *list)
 	rows_update(list, (short)MIN(lobby_player_count, LOBBY_ROWS), lobby_row_text);
 	lobby_join_help(list);
 	visible_set(named(list, "lobby_button_team", 0), game && game->variant.universal_variant.teams);
+	visible_set(named(list,"lobby_button_start",0), global_network_game_server_get()!=NULL);
 	/* (the buttons' focus, off Switch Team when it is hidden) */
 	focus_off_hidden(named(list, "lobby_button_bar", 0));
 	visible_set(named(description, "lobby_right_item", 0), game != NULL && state >= _client_state_pregame);
@@ -5059,6 +5082,7 @@ static void gametype_setup_begin(void)
 	if (!player_ui_game_variant_specified(&gametype_edit.setup_variant))
 		return;
 	gametype_edit.setup_options = *player_ui_get_game_variant_options();
+	match_rules_apply_variant_preset(match_rules_preset_get(), &gametype_edit.setup_variant, &gametype_edit.setup_options);
 	gametype_edit.setup = TRUE;
 	gametype_edit.vehicle_side = 0;
 }
@@ -5558,6 +5582,15 @@ boolean pc_menu_event_function_invoke(
 		{
 			return profile_choose(controller);
 		}
+		else if (!strcmp(name, "port match preset")) {
+			char const *last=strrchr(widget->name,'_'); return last && match_rules_preset_set((short)atoi(last+1));
+		}
+		else if (!strcmp(name, "port faction matchup")) {
+			char const *last=strrchr(widget->name,'_');
+			return last &&
+				match_rules_matchup_set((short)atoi(last+1)) &&
+				match_rules_preset_set(MATCH_RULES_PRESET_FACTION);
+		}
 		else if (!strcmp(name, "port character select")) {
 			extern boolean nxhalo_character_choice_set(boolean,long); char const *last=strrchr(widget->name,'_');
 			return last && nxhalo_character_choice_set(strstr(widget->name,"host_")!=NULL,atoi(last+1));
@@ -5722,7 +5755,12 @@ void pc_menu_game_data_function_invoke(
 		vehicles_update(widget);
 	else if (!strcmp(name, "port lobby preview update"))
 		preview_update(widget);
-	else if (!strcmp(name, "port character status")) {
+	else if (!strcmp(name, "port match status")) {
+			char line[512]; wchar_t text[512];
+			snprintf(line,sizeof(line),"Preset: %s\r\nFactions: %s\r\n%s",match_rules_preset_name(match_rules_preset_get()),match_rules_matchup_name(match_rules_matchup_get()),match_rules_status());
+			text_to_wide(line,text,NUMBEROF(text));text_set_length(widget,text,NUMBEROF(text));return;
+		}
+		else if (!strcmp(name, "port character status")) {
 			extern long nxhalo_character_choice(boolean); extern char const *nxhalo_character_name(short);
 			boolean host=strstr(widget->name,"host_")!=NULL; char line[256]; wchar_t text[256];
 			snprintf(line,sizeof(line),"Selected: %s\r\nUsed when the map contains this character.\r\nOtherwise the map standard is retained.",nxhalo_character_name((short)nxhalo_character_choice(host)));

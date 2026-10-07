@@ -210,6 +210,7 @@
     "ce/shell/main_menu/solo_level_select/header_load_level__0.png",
     "ce/main_menu.online_campaign.xml",
     "ce/main_menu.content.xml",
-    "ce/main_menu.characters.xml"
+    "ce/main_menu.characters.xml",
+    "ce/main_menu.match_rules.xml"
   ]
 }

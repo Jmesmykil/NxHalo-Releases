@@ -5975,6 +5975,7 @@ boolean ui_widget_port_multiplayer_map_choose(
 	if (level_index < 0 || level_index >= ui_map_list_count())
 		return FALSE;
 	map_name = ui_map_list_names()[level_index];
+	if(!ui_map_list_preflight(map_name)) return FALSE;
 	{
 		char build[0x20];
 

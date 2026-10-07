@@ -238,6 +238,7 @@ symbols in this file:
 #include "devices/devices.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "nxhalo_custom_content.h" /* port: map-loaded campaign and host biped presets */
+#include "match_rules.h" /* port: host-authoritative factions and variant presets */
 #include "halo_network_profile.h" /* port: retain legacy BSP triggers outside profile 21 */
 #include "cutscene/cinematics.h" /* port: network co-op's first spawns */
 #include "editor/editor_stubs.h"
@@ -601,11 +602,14 @@ void players_initialize_for_new_map(
 	players_globals->respawn_failure = 0;
 	/* port: clear cached campaign biped tags and swap state on each map */
 	nxhalo_custom_reset();
+	match_rules_reset();
 	/* port: a new map has no network co-op checkpoint yet */
 	csmemset(&players_checkpoint, 0, sizeof(players_checkpoint));
 	csmemset(&players_coop_state, 0, sizeof(players_coop_state));
 	data_make_valid(player_data);
 	data_make_valid(team_data);
+	/* The scenario is loaded and the player datum iterator is now valid for preset status checks. */
+	match_rules_validate_loaded_map();
 	csmemset(
 		machine_to_player_table,
 		NONE,
@@ -1453,7 +1457,10 @@ static void player_spawn(
 					keep the host's replicated definition_index. */
 					if (game_connection() == _game_connection_local ||
 						game_connection() == _game_connection_network_server)
+					{
 						unit_definition_index = nxhalo_multiplayer_character_definition(unit_definition_index);
+						unit_definition_index = match_rules_host_spawn_definition(player_index, unit_definition_index);
+					}
 				}
 				else
 				{

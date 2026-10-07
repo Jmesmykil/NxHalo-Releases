@@ -53,6 +53,7 @@ list's, or the file's made readable; every build), Halo PC's picture of it
 HALO_CUSTOM_EDITION) */
 void ui_map_list_family_name(short family, char const *file, wchar_t *name, long size);
 struct bitmap_data *ui_map_list_family_picture(short family, char const *file);
+boolean ui_map_list_preflight(char const *map_name);
 boolean ui_map_list_family_present(short family, char const *file);
 
 #endif

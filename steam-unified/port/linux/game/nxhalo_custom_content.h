@@ -1,9 +1,17 @@
 #ifndef NXHALO_CUSTOM_CONTENT_H
 #define NXHALO_CUSTOM_CONTENT_H
 #include "cseries.h"
+enum nxhalo_character_faction
+{
+	NXHALO_FACTION_COVENANT = 1,
+	NXHALO_FACTION_USMC,
+	NXHALO_FACTION_FLOOD
+};
+
 /* Host spawn selection: zero preserves the map standard. Resolved against loaded map tags only. */
 long nxhalo_campaign_character_definition(long fallback_definition);
 long nxhalo_multiplayer_character_definition(long fallback_definition);
+short nxhalo_character_faction_bipeds(short faction, long *definitions, short capacity);
 /* Separate campaign and host selectors for the native overlay. */
 short nxhalo_character_count(void);
 char const *nxhalo_character_name(short choice);

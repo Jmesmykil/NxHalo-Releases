@@ -376,6 +376,8 @@ static char const *const port_function_names[] =
 
 	"port character select",
 
+	"port match preset", "port faction matchup",
+
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -400,6 +402,8 @@ static char const *const port_game_data_input_names[] =
 	"port content status",
 
 	"port character status",
+
+	"port match status",
 
 };
 
@@ -1560,6 +1564,85 @@ static boolean pause_box_stock(struct ui_widget_definition const *box)
 
 /* the stock box's pieces drawn with the port's taller box: its frame for
 the number of buttons */
+static void error_dialog_bitmap_redraw(long widget_tag, long depth, long panel, long button, long shade,
+	long *replaced)
+{
+	struct ui_widget_definition *definition;
+	struct ui_widget_child_reference const *children;
+	long replacement = NONE, child;
+
+	if (widget_tag == NONE || depth > 8)
+		return;
+	definition = tag_get(UI_WIDGET_DEFINITION_TAG, widget_tag);
+	if (!definition)
+		return;
+	if (definition->background_bitmap.index != NONE)
+	{
+		long bitmap_tag = definition->background_bitmap.index;
+		long width = definition->bounds.x1 - definition->bounds.x0;
+		long height = definition->bounds.y1 - definition->bounds.y0;
+
+		if (tag_name_ends(bitmap_tag, "\\alert_bkd") ||
+			(definition->type == _widget_type_text_box && width >= 200 && height >= 80))
+			replacement = panel;
+		else if (tag_name_ends(bitmap_tag, "\\text_button_background") ||
+			(definition->type == _widget_type_text_box && width <= 200 && height <= 64))
+			replacement = button;
+		else if (tag_name_ends(bitmap_tag, "\\semi_transparent_grey") ||
+			(definition->type == _widget_type_container && width >= 600 && height >= 440))
+			replacement = shade;
+		if (replacement != NONE && replacement != bitmap_tag)
+		{
+			reference_set(&definition->background_bitmap, BITMAP_GROUP_TAG, replacement);
+			(*replaced)++;
+		}
+	}
+	children = definition->child_widgets.address;
+	for (child = 0; children && child < definition->child_widgets.count; child++)
+		error_dialog_bitmap_redraw(children[child].widget_tag.index, depth + 1, panel, button, shade, replaced);
+}
+
+/* CE's stock error widgets retain their focus, text and bounds; only their
+bitmap references use the port's native ARGB8 redraws. */
+static void error_dialog_redraw(void)
+{
+	static char const *const roots[] =
+	{
+		"ui\\shell\\error\\error_modal_fullscreen",
+		"ui\\shell\\error\\error_nonmodal_fullscreen",
+		"ui\\shell\\error\\error_modal_halfscreen",
+		"ui\\shell\\error\\error_nonmodal_halfscreen",
+		"ui\\shell\\error\\error_modal_qtrscreen",
+		"ui\\shell\\error\\error_nonmodal_qtrscreen",
+	};
+	long panel = find("bitmaps/alert_bkd", build.menus->bitmap_count, bitmap_name);
+	long button = find("bitmaps/text_button_background", build.menus->bitmap_count, bitmap_name);
+	long shade = find("bitmaps/semi_transparent_grey", build.menus->bitmap_count, bitmap_name);
+	long replaced = 0, roots_found = 0, root;
+
+	panel = panel == NONE ? NONE : build.bitmap_tags[panel];
+	button = button == NONE ? NONE : build.bitmap_tags[button];
+	shade = shade == NONE ? NONE : build.bitmap_tags[shade];
+	if (panel == NONE || button == NONE || shade == NONE)
+	{
+		platform_log("menus: stock error dialog redraw assets missing (panel %ld, button %ld, shade %ld)",
+			panel, button, shade);
+		return;
+	}
+	for (root = 0; root < NUMBEROF(roots); root++)
+	{
+		long widget = tag_loaded(UI_WIDGET_DEFINITION_TAG, roots[root]);
+
+		if (widget != NONE)
+		{
+			roots_found++;
+			error_dialog_bitmap_redraw(widget, 0, panel, button, shade, &replaced);
+		}
+	}
+	platform_log("menus: stock error dialog redraw found %ld widget roots and replaced %ld bitmaps; focus, text and bounds are unchanged",
+		roots_found, replaced);
+}
+
 static void pause_box_redraw(struct ui_widget_definition const *box, long buttons)
 {
 	static char const *const names[] = { "pause/pausebox_left", "pause/pausebox_center", "pause/pausebox_right" };
@@ -1766,6 +1849,7 @@ void menu_tags_loaded(
 		instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(build.widget_tags[index])].base_address = widget_build(index);
 	if (build.failed)
 		goto failed;
+	error_dialog_redraw();
 	if (game_map)
 	{
 		pause_patch(instances);

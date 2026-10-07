@@ -543,6 +543,7 @@ symbols in this file:
 #include "game_engine.h"
 #include "game_engine_list.h"
 #include "game_engine_place.h"
+#include "match_rules.h" /* port: native host match rules */
 
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmap_group_lookup.h"
@@ -4536,6 +4537,9 @@ void game_engine_player_killed(
 		}
 	}
 
+	/* Infection is authoritative after stock team balancing. */
+	match_rules_host_player_killed(dead_player_index);
+
 	/* port: the gametype's friendly fire penalty: the team killer's next
 	respawn later (the dead's own, if he has one waiting) */
 	{
@@ -5028,7 +5032,7 @@ boolean game_engine_should_end_game(
 {
 	boolean should_end_game = FALSE;
 
-	if (game_engine && !multiple_teams_alive())
+	if (game_engine && (!multiple_teams_alive() || match_rules_should_end_game()))
 		should_end_game = TRUE;
 	/* port: the gametype's time limit (game_variant_options) */
 	if (game_engine && game_variant_options_get()->time_limit > 0 &&
@@ -5410,6 +5414,8 @@ void game_engine_prespawn_player_update(
 			/* port: 0 or 1 (another machine's player has no local player: -1) */
 			player->team_index = PIN(player->local_player_index % 2, 0, 1);
 		}
+		/* Host team assignment must precede character selection and object_new. */
+		match_rules_host_prespawn_player(player_index);
 	}
 
 	return;
@@ -8565,6 +8571,7 @@ void game_engine_postspawn_player_update(
 	if (game_engine->player_update)
 	{
 		game_engine->player_update(player_index);
+		match_rules_host_postspawn_player(player_index);
 		return;
 	}
 
@@ -8659,6 +8666,8 @@ void game_engine_postspawn_player_update(
 				(char)starting_plasma_grenade_count;
 		}
 	}
+
+	match_rules_host_postspawn_player(player_index);
 
 	return;
 }

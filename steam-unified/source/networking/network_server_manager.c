@@ -3016,12 +3016,28 @@ boolean server_has_a_player_on_each_machine(
 	return TRUE;
 }
 
+/* Explicit localhost-only automation mode. */
+static boolean server_debug_solo_allowed(void)
+{
+#if defined(__linux__) && !defined(HALO_ANDROID)
+    extern char *getenv(char const *);
+    extern char const *config_string(char const *);
+    extern int config_boolean(char const *);
+    char const *flag=getenv("HALO_NETWORK_TEST_SOLO");
+    return flag && !strcmp(flag,"1") && !config_boolean("network.online") &&
+        !strcmp(config_string("network.address"),"127.0.0.1") &&
+        !strncmp(config_string("debug.network_test"),"host:",5);
+#else
+    return FALSE;
+#endif
+}
+
 boolean server_has_enough_machines(
 	struct network_game_server *server)
 {
 	boolean has_enough_machines;
 	long minimum_machine_count =
-		network_game_is_splitscreen_local() ? 1 : 2;
+		(network_game_is_splitscreen_local() || server_debug_solo_allowed()) ? 1 : 2;
 	long machine_count = 0;
 	long client_machine_index;
 
@@ -3046,6 +3062,7 @@ boolean server_has_enough_machines(
 boolean server_ok_to_countdown(
 	struct network_game_server *server)
 {
+	if(server_debug_solo_allowed()) server->game.minimum_players=1;
 	if (server_has_enough_machines(server) &&
 		server_has_a_player_on_each_machine(server) &&
 		!server_needs_more_teams(server) &&

@@ -1,0 +1,60 @@
+{
+  "name": "NxHalo Unified Preview 2.8",
+  "tag": "v0.2.8-steamdeck-unified8",
+  "prerelease": true,
+  "single_executable": true,
+  "binary_sha256": "137194089841bdd24b022f08c529a045e50cefd35af1da8b56c9e97d4ccff693",
+  "network_host_profiles": [
+    11,
+    20,
+    21
+  ],
+  "game_data_included": false,
+  "rollback_preserved": true,
+  "acceptance": {
+    "deck_install_hash_checked": true,
+    "final_2_8_package_installed_on_deck": true,
+    "deck_installed_binary_sha256": "137194089841bdd24b022f08c529a045e50cefd35af1da8b56c9e97d4ccff693",
+    "running_game_process_binary_sha256": "5baaae446fee516af7a9266e0731e86319a3c5c78de7611d75c56d26e35ecd25",
+    "running_process_is_final_package": false,
+    "dialogs_redrawn_runtime": true,
+    "clean_world_frame_rendered": true,
+    "stock_modal_style_human_accepted": false,
+    "physical_controller_selection_verified": true,
+    "controller_accepted_build_sha256": "e09af63c9ae8d362498fb9a3823dbbc174e03463a1fea79ae4d23cf59e865645",
+    "production_map_download_extract_omarchy_verified": true,
+    "deck_map_ui_failure_reproduced": false,
+    "real_preset_match_verified": false,
+    "content_menu_captured": true,
+    "network_menu_captured": true,
+    "archive_contract_cases_passed": 10,
+    "private_host_initialization_profiles": [
+      11,
+      20,
+      21
+    ],
+    "synthetic_peer_join_verified": false,
+    "real_client_interoperability_verified": false,
+    "real_ce_map_gameplay_verified": true,
+    "ce_gameplay_evidence": "22-second native Linux Death Island smoke: actor loaded, ticks31-394, world/weapon/HUD rendered, using private owner resources; not two-client, sustained multiplayer, or physical Switch acceptance",
+    "alternate_character_match_verified": false
+  },
+  "assets": {
+    "NxHalo-SteamDeck-unified-preview2.8.tar.gz": {
+      "bytes": 23621266,
+      "sha256": "84a5f529789873194f8c9b7ba5b3212c603e01a5b5e816e7b9d95cf307f40b3e"
+    },
+    "NxHalo-Unified-source.zip": {
+      "bytes": 17865467,
+      "sha256": "7abe065e42995b186264753cdaec656d35ea8f6839d6e8b160797f41c94e8011"
+    },
+    "SUPPORTED-MODS.md": {
+      "bytes": 2784,
+      "sha256": "be771b6c0e617ef6c2a225582a3188f2d34189da9a326b2d591f1cc13466be07"
+    },
+    "release-notes.md": {
+      "bytes": 4773,
+      "sha256": "5e76e32cdee40e2cb61151b6990be5631d0d8818dfe5dd256d9ccc8028286a31"
+    }
+  }
+}

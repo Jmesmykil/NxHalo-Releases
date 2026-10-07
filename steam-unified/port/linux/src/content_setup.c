@@ -25,8 +25,19 @@ static int content_safe_map_name(char const *in,char *out,size_t size) {
  out[n]=0;return strcmp(out,".")&&strcmp(out,"..");
 }
 int content_setup_download_map(const char *map_name) {
- char name[64],target[128];if(!content_safe_map_name(map_name,name,sizeof(name))){snprintf(content_status_text,sizeof(content_status_text),"Enter a valid Halo CE map name or locator link.");return 0;}
- snprintf(target,sizeof(target),"d:\\maps\\ce\\%s.map",name);return community_map_download_start(name,target);
+ char name[64],target[128];
+ if(!content_safe_map_name(map_name,name,sizeof(name))){
+  snprintf(content_status_text,sizeof(content_status_text),"Enter a map name or HaloNet locator URL containing map=; other catalog URLs are not direct map IDs.");
+  fprintf(stderr,"halo-linux: CE map download request rejected: expected a map name or HaloNet locator URL with map=\n");
+  return 0;
+ }
+ snprintf(target,sizeof(target),"d:\\maps\\ce\\%s.map",name);
+ if(!community_map_download_start(name,target)){
+  snprintf(content_status_text,sizeof(content_status_text),"Could not start the map download; another content job may already be running.");
+  fprintf(stderr,"halo-linux: could not start CE map download for %s\n",name);
+  return 0;
+ }
+ return 1;
 }
 void content_setup_download_clipboard(void){char *p=SDL_GetClipboardText();if(p){content_setup_download_map(p);SDL_free(p);}}
 void content_setup_open_folder(void) {

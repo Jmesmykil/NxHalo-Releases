@@ -43,7 +43,7 @@ enum
 	_event_type_button,
 
 	STICK_EVENT_THRESHOLD = 29490,
-	STICK_EVENT_REPEAT_MILLISECONDS = 250
+	STICK_EVENT_REPEAT_MILLISECONDS = 350
 };
 
 /* ---------- macros */

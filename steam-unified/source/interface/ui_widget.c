@@ -904,7 +904,7 @@ enum
 enum
 {
 	/* a held dpad direction repeats no faster than this */
-	DPAD_EVENT_REPEAT_MILLISECONDS = 250,
+	DPAD_EVENT_REPEAT_MILLISECONDS = 350,
 	NUMBER_OF_DPAD_DIRECTIONS =
 		_widget_event_dpad_right - _widget_event_dpad_up + 1
 };
@@ -5731,6 +5731,9 @@ static void ui_mouse_note_target(
 	{
 		return;
 	}
+#if defined(__linux__) && !defined(HALO_ANDROID)
+    ui_widget_port_lobby_bounds(widget,&bounds);
+#endif
 	target = &ui_mouse_targets[ui_mouse_target_count++];
 	target->widget = widget;
 	target->bounds = bounds;
@@ -6451,7 +6454,7 @@ void render_ui_widgets(
 
 #ifdef HALO_GAME_BROWSER
 	/* Overlay appears above current widget and modal screens. */
-	nxhalo_character_menu_render(FALSE, ui_widget_port_character_overlay_context);
+	/* Native widgets render character selection. */
 #endif
 
 	return;
@@ -7448,7 +7451,7 @@ void process_ui_widgets(
 	widget_globals.current_system_milliseconds = system_milliseconds();
 	ui_widgets_process_mouse();
 #ifdef HALO_GAME_BROWSER
-	if (nxhalo_character_menu_process(FALSE, ui_widget_port_character_overlay_context)) return;
+	/* Native character widgets keep the regular input queue. */
 #endif
 	if (ui_widget_port_press_controller != NONE)
 	{

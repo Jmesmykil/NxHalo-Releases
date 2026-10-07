@@ -7,6 +7,7 @@ export HALO_DATA_ROOT="${HALO_DATA_ROOT:-$DIR/assets}"
 export HALO_SAVE_ROOT="${HALO_SAVE_ROOT:-$HOME/.local/share/halo-linux}"
 export HALO_FULLSCREEN="${HALO_FULLSCREEN:-true}"
 export HALO_MENUS=pc
-export HALO_MENU_OPEN=main_menu/main_menu
+unset HALO_MENU_OPEN
 unset HALO_CAMPAIGN_FD HALO_LEGACY_FD HALO_ONLINE_CAMPAIGN
-exec ./halo "$@"
+if [[ -f "$DIR/halo-runtime.log" ]]; then mv -f "$DIR/halo-runtime.log" "$DIR/halo-runtime.previous.log"; fi
+exec ./halo "$@" > "$DIR/halo-runtime.log" 2>&1

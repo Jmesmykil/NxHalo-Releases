@@ -40,6 +40,7 @@ drive the controller.
 #include "sdl_platform.h"
 #include "port_config.h"
 #include "halo_keyboard.h"
+#include "gamepad_routes.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -590,55 +591,45 @@ static void wheel_update(void)
 
 /* ---------- SDL gamepads */
 
-/* the SDL gamepads in connection order, at most one per port */
+/* Preserve identity within each priority across SDL enumeration/reordering. */
+static uint32_t assigned_gamepad_ids[PORT_COUNT];
 static int sdl_gamepads(SDL_Gamepad *gamepads[PORT_COUNT])
 {
-	SDL_JoystickID *ids;
-	int count = 0, index, found = 0;
-
-	memset(gamepads, 0, sizeof(SDL_Gamepad *) * PORT_COUNT);
-	ids = SDL_GetGamepads(&count);
-	if (!ids)
-		return 0;
+    SDL_JoystickID *ids;
+    struct halo_route_candidate *candidates;
+    uint32_t next[PORT_COUNT];
+    int count=0, index, found=0, used=0;
+    memset(gamepads,0,sizeof(SDL_Gamepad *)*PORT_COUNT);
+    ids=SDL_GetGamepads(&count);
+    candidates=count>0 ? SDL_calloc((size_t)count,sizeof(*candidates)) : NULL;
+    if(ids && candidates) for(index=0;index<count;index++) {
+        SDL_Gamepad *pad=SDL_GetGamepadFromID(ids[index]);
+        SDL_GamepadType type;
+        int rank;
+        if(!pad) continue;
+        type=SDL_GetGamepadType(pad);
 #ifdef HALO_ANDROID
-	{
-		/* Android can list input devices with a few gamepad buttons (the
-		emulator's keyboard, some phones' key devices) as generic gamepads:
-		recognised controllers take the first ports */
-		int pass;
-
-		for (pass = 0; pass < 2; pass++)
-		{
-			for (index = 0; index < count && found < PORT_COUNT; index++)
-			{
-				SDL_Gamepad *gamepad = SDL_GetGamepadFromID(ids[index]);
-				SDL_GamepadType type;
-				BOOL recognised;
-
-				if (!gamepad)
-					continue;
-				type = SDL_GetGamepadType(gamepad);
-				recognised = type != SDL_GAMEPAD_TYPE_UNKNOWN && type != SDL_GAMEPAD_TYPE_STANDARD;
-				if (recognised == (pass == 0))
-					gamepads[found++] = gamepad;
-			}
-		}
-	}
+        rank=(type!=SDL_GAMEPAD_TYPE_UNKNOWN && type!=SDL_GAMEPAD_TYPE_STANDARD) ? 0 : 1;
 #else
-	for (index = 0; index < count && found < PORT_COUNT; index++)
-	{
-		SDL_Gamepad *gamepad = SDL_GetGamepadFromID(ids[index]);
-
-		if (gamepad)
-			gamepads[found++] = gamepad;
-	}
+        if(SDL_GetGamepadVendor(pad)==0x28de && SDL_GetGamepadProduct(pad)==0x1205) rank=3;
+        else if(type==SDL_GAMEPAD_TYPE_PS3 || type==SDL_GAMEPAD_TYPE_PS4 || type==SDL_GAMEPAD_TYPE_PS5) rank=0;
+        else { const char *name=SDL_GetGamepadName(pad); rank=name && strstr(name,"Steam Virtual Gamepad") ? 2 : 1; }
 #endif
-	SDL_free(ids);
-	return found;
+        candidates[used].id=ids[index]; candidates[used++].rank=rank;
+    }
+    if(count>0 && !candidates) { SDL_free(ids); return 0; }
+    found=halo_route_assign(candidates,used,assigned_gamepad_ids,next);
+    memcpy(assigned_gamepad_ids,next,sizeof(next));
+    for(index=0;index<found;index++) gamepads[index]=next[index] ? SDL_GetGamepadFromID(next[index]) : NULL;
+    SDL_free(candidates); SDL_free(ids);
+    return found;
 }
 
 /* whether one gamepad is port 1's (port_gamepad) */
 static BOOL lone_gamepad_split;
+static uint32_t lone_gamepad_id;
+static uint32_t logical_gamepad_ids[PORT_COUNT];
+static DWORD changed_gamepad_ports;
 
 /* no button of the gamepad held, its sticks and triggers at rest */
 static BOOL gamepad_idle(SDL_Gamepad *gamepad)
@@ -668,13 +659,35 @@ static SDL_Gamepad *port_gamepad(SDL_Gamepad *gamepads[PORT_COUNT], int count, i
 	if (count == 1)
 	{
 		BOOL split = pc_menu_split_players() != 0;
+        if(lone_gamepad_id!=assigned_gamepad_ids[0]) {
+            lone_gamepad_id=assigned_gamepad_ids[0];
+            lone_gamepad_split=FALSE;
+        }
 
 		if (split != lone_gamepad_split && gamepad_idle(gamepads[0]))
 			lone_gamepad_split = split;
 		if (lone_gamepad_split)
 			return port == 1 ? gamepads[0] : NULL;
 	}
+    if(count!=1) { lone_gamepad_id=0; lone_gamepad_split=FALSE; }
 	return port < count ? gamepads[port] : NULL;
+}
+
+static void sync_gamepad_sources(SDL_Gamepad *gamepads[PORT_COUNT], int count)
+{
+    int port, i;
+    for(port=0;port<PORT_COUNT;port++) {
+        SDL_Gamepad *pad=port_gamepad(gamepads,count,port);
+        uint32_t id=0;
+        for(i=0;i<count;i++) if(pad && pad==gamepads[i]) { id=assigned_gamepad_ids[i]; break; }
+        if(id!=logical_gamepad_ids[port]) {
+            logical_gamepad_ids[port]=id;
+            memset(&controllers[port].previous,0,sizeof(controllers[port].previous));
+            controllers[port].packet_number++;
+            /* Logical port 0 remains connected for keyboard/mouse. */
+            if(port) changed_gamepad_ports |= 1UL<<port;
+        }
+    }
 }
 
 static SHORT stick(Sint16 value, BOOL flip)
@@ -760,6 +773,7 @@ static DWORD connected_gamepads(void)
 	DWORD mask = XDEVICE_PORT0_MASK;
 	int port;
 
+    sync_gamepad_sources(gamepads,count);
 	/* the first pad shares port 0 with the keyboard (port_gamepad) */
 	for (port = 1; port < PORT_COUNT; port++)
 	{
@@ -777,8 +791,9 @@ BOOL WINAPI XGetDeviceChanges(PXPP_DEVICE_TYPE device_type, PDWORD insertions, P
 	{
 		DWORD connected = connected_gamepads();
 
-		*insertions = connected & ~reported_gamepads;
-		*removals = reported_gamepads & ~connected;
+		*insertions = (connected & ~reported_gamepads) | (changed_gamepad_ports & connected & reported_gamepads);
+		*removals = (reported_gamepads & ~connected) | (changed_gamepad_ports & reported_gamepads);
+        changed_gamepad_ports=0;
 		reported_gamepads = connected;
 	}
 	else if (device_type == XDEVICE_TYPE_DEBUG_KEYBOARD)
@@ -843,6 +858,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		return ERROR_DEVICE_NOT_CONNECTED;
 	platform_pump_events();
 	count = sdl_gamepads(gamepads);
+    sync_gamepad_sources(gamepads,count);
 	if (port == 0)
 	{
 		struct platform_input_state input;
@@ -896,6 +912,7 @@ DWORD WINAPI XInputSetState(HANDLE device, PXINPUT_FEEDBACK feedback)
 	if (port < 0)
 		return ERROR_DEVICE_NOT_CONNECTED;
 	count = sdl_gamepads(gamepads);
+    sync_gamepad_sources(gamepads,count);
 	if (port_gamepad(gamepads, count, port))
 	{
 		/* the game refreshes the motors every frame; rumble a little longer
