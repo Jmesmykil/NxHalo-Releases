@@ -1,0 +1,64 @@
+{
+  "name": "Steam Deck Preview 2.6",
+  "tag": "v0.2.6-steamdeck-preview6",
+  "prerelease": true,
+  "game_data_included": false,
+  "clients": {
+    "NxHalo-SteamDeck": {
+      "network_version": 11,
+      "upstream_commit": null,
+      "binary_sha256": "9c194418d95d6d7821028e568ce5a9b830bd39fdcc41215bc1e5a61acfd036bf"
+    },
+    "OpenCE-Campaign": {
+      "network_version": 21,
+      "upstream_commit": "76b1898ee14e6fb58e0412acc183da509c10e001",
+      "binary_sha256": "f35d7c10b034ac8371d7f803743cd12a660a55aee8041f6b971c7da79be1cc23"
+    },
+    "Chupathingy-Legacy": {
+      "network_version": 20,
+      "upstream_commit": "61eb5615d5703df7a971be7f75c3d1434d716b7e",
+      "binary_sha256": "b28dc9a2611914872accd733f5c4768fffa77f8dbeadf0d1cb448b6354ae247f"
+    }
+  },
+  "acceptance": {
+    "installed_hashes_checked": true,
+    "discovery_pixels_captured": true,
+    "native_multiplayer_gameplay_captured": true,
+    "final_filter_build_gameplay_tested": false,
+    "two_player_campaign_tested": false,
+    "legacy_match_tested": false,
+    "classic_list_is_snapshot": true,
+    "friends_implemented": false,
+    "voice_implemented": false
+  },
+  "assets": {
+    "NxHalo-SteamDeck-preview2.6.tar.gz": {
+      "bytes": 19617675,
+      "sha256": "0a780c071ec88c74aac01cfe4a82ae63b36e9d00ab3afbeb0e46612950424564"
+    },
+    "OpenCE-Campaign-SteamDeck-protocol21.tar.gz": {
+      "bytes": 20281210,
+      "sha256": "93e3875bdce64db2e88414c300e6a9c95b5c280b376987496df243b5228044cf"
+    },
+    "Chupathingy-Legacy-SteamDeck-protocol20.tar.gz": {
+      "bytes": 21473454,
+      "sha256": "ba213b73611de169d69c4c65245a892a329ee27d484d1be30ca8cb183ee4da11"
+    },
+    "NxHalo-runtime-source.zip": {
+      "bytes": 17218084,
+      "sha256": "3b8488db5a253e07733e9344dbdb0d1432fa4dfdcfefd1b54af0868ef859e218"
+    },
+    "OpenCE-campaign-source.zip": {
+      "bytes": 15878735,
+      "sha256": "7e3547464e618531802d092cea0b133157a0159ea15667ea40f20cbf147d81cb"
+    },
+    "Chupathingy-legacy-source.zip": {
+      "bytes": 17648582,
+      "sha256": "bc41cdd214c8643616b22e1668f0f4c35fbdf49c67d3f66225a1c6e6698edce4"
+    },
+    "release-notes.md": {
+      "bytes": 1946,
+      "sha256": "e5167c38b3ce8b193c72987a24a0c69d03e919cf123e27684d7de7db1d8e5311"
+    }
+  }
+}

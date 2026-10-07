@@ -3312,6 +3312,13 @@ enum
 	ONLINE_GAMES_MENU_ITEMS = 4,
 	/* the items' spacing (their vertical offset, -33) */
 	ONLINE_GAMES_ROW = 33,
+#if defined(__linux__) && !defined(HALO_ANDROID)
+	ONLINE_CAMPAIGN_POSITION = 0,
+	LOCAL_COOP_POSITION = 4,
+	ONLINE_CAMPAIGN_EXTRA = 1,
+#else
+	ONLINE_CAMPAIGN_EXTRA = 0,
+#endif
 };
 
 static struct
@@ -3320,6 +3327,8 @@ static struct
 	long description_text_tag;
 	struct ui_widget_child_reference *children;
 	boolean described;
+	boolean campaign_described;
+	boolean local_coop_described;
 } online_games = { NONE, NONE, NULL, FALSE };
 
 void ui_widget_online_games_tags_loaded(
@@ -3344,7 +3353,7 @@ void ui_widget_online_games_tags_loaded(
 	/* (the tags are loaded again with each map: the last copy goes) */
 	if (online_games.children)
 		system_free(online_games.children);
-	children = system_malloc((ONLINE_GAMES_MENU_ITEMS + 1) * sizeof(*children));
+	children = system_malloc((ONLINE_GAMES_MENU_ITEMS + 1 + ONLINE_CAMPAIGN_EXTRA) * sizeof(*children));
 	online_games.children = children;
 	if (!children)
 		return;
@@ -3357,8 +3366,13 @@ void ui_widget_online_games_tags_loaded(
 	after it, a row lower) */
 	for (index = ONLINE_GAMES_POSITION; index <= ONLINE_GAMES_MENU_ITEMS; index++)
 		children[index].vertical_offset += ONLINE_GAMES_ROW;
+#if defined(__linux__) && !defined(HALO_ANDROID)
+	children[LOCAL_COOP_POSITION + 1] = children[LOCAL_COOP_POSITION];
+	children[LOCAL_COOP_POSITION] = old_children[0];
+	children[LOCAL_COOP_POSITION].vertical_offset += LOCAL_COOP_POSITION * ONLINE_GAMES_ROW;
+#endif
 	list->child_widgets.address = XBOX_ADDRESS(children);
-	list->child_widgets.count = ONLINE_GAMES_MENU_ITEMS + 1;
+	list->child_widgets.count = ONLINE_GAMES_MENU_ITEMS + 1 + ONLINE_CAMPAIGN_EXTRA;
 	online_games.list_tag = list_tag;
 
 	/* the line under the items, a row lower */
@@ -3371,7 +3385,7 @@ void ui_widget_online_games_tags_loaded(
 		for (index = 0; index < screen->child_widgets.count; index++)
 		{
 			if (screen_children[index].widget_tag.index == line_tag)
-				screen_children[index].vertical_offset += ONLINE_GAMES_ROW;
+				screen_children[index].vertical_offset += ONLINE_GAMES_ROW * (1 + ONLINE_CAMPAIGN_EXTRA);
 		}
 	}
 }
@@ -3399,6 +3413,28 @@ boolean ui_widget_online_games_item(
 	return online_games.list_tag != NONE && widget && widget->parent &&
 		widget->parent->definition_tag_index == online_games.list_tag &&
 		ui_widget_list_position(widget) == ONLINE_GAMES_POSITION;
+}
+
+static boolean ui_widget_online_campaign_item(struct widget_instance *widget)
+{
+#if defined(__linux__) && !defined(HALO_ANDROID)
+	return online_games.list_tag != NONE && widget && widget->parent &&
+		widget->parent->definition_tag_index == online_games.list_tag &&
+		ui_widget_list_position(widget) == ONLINE_CAMPAIGN_POSITION;
+#else
+	return FALSE;
+#endif
+}
+
+static boolean ui_widget_local_coop_item(struct widget_instance *widget)
+{
+#if defined(__linux__) && !defined(HALO_ANDROID)
+	return online_games.list_tag != NONE && widget && widget->parent &&
+		widget->parent->definition_tag_index == online_games.list_tag &&
+		ui_widget_list_position(widget) == LOCAL_COOP_POSITION;
+#else
+	return FALSE;
+#endif
 }
 
 /* (ui_widget_event_handler_functions.c's) */
@@ -3436,8 +3472,24 @@ short ui_widget_online_games_description(
 	short index)
 {
 	online_games.described = FALSE;
+	online_games.campaign_described = FALSE;
+	online_games.local_coop_described = FALSE;
 	if (online_games.list_tag == NONE || list_widget->definition_tag_index != online_games.list_tag)
 		return index;
+#if defined(__linux__) && !defined(HALO_ANDROID)
+	if (index == ONLINE_CAMPAIGN_POSITION)
+	{
+		online_games.campaign_described = TRUE;
+		return 0;
+	}
+	if (index == LOCAL_COOP_POSITION)
+	{
+		online_games.local_coop_described = TRUE;
+		return 0;
+	}
+	if (index > LOCAL_COOP_POSITION)
+		return (short)(index - 2);
+#endif
 	if (index == ONLINE_GAMES_POSITION)
 	{
 		online_games.described = TRUE;
@@ -3493,6 +3545,15 @@ static void event_handler_dispatch(
 #ifdef HALO_GAME_BROWSER
 	/* ONLINE GAMES (System Link's item copied): the game list's screen, not
 	System Link's */
+	if (ui_widget_online_campaign_item(widget) &&
+		(handler->event_type == _gamepad_analog_button_a || handler->event_type == _gamepad_binary_button_start))
+	{
+#if defined(__linux__) && !defined(HALO_ANDROID)
+		extern int platform_request_online_campaign(void);
+		platform_request_online_campaign();
+#endif
+		return;
+	}
 	if (ui_widget_online_games_item(widget) &&
 		(handler->event_type == _gamepad_analog_button_a || handler->event_type == _gamepad_binary_button_start))
 	{
@@ -5385,7 +5446,15 @@ static void widget_instance_render_text_box(
 			unicode_string_list_get_string(definition->text_label_string_list.index, string_list_index);
 #ifdef HALO_GAME_BROWSER
 		/* (ONLINE GAMES' item and description share System Link's tags) */
-		if (ui_widget_online_games_item(widget))
+		if (ui_widget_online_campaign_item(widget))
+			string = L"ONLINE CAMPAIGN";
+		else if (ui_widget_local_coop_item(widget))
+			string = L"LOCAL CO-OP";
+		else if (online_games.campaign_described && widget->definition_tag_index == online_games.description_text_tag)
+			string = L"Join or host campaign lobbies\r\nwith remote players. No second\r\nlocal controller is required.";
+		else if (online_games.local_coop_described && widget->definition_tag_index == online_games.description_text_tag)
+			string = L"Local split-screen campaign.\r\nA second controller is required.";
+		else if (ui_widget_online_games_item(widget))
 			string = L"ONLINE GAMES";
 		else if (online_games.described && widget->definition_tag_index == online_games.description_text_tag)
 			/* (broken in lines as the game's own: the text box does not wrap) */

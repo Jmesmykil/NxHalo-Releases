@@ -20,6 +20,9 @@ and the debug keyboard that the game's console reads.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__linux__) && !defined(HALO_ANDROID)
+#include <unistd.h>
+#endif
 #if !defined(_WIN32) && !defined(HALO_ANDROID)
 #include <signal.h>
 #endif
@@ -1043,6 +1046,25 @@ static void platform_quit_notice(const char *text)
 	terminal_printf(NULL, "%s", text);
 }
 #endif
+
+void platform_request_quit(void);
+
+int platform_request_online_campaign(void)
+{
+#if defined(__linux__) && !defined(HALO_ANDROID)
+	const char *value = getenv("HALO_CAMPAIGN_FD");
+	char *end;
+	long fd = value ? strtol(value, &end, 10) : -1;
+	if (value && !*end && fd >= 3 && fd <= 63 && write((int)fd, "campaign\n", 9) == 9)
+	{
+		platform_request_quit();
+		return 1;
+	}
+#endif
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Online Campaign",
+		"Install the OpenCE campaign package alongside NxHalo and launch through launch_halo.sh.", platform_window);
+	return 0;
+}
 
 void platform_request_quit(void)
 {

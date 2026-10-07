@@ -1,0 +1,9 @@
+# Steam Deck Preview 2.6
+
+Online campaign is separate from local two-controller co-op. The original NxHalo menu launches the installed online component, retaining local split-screen separately. OpenCE starts with network campaign join/host choices and separately filtered multiplayer, all-community, native version, broker, community-announced, and classic PC/CE lists.
+
+Fixed a missing brokers.txt installation. Discovery merges the four upstream MQTT brokers with https://halo.milenko.org/v1/games, deduplicates native rooms, and refreshes the community directory every ten seconds. Native versions 11-20 hand off to the bundled legacy client; V21 uses OpenCE. Classic CE/PC master snapshots are separate, contain 253/97 addresses, have unknown activity/player counts, and cannot be joined with native OpenCE. These are all discovered sources, not proof of every independently operated private server.
+
+Installed on the physical Deck with executable hashes checked. A live browser capture shows 14 rooms / 78 listed players across V11, V20 and V21; counts change. Gameplay was captured on the installed V21 build before the final explicit campaign-route and classic-notice changes. The final build passed native linking and is installed for the next launch. The active match was not interrupted. Earlier wide lobby and synthetic 128-player roster proofs remain valid, but do not prove a 128-player battle. Two-player campaign hosting/joining, legacy handoff in a real match, controller moderation and internet map-download/join still require acceptance. Friends/follow and proximity voice remain unimplemented.
+
+Extract the three runtime folders beside one another. Supply compatible owner game maps separately in each assets/maps folder (or link to existing owned data). Add launch_halo.sh to Steam as native Linux; disable Proton. Original saves and rollback releases are preserved. No game data, console keys or personal saves are packaged.
