@@ -11,7 +11,7 @@
   "title_id": "010048414C210000",
   "nacp_title": "HALO: CE Content Preview 2.9",
   "nacp_version": "2.9-preview",
-  "switch_sd_staging_verified": false,
+  "switch_sd_staging_verified": true,
   "physical_install_verified": false,
   "physical_runtime_verified": false,
   "rollback_preserved": true,
@@ -50,8 +50,10 @@
       "sha256": "38dc3a634b0e8c71f3284857a305b83ff896f75cfabf0b48e7b2e2eb9560ccdd"
     },
     "RELEASE-NOTES.md": {
-      "bytes": 1085,
-      "sha256": "4d3fec0fbf8949a083c6c3add52e20c40dc034ac961e72a42758545142165c3e"
+      "bytes": 1245,
+      "sha256": "aab572eaaac484dafa279d05f30ddc60a104d6a7302f01439a8b3829a8d86853"
     }
-  }
+  },
+  "sd_destination": "switch/NxHalo-Content29/halo.nro",
+  "sd_destination_sha256": "2a60465f0c928ed8007bfbe4e5b6fce7c1bad2c6713261515fb5e1158523d646"
 }
