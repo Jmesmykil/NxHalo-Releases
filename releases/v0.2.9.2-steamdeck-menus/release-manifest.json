@@ -3,11 +3,11 @@
   "tag": "v0.2.9.1-steamdeck-content",
   "prerelease": true,
   "platform": "Steam Deck/Linux",
-  "binary_sha256": "84336f0f5394a53ea9d8ff6fc8b1e350c6709feb7aa967d378915b9ff3003918",
-  "source_sha256": "b05e6cccf38a412964e0aac3b63a786f048cc04a2f4b2eea0ec0838b21d9feb3",
+  "binary_sha256": "df8033147f53d9f9a632894e7c411889d8490eae6e4d38e97cbb819e80134717",
+  "source_sha256": "0a7e56f53039596fffdd2eacaa4328e1f9e68ae710a8da5c38d56e392c7da0b8",
   "deck_install_verified": true,
   "running_process_binary_sha256": "84336f0f5394a53ea9d8ff6fc8b1e350c6709feb7aa967d378915b9ff3003918",
-  "rollback_binary": "halo.before-menus292-20261007; public match process PID 579445 remains on previous binary until relaunch",
+  "rollback_binary": "halo.before-menus292-20261007; public match PID 579445 still runs prior 2.9.1 until relaunch",
   "acceptance": {
     "native_deck_catalog_capture_reviewed": true,
     "catalog_matching_entries": 5020,
@@ -45,13 +45,13 @@
     "personal saves"
   ],
   "assets": {
-    "NxHalo-SteamDeck-unified-content-preview2.9.1.tar.gz": {
-      "bytes": 22104449,
-      "sha256": "772be2f23b5bc4b324bb2dd8a63abffb396a9b472906568b3732fed3fce474b4"
+    "NxHalo-SteamDeck-unified-content-preview2.9.2.tar.gz": {
+      "bytes": 22113936,
+      "sha256": "d405b821e17bbe442a5d5f1f921a4b02215e10f62d57fd5f80c317b7bc471d5f"
     },
-    "NxHalo-Unified-source-2.9.1.zip": {
-      "bytes": 17887156,
-      "sha256": "b05e6cccf38a412964e0aac3b63a786f048cc04a2f4b2eea0ec0838b21d9feb3"
+    "NxHalo-Unified-source-2.9.2.zip": {
+      "bytes": 17890386,
+      "sha256": "0a7e56f53039596fffdd2eacaa4328e1f9e68ae710a8da5c38d56e392c7da0b8"
     },
     "NATIVE-CONTENT.md": {
       "bytes": 3308,
@@ -62,16 +62,12 @@
       "sha256": "bfc7c9beb983af52c9f28926afec9fb0b6c517cbd0b90ed7c6cb439ba32a893d"
     },
     "release-notes.md": {
-      "bytes": 1231,
-      "sha256": "1d218332b90b764d74116a11a97eadceb7bc54f988e173d362fcad1110b60560"
-    },
-    "NxHalo-SteamDeck-unified-content-preview2.9.2.tar.gz": {
-      "bytes": 22113928,
-      "sha256": "724e9fbb9489880edb72098f1b74aaed739095c1a8728c48949fbb82b8aa0f4b"
+      "bytes": 1968,
+      "sha256": "0fafdc7f5a525ee74161544efaac82d830484f22d823b5c44b0f92d0f5796da3"
     }
   },
   "running_process_is_release_binary": false,
   "hotfix": "mods_pack_N texture-pack selection callback routing",
   "previous_release": "v0.2.9-steamdeck-content",
-  "deck_installed_binary_sha256": "03a94e8d49c3533807c478ba2a3390080db8f74b8b1a207b31510efa2882c84b"
+  "deck_installed_binary_sha256": "df8033147f53d9f9a632894e7c411889d8490eae6e4d38e97cbb819e80134717"
 }

@@ -108,7 +108,7 @@
   <child widget="main_menu/match_rules/presets_4" y="193" />
   <child widget="main_menu/match_rules/presets_5" y="237" />
  </widget>
- <widget name="main_menu/match_rules/combat_help" type="text" controller="1" left="50" top="400" width="540" height="65" font="ui\small_ui" color="#FFFFFFFF">
+ <widget name="main_menu/match_rules/combat_help" type="text" controller="1" left="50" top="414" width="540" height="65" font="ui\small_ui" color="#FFFFFFFF">
   <data input="port match status" />
  </widget>
 </menus>
