@@ -1,0 +1,11 @@
+Mozilla CA certificates, PEM bundle
+
+Source: https://curl.se/ca/cacert.pem
+CA extract documentation and license statement: https://curl.se/docs/caextract.html
+Mozilla source store snapshot: 2026-09-25 03:12:01 GMT
+SHA-256: a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505
+
+The PEM bundle is unmodified. curl.se states that its Mozilla CA extraction
+is licensed under MPL 2.0. The accompanying MPL-2.0.txt is included with the
+Switch ROMFS bundle. The bundle is read at romfs:/cacert.pem and selected
+explicitly with libcurl CURLOPT_CAINFO; peer and hostname checks stay enabled.

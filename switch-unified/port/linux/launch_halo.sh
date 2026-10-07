@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+cd "$DIR"
+export LD_LIBRARY_PATH="$DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export HALO_DATA_ROOT="${HALO_DATA_ROOT:-$DIR/assets}"
+export HALO_SAVE_ROOT="${HALO_SAVE_ROOT:-$HOME/.local/share/halo-linux}"
+export HALO_FULLSCREEN="${HALO_FULLSCREEN:-true}"
+export HALO_MENUS=pc
+export HALO_MENU_OPEN=main_menu/main_menu
+unset HALO_CAMPAIGN_FD HALO_LEGACY_FD HALO_ONLINE_CAMPAIGN
+exec ./halo "$@"

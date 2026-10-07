@@ -1,0 +1,72 @@
+{
+  "name": "NxHalo Unified Switch Preview 2.8",
+  "tag": "v0.2.8-switch-unified8",
+  "prerelease": true,
+  "platform": "Nintendo Switch",
+  "artifact_type": "standalone NRO (not NSP)",
+  "title_id": "010048414C210000",
+  "full_memory_title_override_included": false,
+  "runtime": {
+    "file": "halo.nro",
+    "sha256": "5b18c2b201ee6ab62785911f307197bd7ba13543f6be64161f82b86c2013e376",
+    "source_archive": "NxHalo-Unified-Switch-source.zip",
+    "source_archive_sha256": "a56ec65f5907f5f31599c03f5791612faec976eb4a154a2c50931c1bf9466d50"
+  },
+  "build_evidence": {
+    "guest_build": "passed",
+    "host_package_build": "passed",
+    "tls_peer_and_hostname_verification_enabled": true,
+    "hardware_install_verified": false,
+    "physical_runtime_verified": false,
+    "ums_staging_verified": false,
+    "hardware_acceptance": "unverified"
+  },
+  "data_policy": {
+    "game_maps_included": false,
+    "resource_companions_included": false,
+    "console_keys_included": false,
+    "personal_saves_included": false,
+    "shader_instructions_included": false,
+    "data_root": "sdmc:/switch/halo when no romfs:/maps/ui.map is present",
+    "save_root": "sdmc:/switch/halo/save-community24",
+    "romfs_selection_condition": "romfs:/maps/ui.map exists; candidate contains no map data"
+  },
+  "fallbacks": {
+    "previous_network_candidate": "Profile33 v0.1.11-p33 remains preserved as a separate release; its prior UMS staging/readback does not establish physical runtime acceptance",
+    "stable_campaign_baseline": "Build14 v0.1.1 remains available"
+  },
+  "assets": {
+    "halo.nro": {
+      "bytes": 26503590,
+      "sha256": "5b18c2b201ee6ab62785911f307197bd7ba13543f6be64161f82b86c2013e376"
+    },
+    "NxHalo-Unified-Switch-source.zip": {
+      "bytes": 18255471,
+      "sha256": "a56ec65f5907f5f31599c03f5791612faec976eb4a154a2c50931c1bf9466d50"
+    },
+    "BUILD-SWITCH.md": {
+      "bytes": 2540,
+      "sha256": "ad6db1dc21148397fc3d1a84945e16c4ae1bc8529e900d6fbc11612ca4cb1711"
+    },
+    "BUILD-EVIDENCE.md": {
+      "bytes": 1613,
+      "sha256": "1950409fa4caa16314e8974c352d0a706cd8a1f51dfe9a306e97349f941c0d95"
+    },
+    "RELEASE-NOTES.md": {
+      "bytes": 1486,
+      "sha256": "11dad060414de1cd2a3207c63b8eecb92941b4642b5bd32c0e7c61a62fe5539e"
+    },
+    "cacert.pem": {
+      "bytes": 188900,
+      "sha256": "a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505"
+    },
+    "MPL-2.0.txt": {
+      "bytes": 16726,
+      "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85"
+    },
+    "cacert-source.txt": {
+      "bytes": 595,
+      "sha256": "fc10a6ebf3ea475f4c43a8dd3c71ab779239557d5f075b69a255f7b6196c66dd"
+    }
+  }
+}
