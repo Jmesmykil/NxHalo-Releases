@@ -1,0 +1,25 @@
+HALO CE Switch Content Preview 2.9.1 candidate
+
+Build results
+- Synced final canonical menu_functions.c, retained the Switch-only upscaling-off guard, and rebuilt guest ELF with `ninja -f build.ninja build/android/halo_guest.elf`.
+- DEVKITPRO=/opt/devkitpro make host completed and emitted halo.nro.
+- Texture pack rows now call content_setup_texture_pack_select_row; menu source hash below.
+- NACP title: HALO: CE Content Preview 2.9.1; version: 2.9.1-preview; original title ID 010048414C210000 retained. NRO strings verify title.
+- Switch upscaling remains unavailable and forced off under HALO_SWITCH_GUEST.
+- Sanitized source ZIP has 2,313 entries and excludes every `.inc` file (including rasterizer_xbox_vertex_shaders_data.inc), build/dependency symlinks, generated binaries and embedded guest ELF. Scan found no .map/.yelo/.key/.tik/.nsp/.xci or instructions.inc entries.
+
+Assets
+NRO: /Users/astral/Documents/Codex/2026-10-05/i-need-you-to-do-this/work/switch-content-candidate/source/port/switch/halo.nro
+Source ZIP: /Volumes/Media/GamePorts/HaloCE-task-builds/20261007/switch-build/content-candidate/release/halo-ce-switch-content-preview-2.9.1-source.zip
+Source hash manifest: /Volumes/Media/GamePorts/HaloCE-task-builds/20261007/switch-build/content-candidate/release/SOURCE-HASHES-2.9.1.sha256
+
+SHA256
+5125946c766a5a8991e27011dc28e47684944c77e4a9b9662da390c94e8aeb44  halo.nro
+50dd1b744ce5d9a4fd0375037a34ed7b49b41fe17446dde7b9845cde33ac8007  embedded-guest-elf
+2abd4d8a09f532c459010b67bb67a88402c1dd2e28f44146d5f4c043160c5220  source-zip
+41b85cf17f7fc4c3c5cdf334fdbaf084402e1c14c26ee292f055aa7a20071944  source-hash-manifest
+c4bc84c9e2e92d4faeecb28c9321e560c847d536ab584f3c5a6cc86c377ee3dc  candidate menu_functions.c with Switch guard
+9a2795fe4a9772965ca9282d8d1baafa30efdc85b2f9b1c03769127155ed0eb2  main_menu.content.xml
+acbfe3461c1e723e37b0ef203d54871b3510fe43cc29186bc3c17c358ae8b121  Switch Makefile
+
+No publication, SD staging, installation, or physical-device acceptance is claimed. Preserve the published 2.9 candidate; this is a separate 2.9.1 candidate.

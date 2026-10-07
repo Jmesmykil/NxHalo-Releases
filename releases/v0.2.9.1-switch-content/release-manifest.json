@@ -1,0 +1,52 @@
+{
+  "name": "NxHalo Unified Switch Content Preview 2.9.1",
+  "tag": "v0.2.9.1-switch-content",
+  "prerelease": true,
+  "platform": "Nintendo Switch",
+  "artifact_type": "standalone NRO",
+  "nro_sha256": "5125946c766a5a8991e27011dc28e47684944c77e4a9b9662da390c94e8aeb44",
+  "sanitized_source_sha256": "2abd4d8a09f532c459010b67bb67a88402c1dd2e28f44146d5f4c043160c5220",
+  "source_hash_manifest_sha256": "41b85cf17f7fc4c3c5cdf334fdbaf084402e1c14c26ee292f055aa7a20071944",
+  "embedded_guest_elf_sha256": "50dd1b744ce5d9a4fd0375037a34ed7b49b41fe17446dde7b9845cde33ac8007",
+  "title_id": "010048414C210000",
+  "nacp_title": "HALO: CE Content Preview 2.9.1",
+  "nacp_version": "2.9.1-preview",
+  "switch_sd_staging_verified": false,
+  "physical_install_verified": false,
+  "physical_runtime_verified": false,
+  "rollback_preserved": true,
+  "previous_release": "v0.2.9-switch-content",
+  "source_archive_entries": 2313,
+  "build_warnings": [],
+  "excluded_content": [
+    "game maps",
+    "owner resource companions",
+    "generated shader microcode and all .inc files",
+    "console keys",
+    "personal saves",
+    "generated binaries and dependency links"
+  ],
+  "feature": "mods_pack_N rows route to content_setup_texture_pack_select_row",
+  "assets": {
+    "halo.nro": {
+      "bytes": 26573198,
+      "sha256": "5125946c766a5a8991e27011dc28e47684944c77e4a9b9662da390c94e8aeb44"
+    },
+    "halo-ce-switch-content-preview-2.9.1-source.zip": {
+      "bytes": 18281301,
+      "sha256": "2abd4d8a09f532c459010b67bb67a88402c1dd2e28f44146d5f4c043160c5220"
+    },
+    "BUILD-EVIDENCE.txt": {
+      "bytes": 2080,
+      "sha256": "bd30db99e8c8ad3a57817314e1ad46146bfbea383a8cd8f0f21657bc62ee158a"
+    },
+    "SOURCE-HASHES.sha256": {
+      "bytes": 2384,
+      "sha256": "41b85cf17f7fc4c3c5cdf334fdbaf084402e1c14c26ee292f055aa7a20071944"
+    },
+    "RELEASE-NOTES.md": {
+      "bytes": 800,
+      "sha256": "96f322554e4c30c38f59ea9efb87c77ae8653921ea3d94971c864a4c222d6db3"
+    }
+  }
+}

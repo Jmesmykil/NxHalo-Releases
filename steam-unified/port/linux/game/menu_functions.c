@@ -5699,7 +5699,11 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port content download")) {
             extern void content_setup_download_clipboard(void), content_setup_catalog_download_row(int);
             if (content_widget_name_starts_with(widget, "browser_map_")) { const char *last=strrchr(widget->name,'_'); if(last)content_setup_catalog_download_row(atoi(last+1)); }
-            else content_setup_download_clipboard();
+            else if (content_widget_name_starts_with(widget, "mods_pack_")) {
+                extern int content_setup_texture_pack_select_row(int);
+                const char *last=strrchr(widget->name,'_');
+                return last && content_setup_texture_pack_select_row(atoi(last+1));
+            } else content_setup_download_clipboard();
             return TRUE;
         }
 		else if (!strcmp(name, "port host profile")) {
