@@ -4,9 +4,9 @@
   "prerelease": true,
   "platform": "Nintendo Switch",
   "artifact_type": "standalone NRO",
-  "nro_sha256": "56d7420ca04a26ba1b41ec978e5d08632afd03b88c54951e0d970ae08e3cc26a",
-  "sanitized_source_sha256": "2402a8fd4733bfe4a91e4f0850704c30e885a5309ca5db6ca0cc76d49aa10c60",
-  "source_hash_manifest_sha256": "5e5fe8c0dc66650664d9ddd1264357566419eade612812df0a59876c3dbf164c",
+  "nro_sha256": "82726ce090131249e17c8c25955626e2de2632c24978b8073eb2057d0c81f6d1",
+  "sanitized_source_sha256": "e973f180c10f9301d70de149ff6b58d926b12ddf38137e7107d470e0a9642359",
+  "source_hash_manifest_sha256": "60f0c8eebae31de96d5aafb5e2944995b765646e1dc4db660a57faacf0b3bfbf",
   "embedded_guest_elf_sha256": "50dd1b744ce5d9a4fd0375037a34ed7b49b41fe17446dde7b9845cde33ac8007",
   "title_id": "010048414C210000",
   "nacp_title": "HALO: CE Content Preview 2.9.2",
@@ -28,24 +28,26 @@
   "build": "guest and host builds succeeded",
   "assets": {
     "halo.nro": {
-      "bytes": 26573198,
-      "sha256": "56d7420ca04a26ba1b41ec978e5d08632afd03b88c54951e0d970ae08e3cc26a"
+      "bytes": 26573350,
+      "sha256": "82726ce090131249e17c8c25955626e2de2632c24978b8073eb2057d0c81f6d1"
     },
     "halo-ce-switch-content-preview-2.9.2-source.zip": {
-      "bytes": 18283538,
-      "sha256": "2402a8fd4733bfe4a91e4f0850704c30e885a5309ca5db6ca0cc76d49aa10c60"
+      "bytes": 18283647,
+      "sha256": "e973f180c10f9301d70de149ff6b58d926b12ddf38137e7107d470e0a9642359"
     },
     "BUILD-EVIDENCE.txt": {
-      "bytes": 2187,
-      "sha256": "1cb9ec2c9674146f341d3c46b79dadf668e94582f9e885140af6c18933dbf206"
+      "bytes": 2503,
+      "sha256": "69f256625422442c86093823c0d3a2ff2722e73eca0e42563eceb92622e00de3"
     },
     "SOURCE-HASHES.sha256": {
       "bytes": 52294,
-      "sha256": "5e5fe8c0dc66650664d9ddd1264357566419eade612812df0a59876c3dbf164c"
+      "sha256": "60f0c8eebae31de96d5aafb5e2944995b765646e1dc4db660a57faacf0b3bfbf"
     },
     "RELEASE-NOTES.md": {
       "bytes": 725,
       "sha256": "92d579b1b0df5a0da7d5c5d3e41e14cc8f9520e1ae1ef237afc76b216f92feb6"
     }
-  }
+  },
+  "combat_help_xml_sha256": "a7e6fd02fd506959e64c590f25a0ac44ccecb3d52f6f92ae3b71ec29f74ebcd0",
+  "footer_position_verified": true
 }
