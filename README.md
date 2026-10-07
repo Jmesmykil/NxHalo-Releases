@@ -8,21 +8,15 @@ NxHalo is a native Halo: Combat Evolved port with separate Nintendo Switch and S
 
 **Stable Switch build: Build14 / v0.1.1.** [Build14](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.1-build14) remains the stable campaign baseline and latest non-prerelease. It is a separate title from Profile33 and remains available for rollback.
 
-**Newest Steam Deck/Linux build: Preview 2.6 / v0.2.6 (pre-release, protocol 11).** The [release](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.6-steamdeck-preview6) routes the Xbox menu into the responsive waiting lobby, follows the actual window shape, fixes the game-mode label and hardens nested Custom Edition map ZIP import. It retains cross-console/browser discovery, player inspection and confirmed remote-console Kick/Ban actions. Omarchy built the runtime, and its installed Deck hash was verified. Physical captures show the wide lobby and 128/128 synthetic lobby players; a 128-player battle, controller moderation and internet map-download/join remain unverified.
+**Newest Steam Deck/Linux build: Unified Preview 2.7 / v0.2.7 (pre-release).** [Download the unified release](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.7-steamdeck-unified7). Campaign, online co-op, native multiplayer, separate server filters, CE map setup and host character presets now use one executable with V11/V20/V21 profiles. V11 is multiplayer-only. Host bipeds must exist in the map. Full unified Linux source is [`steam-unified/`](steam-unified); the Switch source remains separate.
 
-**Community online campaign: OpenCE, protocol 21.** The same release provides a separate community campaign runtime and source, with upstream online campaign synchronization and PUBLIC/PRIVATE lobbies. It is installed alongside NxHalo with an isolated save root and has reached its main menu on the Deck. Two-player campaign gameplay remains unverified. All peers need compatible protocol-21 builds; retain NxHalo for protocol-11 Switch/native/browser rooms.
+**Custom Maps & Mods** imports supported map/ZIP files and required owner resource companions, downloads maps through HaloNet, and selects campaign/host characters. OpenSauce/Chimera engine extensions need individual native ports. [Content scope and verification limits](releases/v0.2.7-steamdeck-unified7/SUPPORTED-MODS.md).
 
 The Deck build is native Linux, not Proton. It needs your own prepared compatible Halo CE maps and support files. No game maps, executable, ROM, shader instruction data, console keys or saves are supplied. See the release notes for precise installation and verification status.
 
-## Server discovery and online campaign
+## Server discovery
 
-Preview 2.6 separates **JOIN CAMPAIGN LOBBIES**, **HOST ONLINE CAMPAIGN**, **MULTIPLAYER SERVERS**, and **ALL COMMUNITY SERVERS**. Online campaign does not require a second local controller; local split-screen remains a separate option. NxHalo's Multiplayer > ONLINE CAMPAIGN opens the installed OpenCE component.
-
-Source/version filters keep current V21, legacy V11-20, broker-published, community-announced, classic Halo CE, and classic Halo PC listings separate. The live directory refreshes every ten seconds alongside all four upstream brokers. Native legacy invites launch the sibling `Chupathingy-Legacy` client included in the release. Extract it beside `OpenCE-Campaign` and the NxHalo runtime.
-
-Classic master snapshots contain 253 CE and 97 PC addresses from October 6, 2026. They are listed separately with unknown player counts and activity; joining them requires a classic client. These are all discovered public sources, not a claim to enumerate private or unpublished servers.
-
-The installed Deck build displayed active native rooms and reached live multiplayer gameplay. Final campaign routing and classic-client feedback are installed for the next launch; a two-player campaign run and a legacy real-match handoff remain unverified. Friends/follow and proximity voice remain unimplemented.
+Campaign, multiplayer, all-community, current/legacy native versions, broker and community-announced sources remain separately filtered. Native joins use the same executable. Classic PC/CE snapshots remain separate and are not native-joinable. Online co-op uses remote players without a second controller.
 
 ## Play with your own game
 
@@ -34,7 +28,7 @@ The Switch must already be configured to run this homebrew title. Setup apps are
 
 ## Validation status
 
-Preview 2.6 has physical Deck installation, binary hash verification, visible wide-lobby output and a 128-player synthetic lobby capture. Seven map archive fixtures passed and source received independent review. Native multiplayer gameplay was captured on the Deck. Final filter changes, controller moderation, internet map download/join and two-player campaign gameplay still need acceptance.
+Unified Preview 2.7 is installed on the Deck with a verified executable hash. Content/network menus were captured; archive fixtures and native linking passed. Private host initialization followed a reproduced and corrected keepalive memory fault. Real CE gameplay, two-client interoperability, alternate-character matches and full download/join remain unverified. The prior synthetic roster capture does not prove a 128-player battle.
 
 ## Source
 

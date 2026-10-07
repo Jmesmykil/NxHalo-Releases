@@ -1,0 +1,47 @@
+{
+  "name": "NxHalo Unified Preview 2.7",
+  "tag": "v0.2.7-steamdeck-unified7",
+  "prerelease": true,
+  "single_executable": true,
+  "binary_sha256": "9dec67785bf3ca80107fd78cf3e4c8ba1db269b3c9aaffe3b89a3c60a2a5a1de",
+  "network_host_profiles": [
+    11,
+    20,
+    21
+  ],
+  "game_data_included": false,
+  "rollback_preserved": true,
+  "acceptance": {
+    "deck_install_hash_checked": true,
+    "content_menu_captured": true,
+    "network_menu_captured": true,
+    "archive_contract_cases_passed": 10,
+    "private_host_initialization_profiles": [
+      11,
+      20,
+      21
+    ],
+    "synthetic_peer_join_verified": false,
+    "real_client_interoperability_verified": false,
+    "real_ce_map_gameplay_verified": false,
+    "alternate_character_match_verified": false
+  },
+  "assets": {
+    "NxHalo-SteamDeck-unified-preview2.7.tar.gz": {
+      "bytes": 22007941,
+      "sha256": "541e7e1540c05b423ce74ddaeeb80575f1f30e58742a34097b25582979f9ecda"
+    },
+    "NxHalo-Unified-source.zip": {
+      "bytes": 17847965,
+      "sha256": "259df7a92804fb127b78c0f7a97c4be76c359cf48bc0be55cc2e103d0b8bf4ee"
+    },
+    "SUPPORTED-MODS.md": {
+      "bytes": 2367,
+      "sha256": "5665d6e55eef02d315e42fa42f979b0ccfe2cfb2eb8647e99240900e513c548c"
+    },
+    "release-notes.md": {
+      "bytes": 2287,
+      "sha256": "2f400cc4e54b00af0a8ed93631d49a94ce97ca0df30c445de0d07f623928c467"
+    }
+  }
+}

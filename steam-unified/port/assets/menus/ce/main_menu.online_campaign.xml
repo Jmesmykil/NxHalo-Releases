@@ -1,0 +1,91 @@
+<menus>
+ <widget name="main_menu/online_campaign/root" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+  <on event="b" back="true" />
+  <child widget="main_menu/online_campaign/title" />
+  <child widget="main_menu/online_campaign/list" />
+  <child widget="main_menu/online_campaign/help" />
+ </widget>
+ <widget name="main_menu/online_campaign/title" type="text" controller="1" left="40" top="40" width="560" height="60" text="ONLINE GAMES" font="ui\large_ui" color="#FF2896FF" />
+ <widget name="main_menu/online_campaign/list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+  <child widget="main_menu/online_campaign/mp_join_campaign" y="105" />
+  <child widget="main_menu/online_campaign/mp_create_campaign" y="141" />
+  <child widget="main_menu/online_campaign/mp_join_multiplayer" y="177" />
+  <child widget="main_menu/online_campaign/mp_create_multiplayer" y="213" /><child widget="main_menu/online_campaign/multiplayer_type_join_all_item" y="249" />
+  <child widget="main_menu/online_campaign/multiplayer_type_coop_item" y="285" />
+  <child widget="main_menu/online_campaign/filter_button" y="321" />
+  <child widget="main_menu/online_campaign/quit" y="357" />
+ </widget>
+ <widget name="main_menu/online_campaign/mp_join_campaign" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="JOIN CAMPAIGN LOBBIES" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="start" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/mp_create_campaign" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="HOST ONLINE CAMPAIGN" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
+  <on event="a" run="join controller to mp game" />
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/connected/connected_map_select_wrapper" />
+  <on event="start" run="join controller to mp game" />
+  <on event="start" run="mp type set mode" open="main_menu/multiplayer_type_select/connected/connected_map_select_wrapper" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/multiplayer_type_coop_item" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="LOCAL SPLIT-SCREEN (2 CONTROLLERS)" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
+  <on event="a" run="port coop begin" open="main_menu/multiplayer_type_select/coop/player_2_profile_screen" branch="true" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/quit" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="BACK TO MAIN MENU" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
+  <on event="a" back="true" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/help" type="text" controller="1" left="50" top="414" width="540" height="50" text="Online play uses remote players. No second local controller is required." font="ui\small_ui" color="#FFFFFFFF" />
+ <widget name="main_menu/online_campaign/mp_join_multiplayer" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="MULTIPLAYER SERVERS" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="start" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/multiplayer_type_join_all_item" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="ALL COMMUNITY SERVERS" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="start" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/filter_button" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="SERVER SOURCE / VERSION FILTERS" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
+  <on event="a" open="main_menu/online_campaign/filters" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/filters" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+  <on event="b" back="true" />
+  <child widget="main_menu/online_campaign/filter_title" />
+  <child widget="main_menu/online_campaign/filter_list" />
+ </widget>
+ <widget name="main_menu/online_campaign/filter_title" type="text" controller="1" left="40" top="40" width="560" height="60" text="SERVER FILTERS" font="ui\large_ui" color="#FF2896FF" />
+ <widget name="main_menu/online_campaign/filter_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+  <child widget="main_menu/online_campaign/multiplayer_type_join_current_item" y="132" />
+  <child widget="main_menu/online_campaign/multiplayer_type_join_legacy_item" y="186" />
+  <child widget="main_menu/online_campaign/multiplayer_type_join_broker_item" y="240" />
+  <child widget="main_menu/online_campaign/multiplayer_type_join_announced_item" y="294" />
+  <child widget="main_menu/online_campaign/mp_join_classic_ce" y="348" />
+  <child widget="main_menu/online_campaign/mp_join_classic_pc" y="402" />
+ </widget>
+ <widget name="main_menu/online_campaign/multiplayer_type_join_current_item" type="text" controller="1" left="50" width="540" height="38" bitmap="bitmaps/list_item_bkd" text="CURRENT NATIVE ROOMS (V21)" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="6">
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/multiplayer_type_join_legacy_item" type="text" controller="1" left="50" width="540" height="38" bitmap="bitmaps/list_item_bkd" text="LEGACY NATIVE ROOMS (V11-20)" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="6">
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/multiplayer_type_join_broker_item" type="text" controller="1" left="50" width="540" height="38" bitmap="bitmaps/list_item_bkd" text="BROKER-PUBLISHED SERVERS" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="6">
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/multiplayer_type_join_announced_item" type="text" controller="1" left="50" width="540" height="38" bitmap="bitmaps/list_item_bkd" text="COMMUNITY-ANNOUNCED SERVERS" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="6">
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/mp_join_classic_ce" type="text" controller="1" left="50" width="540" height="38" bitmap="bitmaps/list_item_bkd" text="CLASSIC HALO CE MASTER LIST" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="6">
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/mp_join_classic_pc" type="text" controller="1" left="50" width="540" height="38" bitmap="bitmaps/list_item_bkd" text="CLASSIC HALO PC MASTER LIST" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="6">
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+<widget name="main_menu/online_campaign/mp_create_multiplayer" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="HOST MULTIPLAYER" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3"><on event="a" run="join controller to mp game" /><on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/connected/connected_map_select_wrapper" /><on event="start" run="join controller to mp game" /><on event="start" run="mp type set mode" open="main_menu/multiplayer_type_select/connected/connected_map_select_wrapper" /><on event="left_mouse" run="mouse emit accept event" /></widget></menus>
