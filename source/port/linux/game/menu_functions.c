@@ -3607,7 +3607,8 @@ static void lobby_utf8(wchar_t const *wide, char *text, size_t size)
 /* Replace the legacy boxed team-selection art with a responsive lobby view.
 The original list and widgets still own focus, scrolling, team changes and
 start/leave actions; this only presents their live state. */
-static void lobby_overlay_render(struct network_game const *game, short seconds, short selected_row)
+static void lobby_overlay_render(struct network_game const *game, short seconds, short selected_row,
+	struct widget_instance *list)
 {
 	float margin, left, usable, list_width, right, right_width;
 	long width, index;
@@ -3749,6 +3750,12 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
 	}
 	ui_overlay_rect(508, 414, 112, 26, 4, 0x612F3AFF);
 	ui_overlay_text(UI_FONT_BOLD, 8, 564, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "LEAVE");
+	/* Keep controller/keyboard focus visible over the covered legacy art. */
+	{
+		struct widget_instance *bar = named(list, "lobby_button_bar", 0);
+		if (bar && list->focused_child == bar && bar->focused_child && bar->focused_child->visible)
+			ui_overlay_outline(bar->focused_child->horizontal_offset, 414, 112, 26, 4, 2, 0xEAF3FFFF);
+	}
 	ui_overlay_text(UI_FONT_REGULAR, 8, 320, 453, UI_ALIGN_CENTER, 0xAFC4E0FF,
 		"UP/DOWN BROWSE  |  SELECT A REMOTE PLAYER  |  CONFIRM KICK/BAN  |  B BACK");
 }
@@ -3994,7 +4001,7 @@ static void lobby_update(struct widget_instance *list)
 				}
 			}
 		}
-		lobby_overlay_render(game, seconds, selected);
+		lobby_overlay_render(game, seconds, selected, list);
 	}
 	profile_name_show(description);
 }
