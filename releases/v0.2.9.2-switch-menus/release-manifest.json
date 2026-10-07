@@ -1,0 +1,51 @@
+{
+  "name": "NxHalo Unified Switch Content Preview 2.9.2",
+  "tag": "v0.2.9.2-switch-menus",
+  "prerelease": true,
+  "platform": "Nintendo Switch",
+  "artifact_type": "standalone NRO",
+  "nro_sha256": "56d7420ca04a26ba1b41ec978e5d08632afd03b88c54951e0d970ae08e3cc26a",
+  "sanitized_source_sha256": "2402a8fd4733bfe4a91e4f0850704c30e885a5309ca5db6ca0cc76d49aa10c60",
+  "source_hash_manifest_sha256": "5e5fe8c0dc66650664d9ddd1264357566419eade612812df0a59876c3dbf164c",
+  "embedded_guest_elf_sha256": "50dd1b744ce5d9a4fd0375037a34ed7b49b41fe17446dde7b9845cde33ac8007",
+  "title_id": "010048414C210000",
+  "nacp_title": "HALO: CE Content Preview 2.9.2",
+  "nacp_version": "2.9.2-preview",
+  "switch_sd_staging_verified": false,
+  "physical_install_verified": false,
+  "physical_runtime_verified": false,
+  "rollback_preserved": true,
+  "previous_release": "v0.2.9.1-switch-content",
+  "source_archive_entries": 2313,
+  "excluded_content": [
+    "game maps",
+    "owner resource companions",
+    "generated shader microcode and all .inc files",
+    "console keys",
+    "personal saves",
+    "generated binaries and dependency links"
+  ],
+  "build": "guest and host builds succeeded",
+  "assets": {
+    "halo.nro": {
+      "bytes": 26573198,
+      "sha256": "56d7420ca04a26ba1b41ec978e5d08632afd03b88c54951e0d970ae08e3cc26a"
+    },
+    "halo-ce-switch-content-preview-2.9.2-source.zip": {
+      "bytes": 18283538,
+      "sha256": "2402a8fd4733bfe4a91e4f0850704c30e885a5309ca5db6ca0cc76d49aa10c60"
+    },
+    "BUILD-EVIDENCE.txt": {
+      "bytes": 2187,
+      "sha256": "1cb9ec2c9674146f341d3c46b79dadf668e94582f9e885140af6c18933dbf206"
+    },
+    "SOURCE-HASHES.sha256": {
+      "bytes": 52294,
+      "sha256": "5e5fe8c0dc66650664d9ddd1264357566419eade612812df0a59876c3dbf164c"
+    },
+    "RELEASE-NOTES.md": {
+      "bytes": 725,
+      "sha256": "92d579b1b0df5a0da7d5c5d3e41e14cc8f9520e1ae1ef237afc76b216f92feb6"
+    }
+  }
+}

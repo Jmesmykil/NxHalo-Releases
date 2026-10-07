@@ -1,0 +1,77 @@
+{
+  "name": "NxHalo Unified Content Preview 2.9.1",
+  "tag": "v0.2.9.1-steamdeck-content",
+  "prerelease": true,
+  "platform": "Steam Deck/Linux",
+  "binary_sha256": "84336f0f5394a53ea9d8ff6fc8b1e350c6709feb7aa967d378915b9ff3003918",
+  "source_sha256": "b05e6cccf38a412964e0aac3b63a786f048cc04a2f4b2eea0ec0838b21d9feb3",
+  "deck_install_verified": true,
+  "running_process_binary_sha256": "84336f0f5394a53ea9d8ff6fc8b1e350c6709feb7aa967d378915b9ff3003918",
+  "rollback_binary": "halo.before-menus292-20261007; public match process PID 579445 remains on previous binary until relaunch",
+  "acceptance": {
+    "native_deck_catalog_capture_reviewed": true,
+    "catalog_matching_entries": 5020,
+    "catalog_pages": 558,
+    "dynamic_search_label_visible": true,
+    "physical_search_entry_verified": false,
+    "parser_query_unit_tested": true,
+    "texture_overrides_off_visible": true,
+    "deck_upscaling_off_visible": true,
+    "native_upscale_modes": [
+      "Off",
+      "Quality",
+      "Performance"
+    ],
+    "software_gl_output": "1280x800",
+    "deck_performance_measured": false,
+    "upscale_is_fsr": false,
+    "native_texture_upload_trace": "synthetic TGA identity/decode/GL upload trace for sky\\sky_x10\\bitmaps\\space bitmap 0",
+    "visible_texture_pixel_proof": false,
+    "full_128_player_acceptance": false,
+    "live_preset_matches": false,
+    "friends_voice": false,
+    "production_selector_regression": {
+      "row_0": "selects",
+      "row_11": "selects",
+      "row_12": "rejected",
+      "clipboard_fallback": "intact"
+    }
+  },
+  "excluded_content": [
+    "game maps",
+    "owner resource companions",
+    "shader instruction tokens",
+    "console keys",
+    "personal saves"
+  ],
+  "assets": {
+    "NxHalo-SteamDeck-unified-content-preview2.9.1.tar.gz": {
+      "bytes": 22104449,
+      "sha256": "772be2f23b5bc4b324bb2dd8a63abffb396a9b472906568b3732fed3fce474b4"
+    },
+    "NxHalo-Unified-source-2.9.1.zip": {
+      "bytes": 17887156,
+      "sha256": "b05e6cccf38a412964e0aac3b63a786f048cc04a2f4b2eea0ec0838b21d9feb3"
+    },
+    "NATIVE-CONTENT.md": {
+      "bytes": 3308,
+      "sha256": "783c086c08170ef1ab845a385d5ab67e64d4e7673cc2055491dd5167180255a4"
+    },
+    "SUPPORTED-MODS.md": {
+      "bytes": 2211,
+      "sha256": "bfc7c9beb983af52c9f28926afec9fb0b6c517cbd0b90ed7c6cb439ba32a893d"
+    },
+    "release-notes.md": {
+      "bytes": 1231,
+      "sha256": "1d218332b90b764d74116a11a97eadceb7bc54f988e173d362fcad1110b60560"
+    },
+    "NxHalo-SteamDeck-unified-content-preview2.9.2.tar.gz": {
+      "bytes": 22113928,
+      "sha256": "724e9fbb9489880edb72098f1b74aaed739095c1a8728c48949fbb82b8aa0f4b"
+    }
+  },
+  "running_process_is_release_binary": false,
+  "hotfix": "mods_pack_N texture-pack selection callback routing",
+  "previous_release": "v0.2.9-steamdeck-content",
+  "deck_installed_binary_sha256": "03a94e8d49c3533807c478ba2a3390080db8f74b8b1a207b31510efa2882c84b"
+}

@@ -5853,6 +5853,17 @@ void pc_menu_game_data_function_invoke(
 		gametype_edit_list_update(widget);
 	else if (!strcmp(name, "get edit game settings name"))
 		gametype_edit_name(widget);
+    else if (!strcmp(name, "playlist settings menu update desc")) {
+        struct widget_instance *description = widget->parameters.list.extended_description;
+        struct widget_instance *help = named(description, "playlist_edit_ext_desc_text", 0);
+        struct widget_instance *picture = named(description, "playlist_edit_ext_desc_pic", 0);
+        struct game_variant *variant = edit_variant();
+        short row = focused_row(widget);
+        if (help && row >= 0 && row < 7) help->parameters.text_box.string_list_index = row;
+        if (picture && variant)
+            picture->animation.current_frame_index = (short)PIN(variant->game_engine_index, 0, 5);
+    }
+
 	else if (!strcmp(name, "game settings lists text update"))
 		gametype_option_help(widget);
 	else if (!strcmp(name, "mp edit profile set rule text"))
@@ -5863,7 +5874,10 @@ void pc_menu_game_data_function_invoke(
 		preview_update(widget);
 	else if (!strcmp(name, "port match status")) {
 			char line[512]; wchar_t text[512];
-			snprintf(line,sizeof(line),"Preset: %s\r\nFactions: %s\r\n%s",match_rules_preset_name(match_rules_preset_get()),match_rules_matchup_name(match_rules_matchup_get()),match_rules_status());
+			if (match_rules_preset_get() == MATCH_RULES_PRESET_FACTION)
+                snprintf(line,sizeof(line),"Selected: %s\r\n%.160s",match_rules_matchup_name(match_rules_matchup_get()),match_rules_status());
+            else
+                snprintf(line,sizeof(line),"Selected: %s\r\n%.160s",match_rules_preset_name(match_rules_preset_get()),match_rules_status());
 			text_to_wide(line,text,NUMBEROF(text));text_set_length(widget,text,NUMBEROF(text));return;
 		}
 		else if (!strcmp(name, "port character status")) {

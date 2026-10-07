@@ -203,8 +203,13 @@ boolean match_rules_preset_available(short preset, char *reason, int reason_size
         }
         break;
     case MATCH_RULES_PRESET_ZOMBIES:
-        if (players_in_game() < 2)
-            message = "Zombies waits for two connected players. Flood biped tags are optional; without them, infected retain the standard appearance.";
+        if (!nxhalo_zombie_sword_available())
+        {
+            available = FALSE;
+            message = "This map has no playable energy sword. Choose a sword-enabled custom map.";
+        }
+        else if (players_in_game() < 2)
+            message = "Zombies waits for two connected players. Flood biped tags are optional; infected retain the standard appearance when absent.";
         else if (!faction_bipeds(NXHALO_FACTION_FLOOD, definitions, 8))
             message = "Zombies is playable with standard infected appearance; Flood biped tags are optional and are not auto-delivered.";
         break;
@@ -396,6 +401,13 @@ static boolean zombies_initialize(void)
         set_message("Zombies waits for a second connected player; infection rules will initialize at the next prespawn.");
         return FALSE;
     }
+    if (!nxhalo_zombie_sword_available())
+    {
+        zombies_initialized = TRUE;
+        zombies_ready = FALSE;
+        set_message("This map has no playable energy sword. Choose a sword-enabled custom map.");
+        return FALSE;
+    }
     /* Prefer players whose first unit has not been created. A solo match may
     have spawned its first player before a second joins; that existing unit
     already went over the reliable object-create channel as a human. */
@@ -427,7 +439,7 @@ static boolean zombies_initialize(void)
             zombies_infected[absolute] = TRUE;
     }
     zombies_ready = TRUE;
-    set_message("Zombies: one initial infected chosen; infected players return as Flood and use melee only.");
+    set_message("Zombies: one initial infected chosen; infected use a selected sword as their melee-only weapon.");
     return TRUE;
 }
 
@@ -462,7 +474,7 @@ void match_rules_host_player_killed(long dead_player_index)
     zombies_infected[absolute] = TRUE;
     player = player_get(dead_player_index);
     update_host_team(player, dead_player_index, 1);
-    set_message("Zombies: the host converted the player on death; infected players spawn with melee only.");
+    set_message("Zombies: the host converted the player on death; infected respawn with the sword selected.");
 }
 
 long match_rules_host_spawn_definition(long player_index, long fallback_definition)
@@ -501,7 +513,7 @@ long match_rules_host_spawn_definition(long player_index, long fallback_definiti
     if (count <= 0)
     {
         set_message(preset == MATCH_RULES_PRESET_ZOMBIES ?
-            "Zombies is active; Flood biped tags are unavailable on this map, so infected retain the standard appearance." :
+            "This map has no Flood models; infected use the normal character." :
             "Faction matches require faction biped assets loaded by the selected map; assets are not auto-delivered, so the standard biped is retained.");
         return fallback_definition;
     }
@@ -569,10 +581,11 @@ void match_rules_host_postspawn_player(long player_index)
         absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
         if (absolute >= 0 && absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS && zombies_player_is_infected(player_index))
         {
-            unit_delete_all_weapons(unit_index);
             unit->unit.grenade_counts[_unit_grenade_human_fragmentation] = 0;
             unit->unit.grenade_counts[_unit_grenade_covenant_plasma] = 0;
             unit->unit.desired_grenade_index = NONE;
+            if (!nxhalo_give_zombie_sword(unit_index))
+                set_message("Sword could not be equipped; existing weapons were kept.");
         }
     }
 }

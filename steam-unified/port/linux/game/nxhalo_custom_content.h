@@ -12,6 +12,8 @@ enum nxhalo_character_faction
 long nxhalo_campaign_character_definition(long fallback_definition);
 long nxhalo_multiplayer_character_definition(long fallback_definition);
 short nxhalo_character_faction_bipeds(short faction, long *definitions, short capacity);
+boolean nxhalo_zombie_sword_available(void);
+boolean nxhalo_give_zombie_sword(long unit_index);
 /* Separate campaign and host selectors for the native overlay. */
 short nxhalo_character_count(void);
 char const *nxhalo_character_name(short choice);

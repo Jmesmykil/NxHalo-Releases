@@ -1,1 +1,114 @@
-<menus><widget name="main_menu/match_rules/presets" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient"><on event="b" back="true" /><child widget="main_menu/match_rules/presets_title" /><child widget="main_menu/match_rules/presets_list" /><child widget="main_menu/match_rules/presets_status" /></widget><widget name="main_menu/match_rules/presets_title" type="text" controller="1" left="40" top="30" width="560" height="50" text="MATCH PRESETS" font="ui\large_ui" color="#FF2896FF" /><widget name="main_menu/match_rules/presets_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items"><child widget="main_menu/match_rules/presets_0" y="98" /><child widget="main_menu/match_rules/presets_1" y="130" /><child widget="main_menu/match_rules/presets_2" y="162" /><child widget="main_menu/match_rules/presets_3" y="194" /><child widget="main_menu/match_rules/presets_4" y="226" /><child widget="main_menu/match_rules/presets_5" y="258" /><child widget="main_menu/match_rules/presets_6" y="290" /><child widget="main_menu/match_rules/presets_factions" y="322" /></widget><widget name="main_menu/match_rules/presets_0" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="STANDARD / FULL CUSTOM" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3"><on event="a" run="port match preset" /><on event="start" run="port match preset" /><on event="left_mouse" run="mouse emit accept event" /></widget><widget name="main_menu/match_rules/presets_1" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="FACTION TEAMS" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3"><on event="a" run="port match preset" /><on event="start" run="port match preset" /><on event="left_mouse" run="mouse emit accept event" /></widget><widget name="main_menu/match_rules/presets_2" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="TEAM SWAT (CE)" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3"><on event="a" run="port match preset" /><on event="start" run="port match preset" /><on event="left_mouse" run="mouse emit accept event" /></widget><widget name="main_menu/match_rules/presets_3" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="TOWER OF POWER" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3"><on event="a" run="port match preset" /><on event="start" run="port match preset" /><on event="left_mouse" run="mouse emit accept event" /></widget><widget name="main_menu/match_rules/presets_4" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="DODGEBALL" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3"><on event="a" run="port match preset" /><on event="start" run="port match preset" /><on event="left_mouse" run="mouse emit accept event" /></widget><widget name="main_menu/match_rules/presets_5" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="ZOMBIES / INFECTION" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3"><on event="a" run="port match preset" /><on event="start" run="port match preset" /><on event="left_mouse" run="mouse emit accept event" /></widget><widget name="main_menu/match_rules/presets_6" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="RACING" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3"><on event="a" run="port match preset" /><on event="start" run="port match preset" /><on event="left_mouse" run="mouse emit accept event" /></widget><widget name="main_menu/match_rules/presets_factions" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="FACTION MATCHUP / MAP REQUIREMENTS" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3"><on event="a" open="main_menu/match_rules/factions" /><on event="start" open="main_menu/match_rules/factions" /><on event="left_mouse" run="mouse emit accept event" /></widget><widget name="main_menu/match_rules/presets_status" type="text" controller="1" left="50" top="362" width="540" height="100" font="ui\small_ui" color="#FFFFFFFF"><data input="port match status" /></widget><widget name="main_menu/match_rules/factions" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient"><on event="b" back="true" /><child widget="main_menu/match_rules/factions_title" /><child widget="main_menu/match_rules/factions_list" /><child widget="main_menu/match_rules/factions_status" /></widget><widget name="main_menu/match_rules/factions_title" type="text" controller="1" left="40" top="30" width="560" height="50" text="RANDOM TEAM CHARACTERS" font="ui\large_ui" color="#FF2896FF" /><widget name="main_menu/match_rules/factions_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items"><child widget="main_menu/match_rules/factions_0" y="98" /><child widget="main_menu/match_rules/factions_1" y="130" /><child widget="main_menu/match_rules/factions_2" y="162" /></widget><widget name="main_menu/match_rules/factions_0" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="COVENANT vs USMC / MARINES" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3"><on event="a" run="port faction matchup" /><on event="start" run="port faction matchup" /><on event="left_mouse" run="mouse emit accept event" /></widget><widget name="main_menu/match_rules/factions_1" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="USMC / MARINES vs FLOOD" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3"><on event="a" run="port faction matchup" /><on event="start" run="port faction matchup" /><on event="left_mouse" run="mouse emit accept event" /></widget><widget name="main_menu/match_rules/factions_2" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="FLOOD vs COVENANT" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3"><on event="a" run="port faction matchup" /><on event="start" run="port faction matchup" /><on event="left_mouse" run="mouse emit accept event" /></widget><widget name="main_menu/match_rules/factions_status" type="text" controller="1" left="50" top="362" width="540" height="100" font="ui\small_ui" color="#FFFFFFFF"><data input="port match status" /></widget></menus>
+<menus>
+ <widget name="main_menu/match_rules/presets" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+  <on event="b" back="true" />
+  <child widget="main_menu/match_rules/presets_title" />
+  <child widget="main_menu/match_rules/presets_list" />
+  <child widget="main_menu/match_rules/presets_status" />
+ </widget>
+ <widget name="main_menu/match_rules/presets_title" type="text" controller="1" left="40" top="30" width="560" height="50" text="GAME MODES" font="ui\large_ui" color="#FF2896FF" />
+ <widget name="main_menu/match_rules/presets_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+  <child widget="main_menu/match_rules/presets_0" y="105" />
+  <child widget="main_menu/match_rules/combat_menu" y="153" />
+  <child widget="main_menu/match_rules/presets_factions" y="201" />
+  <child widget="main_menu/match_rules/presets_6" y="249" />
+ </widget>
+ <widget name="main_menu/match_rules/presets_0" type="text" controller="1" left="45" width="550" height="32" bitmap="bitmaps/list_item_bkd" text="STANDARD / CUSTOM GAMETYPE" font="ui\large_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" run="port match preset" />
+  <on event="start" run="port match preset" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/presets_1" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="FACTION TEAMS" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" run="port match preset" />
+  <on event="start" run="port match preset" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/presets_2" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="TEAM SWAT (CE)" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" run="port match preset" />
+  <on event="start" run="port match preset" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/presets_3" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="TOWER OF POWER" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" run="port match preset" />
+  <on event="start" run="port match preset" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/presets_4" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="DODGEBALL" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" run="port match preset" />
+  <on event="start" run="port match preset" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/presets_5" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="ZOMBIES / INFECTION" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" run="port match preset" />
+  <on event="start" run="port match preset" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/presets_6" type="text" controller="1" left="45" width="550" height="32" bitmap="bitmaps/list_item_bkd" text="RACING" font="ui\large_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" run="port match preset" />
+  <on event="start" run="port match preset" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/presets_factions" type="text" controller="1" left="45" width="550" height="32" bitmap="bitmaps/list_item_bkd" text="FACTION MATCHES" font="ui\large_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" open="main_menu/match_rules/factions" />
+  <on event="start" open="main_menu/match_rules/factions" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/presets_status" type="text" controller="1" left="50" top="358" width="540" height="112" font="ui\small_ui" color="#FFFFFFFF">
+  <data input="port match status" />
+ </widget>
+ <widget name="main_menu/match_rules/factions" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+  <on event="b" back="true" />
+  <child widget="main_menu/match_rules/factions_title" />
+  <child widget="main_menu/match_rules/factions_list" />
+  <child widget="main_menu/match_rules/factions_status" />
+ </widget>
+ <widget name="main_menu/match_rules/factions_title" type="text" controller="1" left="40" top="30" width="560" height="50" text="RANDOM TEAM CHARACTERS" font="ui\large_ui" color="#FF2896FF" />
+ <widget name="main_menu/match_rules/factions_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+  <child widget="main_menu/match_rules/factions_0" y="98" />
+  <child widget="main_menu/match_rules/factions_1" y="130" />
+  <child widget="main_menu/match_rules/factions_2" y="162" />
+ </widget>
+ <widget name="main_menu/match_rules/factions_0" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="COVENANT vs USMC / MARINES" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" run="port faction matchup" />
+  <on event="start" run="port faction matchup" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/factions_1" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="USMC / MARINES vs FLOOD" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" run="port faction matchup" />
+  <on event="start" run="port faction matchup" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/factions_2" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="FLOOD vs COVENANT" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" run="port faction matchup" />
+  <on event="start" run="port faction matchup" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/factions_status" type="text" controller="1" left="50" top="362" width="540" height="100" font="ui\small_ui" color="#FFFFFFFF">
+  <data input="port match status" />
+ </widget>
+ <widget name="main_menu/match_rules/custom_gametypes" type="text" controller="1" left="45" width="550" height="28" bitmap="bitmaps/list_item_bkd" text="CREATE / EDIT CUSTOM GAMETYPES" font="ui\small_ui" color="#FF2896FF" text_x="12" text_y="3">
+  <on event="a" open="main_menu/settings_select/multiplayer_setup/playlist_select/gametype_select_screen" />
+  <on event="start" open="main_menu/settings_select/multiplayer_setup/playlist_select/gametype_select_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/combat_menu" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="COMBAT MODES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+  <on event="a" open="main_menu/match_rules/combat" />
+  <on event="start" open="main_menu/match_rules/combat" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/match_rules/combat" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+  <on event="b" back="true" />
+  <child widget="main_menu/match_rules/combat_title" />
+  <child widget="main_menu/match_rules/combat_list" />
+  <child widget="main_menu/match_rules/combat_help" />
+ </widget>
+ <widget name="main_menu/match_rules/combat_title" type="text" controller="1" left="40" top="30" width="560" height="50" text="COMBAT MODES" font="ui\large_ui" color="#FF2896FF" />
+ <widget name="main_menu/match_rules/combat_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+  <child widget="main_menu/match_rules/presets_2" y="105" />
+  <child widget="main_menu/match_rules/presets_3" y="149" />
+  <child widget="main_menu/match_rules/presets_4" y="193" />
+  <child widget="main_menu/match_rules/presets_5" y="237" />
+ </widget>
+ <widget name="main_menu/match_rules/combat_help" type="text" controller="1" left="50" top="400" width="540" height="65" font="ui\small_ui" color="#FFFFFFFF">
+  <data input="port match status" />
+ </widget>
+</menus>

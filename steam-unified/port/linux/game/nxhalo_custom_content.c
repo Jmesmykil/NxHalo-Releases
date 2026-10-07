@@ -10,6 +10,7 @@
 #include "game/players.h"
 #include "interface/hud_messaging.h"
 #include "input/input.h"
+#include "items/weapon_definitions.h"
 #include "objects/object_definitions.h"
 #include "objects/object_types.h"
 #include "objects/objects.h"
@@ -222,6 +223,71 @@ long nxhalo_campaign_character_definition(long fallback_definition)
 long nxhalo_multiplayer_character_definition(long fallback_definition)
 {
     return nxhalo_character_definition_for_context(TRUE, fallback_definition);
+}
+
+static long nxhalo_zombie_sword_definition(void)
+{
+	static char const * const tag_suffixes[] = {
+		"\\energy sword\\energy sword",
+		"\\energy sword\\energy_sword",
+		"\\energy_sword\\energy sword",
+		"\\energy_sword\\energy_sword",
+		"\\energy blade\\energy blade",
+		"\\energy blade\\energy_blade",
+		"\\energy_blade\\energy blade",
+		"\\energy_blade\\energy_blade"
+	};
+	struct tag_iterator iterator;
+	long definition_index;
+	tag_iterator_new(&iterator, WEAPON_DEFINITION_TAG);
+	while ((definition_index = tag_iterator_next(&iterator)) != NONE)
+	{
+		struct weapon_definition *definition = weapon_definition_get(definition_index);
+		short suffix;
+		if (definition->weapon.melee_attack_damage.index == NONE ||
+			definition->weapon.interface_definition.first_person_model.index == NONE ||
+			definition->weapon.interface_definition.first_person_animations.index == NONE ||
+			TEST_FLAG(definition->weapon.flags, _weapon_prevents_melee_attack_bit))
+			continue;
+		for (suffix = 0; suffix < NUMBEROF(tag_suffixes); suffix++)
+			if (string_ends_with(tag_get_name(definition_index), tag_suffixes[suffix]))
+				return definition_index;
+	}
+	return NONE;
+}
+
+boolean nxhalo_zombie_sword_available(void)
+{
+	return nxhalo_zombie_sword_definition() != NONE;
+}
+
+boolean nxhalo_give_zombie_sword(long unit_index)
+{
+	long definition_index = nxhalo_zombie_sword_definition();
+	long weapon_index;
+	short slot;
+	struct object_placement_data placement_data;
+	struct unit_datum *unit;
+	if (unit_index == NONE || definition_index == NONE) return FALSE;
+	object_placement_data_new(&placement_data, definition_index, unit_index);
+	weapon_index = object_new(&placement_data);
+	if (weapon_index == NONE) return FALSE;
+	if (!unit_add_weapon_to_inventory(unit_index, weapon_index, _unit_add_weapon_replace))
+	{
+		object_delete(weapon_index);
+		return FALSE;
+	}
+	unit = unit_get(unit_index);
+	for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
+	{
+		long inventory_weapon = unit->unit.weapon_object_indices[slot];
+		if (inventory_weapon != NONE && object_get(inventory_weapon)->definition_index == definition_index)
+		{
+			unit->unit.desired_weapon_index = slot;
+			return TRUE;
+		}
+	}
+	return FALSE;
 }
 
 /* Only these existing, humanoid-control bipeds are eligible. Infection forms

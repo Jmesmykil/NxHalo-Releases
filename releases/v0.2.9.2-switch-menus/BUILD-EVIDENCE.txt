@@ -1,0 +1,21 @@
+HALO CE Switch Content Preview 2.9.2 candidate
+
+Build results
+- Synced production-frozen match_rules.c/.h, nxhalo_custom_content.c/.h, menu_functions.c/menu_tags.c, menus.json and complete CE XML topology. Retained the Switch SD import/picker adapters and Deck-upscaling-off guard.
+- Guest ELF linked with `ninja -f build.ninja build/android/halo_guest.elf`; Switch NRO repackaged with `DEVKITPRO=/opt/devkitpro make host`.
+- NACP title HALO: CE Content Preview 2.9.2; version 2.9.2-preview; existing title ID 010048414C210000 retained. NRO strings verify title.
+- The synchronized menu routes Join/Create/Local Split/Edit Gametypes as authored in the canonical menu catalog. Match-rule/custom-content sources include the playable-map sword availability gate; stock maps retain inventory and no automatic infection assets.
+- Source ZIP has 2,313 entries and excludes all `.inc` files, build/dependency symlinks, generated binaries, and embedded guest ELF. Audit found no map, yelo, key, ticket, NSP/XCI, instructions.inc, or shader-data entries.
+
+Assets
+NRO: /Users/astral/Documents/Codex/2026-10-05/i-need-you-to-do-this/work/switch-content-candidate/source/port/switch/halo.nro
+Source ZIP: /Volumes/Media/GamePorts/HaloCE-task-builds/20261007/switch-build/content-candidate/release/halo-ce-switch-content-preview-2.9.2-source.zip
+Source hash manifest: /Volumes/Media/GamePorts/HaloCE-task-builds/20261007/switch-build/content-candidate/release/SOURCE-HASHES-2.9.2.sha256
+
+SHA256
+56d7420ca04a26ba1b41ec978e5d08632afd03b88c54951e0d970ae08e3cc26a  halo.nro
+50dd1b744ce5d9a4fd0375037a34ed7b49b41fe17446dde7b9845cde33ac8007  embedded guest ELF
+2402a8fd4733bfe4a91e4f0850704c30e885a5309ca5db6ca0cc76d49aa10c60  sanitized source ZIP
+5e5fe8c0dc66650664d9ddd1264357566419eade612812df0a59876c3dbf164c  source hash manifest
+
+Production Omarchy validation source SHA256 reported by root: 03a94e8d49c3533807c478ba2a3390080db8f74b8b1a207b31510efa2882c84b. Root reports i686 sword harness passed and menu UI tests saved actual custom gametype health changes. This Switch artifact has compile/package evidence only; no Switch device or SD acceptance is claimed. Do not replace published 2.9 artifact.
