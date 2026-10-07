@@ -16,6 +16,6 @@ The reviewed screen shows Deck upscaling off. Available modes are Off, Quality, 
 
 ## Install and acceptance
 
-The final Linux candidate passed a 22-second native CE DeathIsland smoke run with the actor loaded and gameplay ticks progressing. Root is verifying the final Deck install separately; this release note does not claim a fresh install or that the currently running process uses this hash. Retain the previous installed executable for rollback.
+The final Linux candidate passed a 22-second native CE DeathIsland smoke run with the actor loaded and gameplay ticks progressing. It is atomically installed and running on the Deck; PID 566275 and the destination executable both match this release hash. The previous executable remains available as `halo.before-content29-20261007` for rollback.
 
 Full 128-player acceptance, live preset matches, Friends, and voice remain open. No game maps, owner resource companions, shader instruction tokens, console keys, or saves are included. See `NATIVE-CONTENT.md` for details and format limits.
