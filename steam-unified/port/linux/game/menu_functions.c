@@ -2269,6 +2269,8 @@ enum { SERVER_VIEW_ALL, SERVER_VIEW_CAMPAIGN, SERVER_VIEW_MULTIPLAYER, SERVER_VI
 static char map_ready_invite[96];
 static char map_download_invite[96];
 static short map_download_controller;
+static char map_download_map[256];
+static boolean map_download_retry_pending;
 static short server_view = SERVER_VIEW_CAMPAIGN;
 static boolean campaign_host_selected;
 
@@ -3202,6 +3204,38 @@ static struct
 	boolean password_joined;
 } lobby_browser;
 
+/* Download the authoritative rotated map and retain the same room invite.
+ * The browser only retries after that room advertises this exact map. */
+boolean pc_menu_queue_rotated_map_download(char const *map_name)
+{
+	extern char const *cache_files_map_directory(void);
+	char file[64], target[512];
+	short family = map_family_parse(map_name, file, sizeof(file));
+	int index;
+	if (family != _map_family_custom_edition || !file[0] || map_download_retry_pending)
+		return FALSE;
+	for (index = 0; index < lobby_browser.count; index++)
+	{
+		if (!memcmp(lobby_browser.games[index].identifier, lobby_browser.identifier, sizeof(lobby_browser.identifier)) &&
+			lobby_browser.games[index].invite[0])
+		{
+			char const *directory = cache_files_map_directory();
+			int length = snprintf(target, sizeof(target), "%sce\\%s.map", directory, file);
+			if (length < 0 || (size_t)length >= sizeof(target) ||
+				!community_map_download_start(file, target))
+				return FALSE;
+			csstrncpy(map_download_invite, lobby_browser.games[index].invite, sizeof(map_download_invite));
+			map_download_invite[sizeof(map_download_invite) - 1] = 0;
+			csstrncpy(map_download_map, map_name, sizeof(map_download_map));
+			map_download_map[sizeof(map_download_map) - 1] = 0;
+			map_download_controller = lobby_browser.controller;
+			map_download_retry_pending = TRUE;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 static void lobby_browser_begin(void)
 {
 	lobby_browser.count = 0;
@@ -3219,7 +3253,8 @@ static void lobby_browser_begin(void)
 /* "gamespy screen dispose" */
 static void lobby_browser_end(void)
 {
-	map_download_invite[0]=0;
+	if (!map_download_retry_pending)
+		map_download_invite[0] = 0;
 	lobby_browser.joining = lobby_browser.ready = FALSE;
 	p2p_lobby_browse(FALSE);
 }
@@ -3357,14 +3392,43 @@ static void lobby_browser_update(struct widget_instance *list)
 	lobby_browser.count = lobby_browser_collect();
 	{
 		char progress[256]; int state=community_map_download_status(progress,sizeof(progress));
-		if (map_download_invite[0] && state==COMMUNITY_MAP_DOWNLOAD_READY) {
-			short chosen=lobby_browser.chosen; boolean same=chosen>=0 && chosen<lobby_browser.count && !strcmp(lobby_browser.games[chosen].invite,map_download_invite);
-			csstrncpy(map_ready_invite,map_download_invite,sizeof(map_ready_invite)-1);
-			community_map_download_clear(); map_download_invite[0]=0; ui_widget_port_multiplayer_maps_refresh();
-			if (same && ui_map_list_preflight(lobby_browser.games[chosen].map)) ui_widget_port_post_button(map_download_controller,BUTTON_A);
-            else { map_ready_invite[0]=0; network_profile_clear_room(); }
+		if (map_download_retry_pending && state==COMMUNITY_MAP_DOWNLOAD_READY) {
+			short room = NONE, index;
+			for (index = 0; index < lobby_browser.count; index++)
+				if (!strcmp(lobby_browser.games[index].invite, map_download_invite)) { room = index; break; }
+			if (room != NONE && _stricmp(lobby_browser.games[room].map, map_download_map)) {
+				char file[64];
+				short family=map_family_parse(lobby_browser.games[room].map,file,sizeof(file));
+				if (ui_map_list_family_present(family,file)) {
+					csstrncpy(map_download_map,lobby_browser.games[room].map,sizeof(map_download_map));
+					map_download_map[sizeof(map_download_map)-1]=0;
+				} else {
+					community_map_download_clear();
+					map_download_retry_pending=FALSE;
+					if (!pc_menu_queue_rotated_map_download(lobby_browser.games[room].map)) {
+						map_download_invite[0]=map_download_map[0]=0;
+						network_profile_clear_room();
+					}
+					state=COMMUNITY_MAP_DOWNLOAD_IDLE;
+				}
+			}
+			if (state==COMMUNITY_MAP_DOWNLOAD_READY && room != NONE && !_stricmp(lobby_browser.games[room].map, map_download_map)) {
+				csstrncpy(map_ready_invite, map_download_invite, sizeof(map_ready_invite)-1);
+				community_map_download_clear();
+				map_download_invite[0] = map_download_map[0] = 0;
+				map_download_retry_pending = FALSE;
+				ui_widget_port_multiplayer_maps_refresh();
+				lobby_browser.chosen = room;
+				if (ui_map_list_preflight(lobby_browser.games[room].map))
+					ui_widget_port_post_button(map_download_controller, BUTTON_A);
+				else { map_ready_invite[0] = 0; network_profile_clear_room(); }
+			}
 		}
-		else if (state==COMMUNITY_MAP_DOWNLOAD_FAILED) { map_download_invite[0]=0; network_profile_clear_room(); }
+		else if (state==COMMUNITY_MAP_DOWNLOAD_FAILED && map_download_retry_pending) {
+			map_download_invite[0] = map_download_map[0] = 0;
+			map_download_retry_pending = FALSE;
+			network_profile_clear_room();
+		}
 	}
 
 	if (focused == BROWSER_ROWS - 1 && lobby_browser.first + BROWSER_ROWS < lobby_browser.count)
@@ -3623,6 +3687,9 @@ static boolean lobby_browser_select(struct widget_instance *widget, short contro
 			if (community_map_download_start(file,target)) {
 				csstrncpy(map_download_invite,game->invite,sizeof(map_download_invite)-1); map_download_invite[sizeof(map_download_invite)-1]=0;
 				map_download_controller=controller;
+				csstrncpy(map_download_map,game->map,sizeof(map_download_map));
+				map_download_map[sizeof(map_download_map)-1]=0;
+				map_download_retry_pending=TRUE;
 			}
 			return TRUE;
 		}

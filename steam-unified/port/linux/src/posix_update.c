@@ -52,6 +52,8 @@ static const char *const certificate_bundles[] =
 };
 
 static pthread_once_t certificates_once = PTHREAD_ONCE_INIT;
+/* Mbed TLS TLS 1.3 and PSA crypto are not built with threading support here. */
+static pthread_mutex_t update_download_mutex = PTHREAD_MUTEX_INITIALIZER;
 static mbedtls_x509_crt certificates;
 static int certificates_loaded;
 static int crypto_ready;
@@ -389,7 +391,7 @@ the status, or 0 on failure */
 static int https_get(const char *url, struct download *download, char *location, size_t location_size, char *error,
 	int error_size)
 {
-	static struct connection connection;
+	struct connection connection;
 	char host[256], port[16], path[2048];
 	char request[3072];
 	char line[MAXIMUM_HEADER_SIZE];
@@ -491,7 +493,7 @@ static int https_get(const char *url, struct download *download, char *location,
 	return status;
 }
 
-int update_download_limited(const char *url, const char *path, unsigned long long maximum_bytes,
+static int update_download_limited_unlocked(const char *url, const char *path, unsigned long long maximum_bytes,
 	update_progress_proc progress, void *context, char *error, int error_size)
 {
 	char current[2048];
@@ -566,6 +568,20 @@ int update_download_limited(const char *url, const char *path, unsigned long lon
 	fclose(download.file);
 	unlink(path);
 	return 0;
+}
+
+int update_download_limited(const char *url, const char *path, unsigned long long maximum_bytes,
+	update_progress_proc progress, void *context, char *error, int error_size)
+{
+	int result;
+
+	/* This Mbed TLS build has TLS 1.3 and PSA enabled without MBEDTLS_THREADING_C.
+	Serialize the whole updater operation so PSA RNG/crypto state and TLS internals
+	are never entered concurrently, including across redirect handshakes. */
+	pthread_mutex_lock(&update_download_mutex);
+	result = update_download_limited_unlocked(url, path, maximum_bytes, progress, context, error, error_size);
+	pthread_mutex_unlock(&update_download_mutex);
+	return result;
 }
 
 int update_download(const char *url, const char *path, update_progress_proc progress, void *context,

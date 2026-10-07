@@ -1,0 +1,63 @@
+{
+  "name": "NxHalo Unified Preview 2.8.1",
+  "tag": "v0.2.8.1-steamdeck-unifiedhotfix",
+  "prerelease": true,
+  "platform": "Steam Deck/Linux",
+  "single_executable": true,
+  "binary_sha256": "d7eb374e9f1c3dc010f18445b6c97092722a6d96e18ded9800b8cfea0330e1c6",
+  "source_sha256": "c8c9a73ccd44bf89f3c8374408bc16704c634f53c897686f0e0e3db3bba4e9ca",
+  "deck_2_8_1_installed": true,
+  "deck_2_8_1_running": false,
+  "latest_verified_deck_binary_sha256": "d7eb374e9f1c3dc010f18445b6c97092722a6d96e18ded9800b8cfea0330e1c6",
+  "rollback_preserved": true,
+  "acceptance": {
+    "native_omarchy_deathisland_smoke_seconds": 22,
+    "native_omarchy_actor_loaded": true,
+    "native_omarchy_ticks": "31-393",
+    "native_missing_ce_host_probe_seconds": 12,
+    "native_missing_ce_host_probe_no_restart_or_crash": true,
+    "production_missing_map_guard_cases_passed": true,
+    "tls_production_32bit_failure_cleanup_passed": true,
+    "tls_two_thread_https_ca_downloads_passed": true,
+    "deck_custom_map_download_load_join_on_previous_2_8": true,
+    "deck_both_controller_inputs_on_previous_2_8": true,
+    "deck_profile21_campaign_join_in_progress": "b30/a30 00:33:46/01:27:16",
+    "deck_profile11_bloodgulch_28_player_session": "07:58:17 to disconnect 08:00:49",
+    "deck_infinity_ce_retry_profile20_loaded": "08:37:32",
+    "full_128_player_acceptance": false,
+    "live_preset_matches": false,
+    "friends_voice": false,
+    "invalid_menu_index_widget_root_cause_resolved": false,
+    "hardware_install_of_2_8_1": false
+  },
+  "excluded_content": [
+    "game maps",
+    "owner resource companions",
+    "shader instruction tokens",
+    "console keys",
+    "personal saves"
+  ],
+  "assets": {
+    "NxHalo-SteamDeck-unified-preview2.8.1.tar.gz": {
+      "bytes": 23623414,
+      "sha256": "7440518f764b8fc3c16719aab8db9b6c12db3bec11eced47aad4b4349258b121"
+    },
+    "NxHalo-Unified-source-2.8.1.zip": {
+      "bytes": 17866895,
+      "sha256": "c8c9a73ccd44bf89f3c8374408bc16704c634f53c897686f0e0e3db3bba4e9ca"
+    },
+    "SUPPORTED-MODS.md": {
+      "bytes": 1426,
+      "sha256": "0d56adf0e4d3e99d235a8b23d41040a91b5c71e1eac8783c9853206deec9e58d"
+    },
+    "release-notes.md": {
+      "bytes": 2773,
+      "sha256": "87c1b38175d3a18cc2477d7bfa76e8b17b8dd139ffcbafaee84be2de274fb492"
+    }
+  },
+  "deck_running_process_at_last_check": true,
+  "deck_2154_missing_map_rotation_dashboard_exit_observed": true,
+  "deck_2_8_1_rotation_verified": false,
+  "deck_2_8_1_installed_binary_sha256": "d7eb374e9f1c3dc010f18445b6c97092722a6d96e18ded9800b8cfea0330e1c6",
+  "latest_running_deck_binary_sha256": "2154e51b9e80077d71fd3102fe4d375fe5ef70a8a0009f866c7bb5bc23488a65"
+}

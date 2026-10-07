@@ -3448,6 +3448,39 @@ boolean ui_widget_event_handler_function_invoke(
 			console_warning("event handler '%s' failed", event_handler_function_list.names[(short)function_index]);
 		return result;
 	}
+	/* Keep invalid callback diagnostics useful without flooding a controller loop.
+	 * Log each callback/widget-definition pair once, up to sixteen distinct pairs.
+	 * Only read the validated widget instance fields; do not dereference the
+	 * invalid handler or resolve the tag here. */
+	{
+		static struct
+		{
+			word function_index;
+			long definition_tag_index;
+		} reported[16];
+		static long reported_count = 0;
+		long index;
+		boolean already_reported = FALSE;
+
+		for (index = 0; index < reported_count; index++)
+		{
+			if (reported[index].function_index == function_index &&
+				reported[index].definition_tag_index == widget->definition_tag_index)
+			{
+				already_reported = TRUE;
+				break;
+			}
+		}
+		if (!already_reported && reported_count < NUMBEROF(reported))
+		{
+			reported[reported_count].function_index = function_index;
+			reported[reported_count].definition_tag_index = widget->definition_tag_index;
+			reported_count++;
+			console_warning("invalid event handler index %u on widget '%s' (definition tag %ld)",
+				(unsigned)function_index, widget->name ? widget->name : "<unnamed>",
+				widget->definition_tag_index);
+		}
+	}
 	error(2, "invalid event_handler_function");
 	return FALSE;
 }
