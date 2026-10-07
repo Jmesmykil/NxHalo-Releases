@@ -62,8 +62,8 @@
       "sha256": "bfc7c9beb983af52c9f28926afec9fb0b6c517cbd0b90ed7c6cb439ba32a893d"
     },
     "release-notes.md": {
-      "bytes": 1968,
-      "sha256": "0fafdc7f5a525ee74161544efaac82d830484f22d823b5c44b0f92d0f5796da3"
+      "bytes": 2064,
+      "sha256": "c23dc6f114da17918786c6626a1cbb26f9b342b523acf53fa374a240ce6f254b"
     }
   },
   "running_process_is_release_binary": false,
