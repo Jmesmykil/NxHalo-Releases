@@ -429,15 +429,25 @@ static void platform_fullscreen_kind_apply(void)
 		exclusive && display ? SDL_GetDesktopDisplayMode(display) : NULL);
 }
 
-/* whether the game is, or is to be, fullscreen, and if so the size in
-pixels of the display it fills (d3d8_gl.c draws at that resolution) */
+/* Draw at the actual window's shape, including a resized window or a
+gamescope window whose fullscreen request is managed by the compositor. */
 BOOL platform_screen_mode(long *width, long *height)
 {
 	SDL_DisplayID display;
 	const SDL_DisplayMode *mode;
+	if (platform_window)
+	{
+		int window_width, window_height;
+		SDL_GetWindowSizeInPixels(platform_window, &window_width, &window_height);
+		if (window_width > 0 && window_height > 0)
+		{
+			*width = window_width;
+			*height = window_height;
+			return TRUE;
+		}
+	}
 
-	if (platform_window ? !(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) :
-		!platform_fullscreen_setting() || !platform_sdl_initialize())
+	if (!platform_fullscreen_setting() || !platform_sdl_initialize())
 	{
 		return FALSE;
 	}

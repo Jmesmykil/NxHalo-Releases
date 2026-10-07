@@ -974,6 +974,10 @@ void network_test_update(
 					variant.universal_variant.score_to_win = network_test.score_to_win;
 				player_ui_set_game_variant(&variant);
 				network_game_server_change_game_variant(global_network_game_server_get(), &variant);
+				/* Fast setup creates the server after loading the lobby. Open it
+				   explicitly and honor this test's scheduled start delay. */
+				network_game_server_open_game(global_network_game_server_get());
+				network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
 				network_test.map_set = TRUE;
 			}
 			if (!network_test.player_added && network_test.setup_seconds >= 2.0f && global_network_game_client_get())

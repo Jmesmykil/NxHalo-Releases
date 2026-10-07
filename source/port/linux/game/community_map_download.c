@@ -39,6 +39,31 @@ static unsigned long map_zip_long(unsigned char const *p)
 	return map_zip_word(p) | map_zip_word(p + 2) << 16;
 }
 
+/* Return the basename while rejecting absolute paths and parent traversal. */
+static char const *map_zip_basename(char *name, unsigned long size, int *unsafe)
+{
+	char *base = name;
+	unsigned long index;
+	*unsafe = !size || name[0] == '/' || name[0] == '\\' ||
+		(size >= 2 && ((name[0] >= 'A' && name[0] <= 'Z') || (name[0] >= 'a' && name[0] <= 'z')) && name[1] == ':');
+	for (index = 0; index < size; index++)
+	{
+		if (!name[index]) { *unsafe = 1; return NULL; }
+		if (name[index] == '\\') name[index] = '/';
+		if (name[index] == '/')
+		{
+			if (index >= 2 && name[index - 1] == '.' && name[index - 2] == '.' &&
+				(index == 2 || name[index - 3] == '/'))
+				*unsafe = 1;
+			base = name + index + 1;
+		}
+	}
+	if (size >= 2 && name[size - 1] == '.' && name[size - 2] == '.' &&
+		(size == 2 || name[size - 3] == '/'))
+		*unsafe = 1;
+	return base;
+}
+
 static void map_download_progress(void *context, unsigned long long received, unsigned long long total)
 {
 	struct map_download_job *job = context;
@@ -55,7 +80,7 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 {
 	unsigned char tail[65558], central[46], local[30], input[16384], output[16384];
 	long end, tail_size, directory, end_record;
-	unsigned long entries, index, packed, unpacked, crc, offset, written = 0;
+	unsigned long entries, index, packed, unpacked, crc, offset, written = 0, selected_flags = 0;
 	unsigned long checksum = crc32(0L, Z_NULL, 0);
 	unsigned long directory_size;
 	int found = 0, method = -1, success = 0;
@@ -92,34 +117,76 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 	for (index = 0; index < entries; index++)
 	{
 		char name[256];
-		unsigned long name_size, extra_size, comment_size;
+		unsigned long name_size, extra_size, comment_size, flags, compressed_size, uncompressed_size;
+		char const *basename;
+		int unsafe_path;
 		if (fread(central, 1, sizeof(central), zip) != sizeof(central) || map_zip_long(central) != 0x02014b50)
 			return 0;
 		name_size = map_zip_word(central + 28);
 		extra_size = map_zip_word(central + 30);
 		comment_size = map_zip_word(central + 32);
+		flags = map_zip_word(central + 8);
+		compressed_size = map_zip_long(central + 20);
+		uncompressed_size = map_zip_long(central + 24);
 		if (!name_size || name_size >= sizeof(name) || fread(name, 1, name_size, zip) != name_size)
 			return 0;
 		name[name_size] = 0;
-		if (strchr(name, '/') || strchr(name, '\\') || strstr(name, ".."))
-			return 0;
-		if (!SDL_strcasecmp(name, expected))
+		basename = map_zip_basename(name, name_size, &unsafe_path);
+		if (basename && !SDL_strcasecmp(basename, expected))
 		{
+			unsigned char extra[4096];
+			unsigned long cursor = 0;
+			if (unsafe_path || found || (flags & 1) || compressed_size == 0xffffffffUL ||
+				uncompressed_size == 0xffffffffUL || map_zip_long(central + 42) == 0xffffffffUL ||
+				extra_size > sizeof(extra) || fread(extra, 1, extra_size, zip) != extra_size)
+				return 0;
+			while (cursor + 4 <= extra_size)
+			{
+				unsigned long id = map_zip_word(extra + cursor);
+				unsigned long length = map_zip_word(extra + cursor + 2);
+				if (cursor + 4 + length > extra_size) return 0;
+				if (id == 0x0001) return 0;
+				cursor += 4 + length;
+			}
+			if (cursor != extra_size) return 0;
 			method = (int)map_zip_word(central + 10);
-			packed = map_zip_long(central + 20);
-			unpacked = map_zip_long(central + 24);
+			packed = compressed_size;
+			unpacked = uncompressed_size;
 			crc = map_zip_long(central + 16);
 			offset = map_zip_long(central + 42);
+			selected_flags = flags;
 			found = 1;
 		}
-		if (fseek(zip, (long)(extra_size + comment_size), SEEK_CUR))
+		else if (fseek(zip, (long)(extra_size + comment_size), SEEK_CUR))
+			return 0;
+		if (found && basename && !SDL_strcasecmp(basename, expected) &&
+			fseek(zip, (long)comment_size, SEEK_CUR))
 			return 0;
 	}
 	if (!found || (method != 0 && method != 8) || !unpacked || unpacked > MAP_DOWNLOAD_MAX_MAP ||
+		(method == 0 && packed != unpacked) ||
 		packed > MAP_DOWNLOAD_MAX_ARCHIVE || fseek(zip, (long)offset, SEEK_SET) ||
 		fread(local, 1, sizeof(local), zip) != sizeof(local) || map_zip_long(local) != 0x04034b50 ||
-		fseek(zip, (long)(map_zip_word(local + 26) + map_zip_word(local + 28)), SEEK_CUR))
+		map_zip_word(local + 6) != selected_flags || map_zip_word(local + 8) != (unsigned long)method)
 		return 0;
+	{
+		unsigned long local_name_size = map_zip_word(local + 26);
+		unsigned long local_extra_size = map_zip_word(local + 28);
+		unsigned char local_extra[4096];
+		unsigned long cursor = 0;
+		if (!local_name_size || local_extra_size > sizeof(local_extra) ||
+			fseek(zip, (long)local_name_size, SEEK_CUR) ||
+			fread(local_extra, 1, local_extra_size, zip) != local_extra_size)
+			return 0;
+		while (cursor + 4 <= local_extra_size)
+		{
+			unsigned long id = map_zip_word(local_extra + cursor);
+			unsigned long length = map_zip_word(local_extra + cursor + 2);
+			if (cursor + 4 + length > local_extra_size || id == 0x0001) return 0;
+			cursor += 4 + length;
+		}
+		if (cursor != local_extra_size) return 0;
+	}
 	snprintf(partial, sizeof(partial), "%s.partial", target);
 	file = CreateFileA(partial, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE)
@@ -127,7 +194,7 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 	{
 		z_stream stream;
 		unsigned long remaining = packed;
-		int ended = 0;
+		int ended = method == 0;
 		memset(&stream, 0, sizeof(stream));
 		if (method == 8 && inflateInit2(&stream, -MAX_WBITS) != Z_OK)
 			goto done;
@@ -170,10 +237,11 @@ inflate_done:
 				goto done;
 			}
 		}
+		if (written == unpacked && checksum == crc &&
+			(method != 8 || (ended && remaining == 0 && stream.avail_in == 0)))
+			success = 1;
 		if (method == 8) inflateEnd(&stream);
 	}
-	if (written == unpacked && checksum == crc)
-		success = 1;
 done:
 	CloseHandle(file);
 	if (success)

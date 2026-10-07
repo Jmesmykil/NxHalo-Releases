@@ -3611,7 +3611,7 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
 {
 	float margin, left, usable, list_width, right, right_width;
 	long width, index;
-	char text[160], title[96];
+	char text[160], title[96], engine[48];
 	wchar_t wide[80];
 	struct network_player const *selected_player = NULL;
 
@@ -3684,8 +3684,11 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
 	ustrncpy(wide, game->variant.human_readable_game_description, NUMBEROF(wide) - 1);
 	wide[NUMBEROF(wide) - 1] = 0;
 	lobby_utf8(wide, title, sizeof(title));
+	lobby_utf8(engine_names[PIN(game->variant.game_engine_index, 0, 5)], engine, sizeof(engine));
+	if (!title[0])
+		csstrncpy(title, engine, sizeof(title) - 1);
 	ui_overlay_text(UI_FONT_BOLD, 13, right + 14, 136, UI_ALIGN_LEFT, 0xF0F4FAFF, title);
-	snprintf(text, sizeof(text), "MODE  %s", engine_names[PIN(game->variant.game_engine_index, 0, 5)]);
+	snprintf(text, sizeof(text), "MODE  %s", engine);
 	ui_overlay_text(UI_FONT_REGULAR, 10, right + 14, 164, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
 	snprintf(text, sizeof(text), "MAP  %s", game->map.name);
 	ui_overlay_text(UI_FONT_REGULAR, 10, right + 14, 186, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
@@ -3726,22 +3729,26 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
 	ui_overlay_rect(-margin, 432, (float)width, 1, 0, 0x3D8BFFFF);
 	if (game->variant.universal_variant.teams)
 	{
-		ui_overlay_rect(12 + margin, 414, 112, 26, 4, 0x153765FF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 68 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "TEAM");
+		ui_overlay_rect(12, 414, 112, 26, 4, 0x153765FF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 68, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "TEAM");
+	}
+	if (global_network_game_server_get() && selected_player &&
+		selected_player->machine_index != network_game_client_get_local_machine_index())
+	{
+		ui_overlay_rect(136, 414, 112, 26, 4, 0x612F3AFF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 192, 423, UI_ALIGN_CENTER, 0xEAF3FFFF,
+			lobby_confirm_action == _lobby_action_kick ? "CONFIRM KICK" : "KICK CONSOLE");
+		ui_overlay_rect(260, 414, 112, 26, 4, 0x612F3AFF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 316, 423, UI_ALIGN_CENTER, 0xEAF3FFFF,
+			lobby_confirm_action == _lobby_action_ban ? "CONFIRM BAN" : "BAN CONSOLE");
 	}
 	if (global_network_game_server_get())
 	{
-		ui_overlay_rect(136 + margin, 414, 112, 26, 4, 0x612F3AFF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 192 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF,
-			lobby_confirm_action == _lobby_action_kick ? "CONFIRM KICK" : "KICK CONSOLE");
-		ui_overlay_rect(260 + margin, 414, 112, 26, 4, 0x612F3AFF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 316 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF,
-			lobby_confirm_action == _lobby_action_ban ? "CONFIRM BAN" : "BAN CONSOLE");
-		ui_overlay_rect(384 + margin, 414, 112, 26, 4, 0x1B5C42FF);
-		ui_overlay_text(UI_FONT_BOLD, 8, 440 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "START");
+		ui_overlay_rect(384, 414, 112, 26, 4, 0x1B5C42FF);
+		ui_overlay_text(UI_FONT_BOLD, 8, 440, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "START");
 	}
-	ui_overlay_rect(508 + margin, 414, 112, 26, 4, 0x612F3AFF);
-	ui_overlay_text(UI_FONT_BOLD, 8, 564 + margin, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "LEAVE");
+	ui_overlay_rect(508, 414, 112, 26, 4, 0x612F3AFF);
+	ui_overlay_text(UI_FONT_BOLD, 8, 564, 423, UI_ALIGN_CENTER, 0xEAF3FFFF, "LEAVE");
 	ui_overlay_text(UI_FONT_REGULAR, 8, 320, 453, UI_ALIGN_CENTER, 0xAFC4E0FF,
 		"UP/DOWN BROWSE  |  SELECT A REMOTE PLAYER  |  CONFIRM KICK/BAN  |  B BACK");
 }

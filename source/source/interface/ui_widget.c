@@ -4121,6 +4121,22 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 		(widget_stack>=0) && (widget_stack<MAXIMUM_GAMEPADS));
 	if (tag_index == NONE)
 		tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, name);
+#ifdef HALO_GAME_BROWSER
+	/* Keep the Xbox menu tree as the front door, but use the responsive PC
+	lobby for every top-level network pregame screen when its tag was built. */
+	if (!parent)
+	{
+		long pregame_tag = tag_loaded(UI_WIDGET_DEFINITION_TAG,
+			"ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen");
+		if (pregame_tag != NONE && tag_index == pregame_tag)
+		{
+			long lobby_tag = tag_loaded(UI_WIDGET_DEFINITION_TAG,
+				"pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen");
+			if (lobby_tag != NONE)
+				tag_index = lobby_tag;
+		}
+	}
+#endif
 	if (tag_index != NONE)
 	{
 		definition = ui_widget_definition_get(tag_index);

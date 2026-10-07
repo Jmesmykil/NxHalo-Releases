@@ -3836,11 +3836,12 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 
 /* ---------- presentation */
 
-static void write_screenshot(struct render_target_entry *target)
+static void write_screenshot(struct render_target_entry *target, int window_width, int window_height)
 {
 	const char *directory = *config_string("debug.screenshot_directory") ?
 		config_string("debug.screenshot_directory") : NULL;
-	unsigned long width = target->target.gl_width, height = target->target.gl_height;
+	unsigned long width = target ? target->target.gl_width : (unsigned long)window_width;
+	unsigned long height = target ? target->target.gl_height : (unsigned long)window_height;
 	unsigned char *pixels;
 	char path[512];
 	FILE *file;
@@ -3848,10 +3849,12 @@ static void write_screenshot(struct render_target_entry *target)
 	unsigned char header[54] = { 'B', 'M' };
 	unsigned long image_size = width * height * 4;
 
-	if (!directory)
+	if (!directory || !width || !height)
 		return;
 	pixels = malloc(image_size);
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(target->target.texture, 0));
+	if (!pixels)
+		return;
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, target ? framebuffer_get(target->target.texture, 0) : 0);
 	glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
 	/* the display ignores destination alpha, which the game uses as scratch;
 	image viewers would show it as transparency */
@@ -3873,7 +3876,9 @@ static void write_screenshot(struct render_target_entry *target)
 		*(unsigned int *)(header + 10) = 54;
 		*(unsigned int *)(header + 14) = 40;
 		*(int *)(header + 18) = (int)width;
-		*(int *)(header + 22) = -(int)height; /* rows from the top, as read */
+		/* Game targets have already been flipped; the displayed GL window
+		   has rows from the bottom, which a positive BMP height describes. */
+		*(int *)(header + 22) = target ? -(int)height : (int)height;
 		*(unsigned short *)(header + 26) = 1;
 		*(unsigned short *)(header + 28) = 32;
 		*(unsigned int *)(header + 34) = (unsigned int)image_size;
@@ -3933,8 +3938,9 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		if (trace_frame())
 			platform_log("present back buffer %08lx texture %u", (unsigned long)device.back_buffer.Data,
 				back_buffer->target.texture);
-		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
-			write_screenshot(back_buffer);
+		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0 &&
+			!config_boolean("debug.screenshot_composed"))
+			write_screenshot(back_buffer, 0, 0);
 
 		platform_video_drawable_size(&window_width, &window_height);
 		/* letterbox to the back buffer's aspect ratio */
@@ -3960,6 +3966,9 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		/* Draw server details over the completed game picture before swapping. */
 		ui_overlay_present(x, y, width, height, window_width, window_height);
 #endif
+		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0 &&
+			config_boolean("debug.screenshot_composed"))
+			write_screenshot(NULL, window_width, window_height);
 		halo_phase_emit((uint64_t)device.frame+1);
 		halo_frame_emit((uint64_t)device.frame+1);
 #ifdef HALO_ANDROID

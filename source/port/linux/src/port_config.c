@@ -391,6 +391,8 @@ static const struct config_setting config_settings[] =
 		"A folder to save frames to (with screenshot_every); empty none." },
 	{ "debug.screenshot_every", _config_integer, "0", "HALO_SCREENSHOT_EVERY", _environment_value, _platform_all,
 		"Save every this many frames to screenshot_directory; 0 none." },
+	{ "debug.screenshot_composed", _config_boolean, "false", "HALO_SCREENSHOT_COMPOSED", _environment_value, _platform_all,
+		"Capture the displayed window including the online and lobby overlays." },
 	{ "debug.texture_dump_directory", _config_string, "\"\"", "HALO_TEXTURE_DUMP", _environment_value, _platform_all,
 		"A folder to write every texture to as it is uploaded; empty none." },
 	{ "debug.texture_log", _config_boolean, "false", "HALO_TEXTURE_LOG", _environment_set_is_true, _platform_all,

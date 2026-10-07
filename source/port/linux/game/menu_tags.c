@@ -1583,7 +1583,7 @@ void menu_tags_loaded(
 
 	/* (ui.map, and a multiplayer map: its pause menu's SETTINGS) */
 	if ((game_map && tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE) ||
-		strcmp(config_string("display.menus"), "pc"))
+		(game_map && strcmp(config_string("display.menus"), "pc")))
 	{
 		return;
 	}
@@ -1730,7 +1730,8 @@ char const *pc_menus_root_name(
 	char const *open = config_string("debug.menu_open");
 
     /* The same bounded menu test can address the original Xbox widgets. */
-    if (!strncmp(open, "ui\\", 3) && tag_loaded(UI_WIDGET_DEFINITION_TAG, open) != NONE) {
+	if (!strcmp(config_string("display.menus"), "pc") && !strncmp(open, "ui\\", 3) &&
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, open) != NONE) {
         extern boolean pc_menu_profile_edit_begin(void);
         pc_menu_profile_edit_begin();
         return open;
@@ -1755,7 +1756,8 @@ char const *pc_menus_root_name(
 		}
 		platform_log("menus: debug.menu_open: there is no widget named %s", open);
 	}
-	return menu_tags.loaded && menu_tags.root[0] ? menu_tags.root : "ui\\shell\\main_menu\\main_menu";
+	return !strcmp(config_string("display.menus"), "pc") && menu_tags.loaded && menu_tags.root[0] ?
+		menu_tags.root : "ui\\shell\\main_menu\\main_menu";
 }
 
 boolean pc_menu_tag(
@@ -1799,13 +1801,14 @@ char const *pc_menus_screen(
 			"pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen" },
 	};
 	short index;
+	boolean pc_menus = !strcmp(config_string("display.menus"), "pc");
 
 	if (!menu_tags.loaded)
 		return name;
 	for (index = 0; index < NUMBEROF(screens); index++)
 	{
 		if (!strcmp(name, screens[index].game_name))
-			return screens[index].menu_name;
+			return index == 1 || pc_menus ? screens[index].menu_name : name;
 	}
 	return name;
 }
