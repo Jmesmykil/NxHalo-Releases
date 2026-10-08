@@ -4539,6 +4539,9 @@ void game_engine_player_killed(
 
 	/* Infection is authoritative after stock team balancing. */
 	match_rules_host_player_killed(dead_player_index);
+	/* Gun Game progression follows the same authoritative, credited-kill
+	   predicate used by stock Slayer; suicides and friendly fire do not advance. */
+	match_rules_host_player_scored_kill(killing_player_index, dead_player_index, player_kill);
 
 	/* port: the gametype's friendly fire penalty: the team killer's next
 	respawn later (the dead's own, if he has one waiting) */

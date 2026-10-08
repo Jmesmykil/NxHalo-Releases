@@ -1,6 +1,4 @@
-# NxHalo — Halo for Nintendo Switch and Steam Deck
-
-## Current Steam Deck/Linux 2.9.7 — host rules and Gun Game
+# Steam Deck/Linux 2.9.7 — host rules and Gun Game
 
 [Download runtime and matching source](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.7-steamdeck-host-rules).
 Executable SHA-256: 090807f68d38770fbd78d40a1f9ebe4e6e230f6f7a37600d0059722bc77988a7. Installed on the Steam Deck through the existing shortcut, with 2.9.6 retained for rollback.
@@ -27,22 +25,3 @@ At 640×480, the natural MODES → Combat → Gun Game path retained its selecti
 Compatibility above refers to the tested native network version, not arbitrary classic PC/CE or browser builds. New models/weapons still require compatible map assets; arbitrary scenery Prop Hunt and the plasma-pistol disguise selector are unfinished. A completed large race-map pack, persistent friends, broad CE engine-mod ports, full campaign lifecycle acceptance, real-player capacity and physical Switch acceptance remain open. Voice requires compatible clients; automated checks did not use hardware microphones.
 
 [Host rules guide](steam-unified/docs/HOST-RULES-2.9.7.md) · [Texture pack guide](steam-unified/docs/NATIVE-MODS-2.9.6.md) · [Deck evidence](releases/v0.2.9.7-steamdeck-host-rules/DECK-GPU.json) · [Gun Game evidence](releases/v0.2.9.7-steamdeck-host-rules/GUN-GAME.json).
-## Nintendo Switch
-
-The newest Switch package remains [Co-op Lifecycle Preview 2.9.4](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.4-switch-coopfix1-preview): Homebrew Menu NRO, source and build evidence. NRO SHA-256: e98eea315b6733ff1b3d2f6d3b19d4539332540b32157181ec5d8ac328e2c2d0. Cross-build and UMS readback passed; physical launch is not confirmed. This Linux release does not replace the Switch executable.
-
-Use your own compatible data under sdmc:/switch/halo/maps/; this preview saves under sdmc:/switch/halo/save-community24/. Older Profile33/Build14 releases remain historical downloads.
-
-## Install and play
-
-Extract the Linux runtime, supply your own compatible game maps in assets/maps, and run launch_halo.sh natively with Proton OFF. Keep your existing settings and saves. No game maps, resource companions, console keys or personal saves are provided.
-
-Online campaign supports remote players without requiring a second local controller. Native multiplayer/campaign and classic PC/CE directories remain separately filtered by source and version; classic snapshots require a compatible classic client.
-
-CE609 maps needing external resources require owner-supplied bitmaps.map, sounds.map and loc.map under assets/maps/ce. DLL/Lua/OpenSauce/shader engine extensions need individual native ports. The texture catalogue is an initial compatible content source, not a claim that all CE mods run natively.
-
-## Source and credits
-
-Matching Linux source is in [steam-unified/](steam-unified/) and the release source ZIP. Original decompilation, OpenCE, port and library attribution/licenses remain intact. Optional authored texture packages retain their own licenses. Earlier releases remain available for rollback.
-
-This unofficial fan project is not endorsed by Microsoft, Bungie or Halo Studios.

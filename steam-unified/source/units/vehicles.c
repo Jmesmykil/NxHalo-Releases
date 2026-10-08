@@ -2457,10 +2457,67 @@ instruction scheduling, branch layout, and relocation placement. Keep the
 file-static call topology intact while closing it. */
 
 /* Shared native control uses the existing crouch bit for Ghost boost. */
+/* Authored stationary gun emplacements can use the human-jeep type while
+   supplying no vehicle physics or locomotion (e.g. 3Tiers' 50cal). */
+static boolean vehicle_definition_is_stationary_gunner(
+    const struct vehicle_definition *definition)
+{
+    struct mounted_initial_weapon
+    {
+        struct tag_reference weapon;
+        long unused[5];
+    };
+    boolean gunner = FALSE;
+    boolean weapon = FALSE;
+    long index;
+    real slide_rates[2];
+    boolean tag_index_is_group(long tag_index, long group_tag);
+
+    if (definition->vehicle_type != _vehicle_type_human_jeep ||
+        definition->unit.object.physics.index != NONE ||
+        definition->unknown2f8 != 0.0f || definition->unknown2fc != 0.0f ||
+        definition->unknown300 != 0.0f || definition->unknown304 != 0.0f ||
+        definition->unknown330 != 0.0f || definition->unknown334 != 0.0f ||
+        definition->unit.unit.seats.count <= 0 ||
+        definition->unit.unit.seats.count > 32 ||
+        definition->unit.unit.initial_weapons.count <= 0 ||
+        definition->unit.unit.initial_weapons.count > 16)
+        return FALSE;
+
+    /* HEK offsets 0x338/0x33c are slide acceleration/deceleration. */
+    csmemcpy(slide_rates, definition->unused338, sizeof(slide_rates));
+    if (slide_rates[0] != 0.0f || slide_rates[1] != 0.0f)
+        return FALSE;
+
+    for (index = 0; index < definition->unit.unit.seats.count; ++index)
+    {
+        const struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+            &definition->unit.unit.seats, index, struct unit_seat);
+        if (TEST_FLAG(seat->flags, _unit_seat_driver_bit))
+            return FALSE;
+        if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit))
+            gunner = TRUE;
+    }
+    for (index = 0; index < definition->unit.unit.initial_weapons.count; ++index)
+    {
+        const struct mounted_initial_weapon *initial = TAG_BLOCK_GET_ELEMENT(
+            &definition->unit.unit.initial_weapons, index, struct mounted_initial_weapon);
+        if (initial->weapon.group_tag == 'weap' &&
+            tag_index_is_group(initial->weapon.index, 'weap'))
+            weapon = TRUE;
+    }
+    return gunner && weapon;
+}
+
 boolean vehicle_definition_is_turret(long definition_index)
 {
-    return definition_index != NONE &&
-        vehicle_specific_definition_get(definition_index)->vehicle_type == _vehicle_type_turret;
+    const struct vehicle_definition *definition;
+    boolean tag_index_is_group(long tag_index, long group_tag);
+    if (definition_index == NONE || !tag_index_is_group(definition_index, VEHICLE_DEFINITION_TAG))
+        return FALSE;
+    definition = vehicle_specific_definition_get(definition_index);
+    return definition->vehicle_type == _vehicle_type_turret ||
+        vehicle_definition_is_stationary_gunner(definition);
 }
 
 boolean vehicle_supports_boost(long vehicle_index)

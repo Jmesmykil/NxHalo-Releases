@@ -1,0 +1,78 @@
+{
+  "fixture": "/mnt/storage/data/nxhalo-multiplayer-lab22/runtime-proof/zombies-loadout-c8c-char5-e3peer",
+  "runtime": "host /mnt/storage/data/nxhalo-multiplayer-lab22/lobby-modes-runtime-20261008/versions/c8c480c44e18107c115ddf3cf341e9085f4c0f6868b1188d06a5ab847a2ecc8f/halo; peer /mnt/storage/data/nxhalo-multiplayer-lab22/lobby-modes-runtime-20261008/versions/e3cdc7999eb273329daca96b90201b8263f20b0963902f1d036170670f474bec/halo",
+  "map": "b30faction-sword-melee@ce",
+  "audio": "SDL_AUDIODRIVER=dummy",
+  "preset": "Zombies",
+  "host_binary": "/mnt/storage/data/nxhalo-multiplayer-lab22/lobby-modes-runtime-20261008/versions/c8c480c44e18107c115ddf3cf341e9085f4c0f6868b1188d06a5ab847a2ecc8f/halo",
+  "peer_binary": "/mnt/storage/data/nxhalo-multiplayer-lab22/lobby-modes-runtime-20261008/versions/e3cdc7999eb273329daca96b90201b8263f20b0963902f1d036170670f474bec/halo",
+  "character_choice": "5",
+  "input_events": [],
+  "alignment_events": [],
+  "completed_inputs": {
+    "B": 3,
+    "RT": 3
+  },
+  "roles": {
+    "host": {
+      "exit": 0,
+      "joining": false,
+      "hosting": true,
+      "started": true,
+      "ticks": 16,
+      "tick_samples": [
+        "halo-linux: network test: tick 367 player 0: (-66.709 17.959 1.019) h1.00/1.00 g0/0 w held=weapons\\shotgun\\shotgun slot0 melee_only=0 a-68/0 f-68 l-68/0 as161/120 st0 thr0.00 931:24 s0 k0 d0 f0 t0 m0 player 1: (-62.423 20.683 1.560) h1.00/1.00 g0/0 w held=weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword slot0 melee_only=1 a-54/0 f-54 l-54/0 as-1/120 st0 thr0.00 694:0 s0 k0 d0 f0 t1 m1 | items 0 (+4 -0 !0 x0) | playing to 50 | sent 772 received 732 corrected 0 | hits 0 dealt 0 rejected 0 replayed 0 | local 0 camera (-66.7 18.0 1.6) respawn 0",
+        "halo-linux: network test: tick 398 player 0: (-66.709 17.959 1.019) h1.00/1.00 g0/0 w held=weapons\\shotgun\\shotgun slot0 melee_only=0 a-68/0 f-68 l-68/0 as161/120 st0 thr0.00 931:24 s0 k0 d0 f0 t0 m0 player 1: (-62.423 20.683 1.560) h1.00/1.00 g0/0 w held=weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword slot0 melee_only=1 a-54/0 f-54 l-54/0 as-1/120 st0 thr0.00 694:0 s0 k0 d0 f0 t1 m1 | items 0 (+4 -0 !0 x0) | playing to 50 | sent 836 received 794 corrected 0 | hits 0 dealt 0 rejected 0 replayed 0 | local 0 camera (-66.7 18.0 1.6) respawn 0",
+        "halo-linux: network test: tick 429 player 0: (-66.709 17.959 1.019) h1.00/1.00 g0/0 w held=weapons\\shotgun\\shotgun slot0 melee_only=0 a-68/0 f-68 l-68/0 as161/120 st0 thr0.00 931:24 s0 k0 d0 f0 t0 m0 player 1: (-62.423 20.683 1.560) h1.00/1.00 g0/0 w held=weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword slot0 melee_only=1 a-54/0 f-54 l-54/0 as-1/120 st0 thr0.00 694:0 s0 k0 d0 f0 t1 m1 | items 0 (+4 -0 !0 x0) | playing to 50 | sent 901 received 856 corrected 0 | hits 0 dealt 0 rejected 0 replayed 0 | local 0 camera (-66.7 18.0 1.6) respawn 0",
+        "halo-linux: network test: tick 459 player 0: (-66.709 17.959 1.019) h1.00/1.00 g0/0 w held=weapons\\shotgun\\shotgun slot0 melee_only=0 a-68/0 f-68 l-68/0 as161/120 st0 thr0.00 931:24 s0 k0 d0 f0 t0 m0 player 1: (-62.423 20.683 1.560) h1.00/1.00 g0/0 w held=weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword slot0 melee_only=1 a-54/0 f-54 l-54/0 as-1/120 st0 thr0.00 694:0 s0 k0 d0 f0 t1 m1 | items 0 (+4 -0 !0 x0) | playing to 50 | sent 963 received 918 corrected 0 | hits 0 dealt 0 rejected 0 replayed 0 | local 0 camera (-66.7 18.0 1.6) respawn 0",
+        "halo-linux: network test: tick 489 player 0: (-66.709 17.959 1.019) h1.00/1.00 g0/0 w held=weapons\\shotgun\\shotgun slot0 melee_only=0 a-68/0 f-68 l-68/0 as161/120 st0 thr0.00 931:24 s0 k0 d0 f0 t0 m0 player 1: (-62.423 20.683 1.560) h1.00/1.00 g0/0 w held=weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword slot0 melee_only=1 a-54/0 f-54 l-54/0 as-1/120 st0 thr0.00 694:0 s0 k0 d0 f0 t1 m1 | items 0 (+4 -0 !0 x0) | playing to 50 | sent 1026 received 976 corrected 0 | hits 0 dealt 0 rejected 0 replayed 0 | local 0 camera (-66.7 18.0 1.6) respawn 0"
+      ],
+      "map_errors": [
+        "halo-linux: menus: stock error dialog redraw found 2 widget roots and replaced 3 bitmaps; focus, text and bounds are unchanged"
+      ],
+      "screenshots": [
+        "frame00000.bmp",
+        "frame00060.bmp",
+        "frame00120.bmp",
+        "frame00180.bmp",
+        "frame00240.bmp",
+        "frame00300.bmp",
+        "frame00360.bmp",
+        "frame00420.bmp",
+        "frame00480.bmp",
+        "frame00540.bmp"
+      ]
+    },
+    "peer": {
+      "exit": 0,
+      "joining": true,
+      "hosting": false,
+      "started": false,
+      "ticks": 16,
+      "tick_samples": [
+        "halo-linux: network test: tick 375 player 0: (-66.709 17.959 1.019) h1.00/1.00 g0/0 w held=weapons\\shotgun\\shotgun slot0 melee_only=0 a-68/0 f-68 l-68/0 as161/120 st0 thr0.00 931:24 s0 k0 d0 f0 t0 m0 player 1: (-62.423 20.683 1.560) h1.00/1.00 g0/0 w held=weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword slot0 melee_only=1 a-54/0 f-54 l-54/0 as-1/120 st0 thr0.00 694:0 s0 k0 d0 f0 t1 m1 | items 0 (+4 -0 !0 x0) | playing to 50 | sent 752 received 788 corrected 0 | hits 0 dealt 0 rejected 0 replayed 0 | local 1 camera (-62.4 20.7 2.2) respawn 0",
+        "halo-linux: network test: tick 407 player 0: (-66.709 17.959 1.019) h1.00/1.00 g0/0 w held=weapons\\shotgun\\shotgun slot0 melee_only=0 a-68/0 f-68 l-68/0 as161/120 st0 thr0.00 931:24 s0 k0 d0 f0 t0 m0 player 1: (-62.423 20.683 1.560) h1.00/1.00 g0/0 w held=weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword slot0 melee_only=1 a-54/0 f-54 l-54/0 as-1/120 st0 thr0.00 694:0 s0 k0 d0 f0 t1 m1 | items 0 (+4 -0 !0 x0) | playing to 50 | sent 816 received 854 corrected 0 | hits 0 dealt 0 rejected 0 replayed 0 | local 1 camera (-62.4 20.7 2.2) respawn 0",
+        "halo-linux: network test: tick 437 player 0: (-66.709 17.959 1.019) h1.00/1.00 g0/0 w held=weapons\\shotgun\\shotgun slot0 melee_only=0 a-68/0 f-68 l-68/0 as161/120 st0 thr0.00 931:24 s0 k0 d0 f0 t0 m0 player 1: (-62.423 20.683 1.560) h1.00/1.00 g0/0 w held=weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword slot0 melee_only=1 a-54/0 f-54 l-54/0 as-1/120 st0 thr0.00 694:0 s0 k0 d0 f0 t1 m1 | items 0 (+4 -0 !0 x0) | playing to 50 | sent 876 received 917 corrected 0 | hits 0 dealt 0 rejected 0 replayed 0 | local 1 camera (-62.4 20.7 2.2) respawn 0",
+        "halo-linux: network test: tick 468 player 0: (-66.709 17.959 1.019) h1.00/1.00 g0/0 w held=weapons\\shotgun\\shotgun slot0 melee_only=0 a-68/0 f-68 l-68/0 as161/120 st0 thr0.00 931:24 s0 k0 d0 f0 t0 m0 player 1: (-62.423 20.683 1.560) h1.00/1.00 g0/0 w held=weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword slot0 melee_only=1 a-54/0 f-54 l-54/0 as-1/120 st0 thr0.00 694:0 s0 k0 d0 f0 t1 m1 | items 0 (+4 -0 !0 x0) | playing to 50 | sent 938 received 977 corrected 0 | hits 0 dealt 0 rejected 0 replayed 0 | local 1 camera (-62.4 20.7 2.2) respawn 0",
+        "halo-linux: network test: tick 498 player 0: (-66.709 17.959 1.019) h1.00/1.00 g0/0 w held=weapons\\shotgun\\shotgun slot0 melee_only=0 a-68/0 f-68 l-68/0 as161/120 st0 thr0.00 931:24 s0 k0 d0 f0 t0 m0 player 1: (-62.423 20.683 1.560) h1.00/1.00 g0/0 w held=weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword slot0 melee_only=1 a-54/0 f-54 l-54/0 as-1/120 st0 thr0.00 694:0 s0 k0 d0 f0 t1 m1 | items 0 (+4 -0 !0 x0) | playing to 50 | sent 998 received 1044 corrected 0 | hits 0 dealt 0 rejected 0 replayed 0 | local 1 camera (-62.4 20.7 2.2) respawn 0"
+      ],
+      "map_errors": [
+        "halo-linux: menus: stock error dialog redraw found 2 widget roots and replaced 3 bitmaps; focus, text and bounds are unchanged",
+        "halo-linux: menus: stock error dialog redraw found 2 widget roots and replaced 3 bitmaps; focus, text and bounds are unchanged"
+      ],
+      "screenshots": [
+        "frame00000.bmp",
+        "frame00060.bmp",
+        "frame00120.bmp",
+        "frame00180.bmp",
+        "frame00240.bmp",
+        "frame00300.bmp",
+        "frame00360.bmp",
+        "frame00420.bmp",
+        "frame00480.bmp",
+        "frame00540.bmp",
+        "frame00600.bmp"
+      ]
+    }
+  }
+}

@@ -227,16 +227,31 @@ long nxhalo_multiplayer_character_definition(long fallback_definition)
 
 static long nxhalo_zombie_melee_weapon_definition(void)
 {
+	static char const * const preferred_tag_path =
+		"weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword";
 	static char const * const tag_paths[] = {
 		"weapons\\ball\\ball",
 		"weapons\\flag\\flag",
 		"weapons\\pistol\\pistol"
 	};
 	short index;
+	long definition_index = tag_loaded(WEAPON_DEFINITION_TAG, preferred_tag_path);
+	struct weapon_definition *definition;
+	if (definition_index != NONE)
+	{
+		definition = weapon_definition_get(definition_index);
+		if (definition->weapon.triggers.count == 0 &&
+			definition->weapon.melee_attack_damage.index != NONE &&
+			definition->weapon.melee_attack_response.index != NONE &&
+			definition->weapon.interface_definition.first_person_model.index != NONE &&
+			definition->weapon.interface_definition.first_person_animations.index != NONE &&
+			!TEST_FLAG(definition->weapon.flags, _weapon_detonates_when_dropped_bit) &&
+			!TEST_FLAG(definition->weapon.flags, _weapon_prevents_melee_attack_bit))
+			return definition_index;
+	}
 	for (index = 0; index < NUMBEROF(tag_paths); index++)
 	{
-		long definition_index = tag_loaded(WEAPON_DEFINITION_TAG, tag_paths[index]);
-		struct weapon_definition *definition;
+		definition_index = tag_loaded(WEAPON_DEFINITION_TAG, tag_paths[index]);
 		if (definition_index == NONE)
 			continue;
 		definition = weapon_definition_get(definition_index);

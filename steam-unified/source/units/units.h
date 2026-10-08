@@ -858,6 +858,9 @@ boolean unit_set_seat(
 	char const *seat_label);
 
 
+boolean unit_definition_can_use_weapon(
+	long unit_definition_index,
+	long weapon_definition_index);
 boolean unit_can_use_weapon(
 	long unit_index,
 	long weapon_index);

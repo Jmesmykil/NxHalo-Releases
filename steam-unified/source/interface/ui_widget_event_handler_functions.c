@@ -6110,8 +6110,9 @@ boolean ui_widget_port_gametype_choose(
 	if (!playlist_profile_get(profile_index, &profile))
 		return FALSE;
 	server = global_network_game_server_get();
-	if (!match_rules_preset_set(MATCH_RULES_PRESET_STANDARD))
-		return FALSE;
+	/* The mode picker owns the pending match preset. Confirming its selected
+	 * profile must not overwrite that choice; explicit Standard/base-type
+	 * actions clear it in the gametype editor. */
 	if (saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
 		saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
 	player_ui_set_game_variant(&profile);

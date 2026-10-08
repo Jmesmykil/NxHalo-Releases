@@ -7,7 +7,7 @@ struct unit_control_data;
 enum match_rules_preset {
  MATCH_RULES_PRESET_STANDARD=0, MATCH_RULES_PRESET_FACTION, MATCH_RULES_PRESET_SWAT,
  MATCH_RULES_PRESET_TOWER_OF_POWER, MATCH_RULES_PRESET_DODGEBALL,
- MATCH_RULES_PRESET_ZOMBIES, MATCH_RULES_PRESET_RACING, MATCH_RULES_PRESET_COUNT
+ MATCH_RULES_PRESET_ZOMBIES, MATCH_RULES_PRESET_RACING, MATCH_RULES_PRESET_GUN_GAME, MATCH_RULES_PRESET_COUNT
 };
 enum match_rules_matchup {
  MATCH_RULES_MATCHUP_COVENANT_USMC=0, MATCH_RULES_MATCHUP_USMC_FLOOD,
@@ -31,8 +31,12 @@ boolean match_rules_apply_variant_preset(short preset, struct game_variant *vari
 long match_rules_host_spawn_definition(long player_index, long fallback_definition);
 void match_rules_host_prespawn_player(long player_index);
 void match_rules_host_player_killed(long player_index);
+void match_rules_host_player_scored_kill(long killer_player_index, long dead_player_index, boolean credited_player_kill);
+short match_rules_host_required_spawn_weapons(long player_index, long *definitions, short capacity);
+void match_rules_host_note_loadout_fallback(void);
 void match_rules_host_postspawn_player(long player_index);
 void match_rules_host_apply_infected_lunge(long player_index, struct unit_control_data *control, boolean equipment_action_consumed);
+boolean match_rules_player_lunge_active(long player_index);
 boolean match_rules_player_melee_only(long player_index);
 boolean match_rules_weapon_allowed_for_unit(long unit_index, long weapon_definition_index);
 boolean match_rules_grenade_pickup_allowed(long unit_index);

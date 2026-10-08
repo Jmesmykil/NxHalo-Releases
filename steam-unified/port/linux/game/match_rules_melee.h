@@ -5,6 +5,8 @@
 #include "units/units.h"
 #include "units/unit_control_data.h"
 
+#include "match_rules_action.h"
+
 /* Shared by the host control path, damage-report validator, and regression harness. */
 static void match_rules_filter_infected_control(
     boolean infected,

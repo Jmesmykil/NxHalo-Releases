@@ -6,6 +6,7 @@
 #include "cseries.h"
 #include "game/game.h"
 #include "game/game_engine.h"
+#include "game/game_engine_slayer.h"
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "cutscene/cinematics.h"
@@ -22,12 +23,16 @@
 #include "units/bipeds.h"
 #include "units/unit_definitions.h"
 #include "units/unit_control_data.h"
+#include "items/weapon_definitions.h"
+#include "tag_files/tag_groups.h"
 #include "physics/collisions.h"
 #include "physics/physics_definitions.h"
 #include "objects/objects.h"
 #include "../src/port_config.h"
 #include "match_rules.h"
 #include "match_rules_melee.h"
+#include "gun_game_progression.h"
+#include "network_distributed.h"
 #include "nxhalo_custom_content.h"
 
 #include <stdio.h>
@@ -52,10 +57,13 @@ static boolean lunge_button_held[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 static long lunge_last_tick[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 static long lunge_started_tick[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 static real_vector3d lunge_direction[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+static struct gun_game_progression gun_game_players[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+static boolean match_rules_variant_is_gun_game(void);
+static short const gun_game_weapon_list_indices[GUN_GAME_WEAPON_STAGE_COUNT] = { 4, 0, 6, 3, 8, 9, 7 }; /* pistol, AR, plasma rifle, needler, shotgun, sniper, rocket */
 
 static char const * const match_preset_names[MATCH_RULES_PRESET_COUNT] = {
     "Standard", "Faction match", "SWAT", "Tower of Power",
-    "Grenade Dodgeball", "Zombies", "Native Race"
+    "Grenade Dodgeball", "Zombies", "Native Race", "Gun Game"
 };
 static char const * const matchup_names[MATCH_RULES_MATCHUP_COUNT] = {
     "Covenant vs USMC", "USMC vs Flood", "Flood vs Covenant"
@@ -140,6 +148,7 @@ void match_rules_reset(void)
     for (index = 0; index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; index++)
     {
         zombies_tracked_player[index] = NONE;
+        gun_game_progression_clear(&gun_game_players[index]);
         lunge_tracked_player[index] = NONE;
         lunge_button_held[index] = FALSE;
         lunge_last_tick[index] = NONE;
@@ -185,6 +194,25 @@ static unsigned long mix_seed(unsigned long value)
 static short faction_bipeds(short faction, long *definitions, short capacity)
 {
     return nxhalo_character_faction_bipeds(faction, definitions, capacity);
+}
+
+static long gun_game_weapon_definition(int stage)
+{
+    if (stage < 0 || stage >= GUN_GAME_WEAPON_STAGE_COUNT)
+        return NONE;
+    return list_index_to_weapon_definition_index(gun_game_weapon_list_indices[stage]);
+}
+
+static int gun_game_bind_player(long player_index)
+{
+    short absolute;
+    if (player_index == NONE)
+        return -1;
+    absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+    if (absolute < 0 || absolute >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+        return -1;
+    gun_game_progression_bind(&gun_game_players[absolute], player_index);
+    return absolute;
 }
 
 static long active_roster(long *roster, short capacity);
@@ -244,6 +272,19 @@ boolean match_rules_preset_available(short preset, char *reason, int reason_size
             message = "Native Race requires a map with at least two Race Track netgame markers; track geometry is not generated.";
         }
         break;
+    case MATCH_RULES_PRESET_GUN_GAME:
+        for (short stage = 0; stage < GUN_GAME_WEAPON_STAGE_COUNT; stage++)
+        {
+            if (gun_game_weapon_definition(stage) == NONE)
+            {
+                available = FALSE;
+                message = "Gun Game requires all seven stock ladder weapons to be loaded by the selected map.";
+                break;
+            }
+        }
+        if (available)
+            message = "Gun Game uses pistol, assault rifle, plasma rifle, needler, shotgun, sniper rifle, then rocket launcher.";
+        break;
     case MATCH_RULES_PRESET_ZOMBIES:
         if (list_index_to_weapon_definition_index(8) == NONE)
         {
@@ -301,6 +342,30 @@ boolean match_rules_validate_loaded_map(void)
         }
         if (host_authority)
             set_message("Native Race map requirements are satisfied.");
+        return TRUE;
+    }
+    if (match_rules_variant_is_gun_game())
+    {
+        short stage;
+        /* An edited profile may carry arbitrary Slayer options. The active
+         * Gun Game variant always remains FFA and ends at its seven-kill ladder. */
+        if (host_authority)
+        {
+            variant->universal_variant.teams = FALSE;
+            variant->universal_variant.score_to_win = GUN_GAME_STAGE_COUNT;
+            variant->game_engine_variant.slayer.kill_in_order = FALSE;
+        }
+        for (stage = 0; stage < GUN_GAME_WEAPON_STAGE_COUNT; stage++)
+        {
+            if (gun_game_weapon_definition(stage) == NONE)
+            {
+                if (host_authority)
+                    set_message("Gun Game requires all seven stock ladder weapon tags in the loaded map.");
+                return FALSE;
+            }
+        }
+        if (host_authority)
+            set_message("Gun Game map requirements are satisfied.");
         return TRUE;
     }
     if (preset == MATCH_RULES_PRESET_STANDARD)
@@ -382,6 +447,26 @@ void match_rules_update_map_notice(void)
     race_warning_last_wait_reason = -1;
 }
 
+static void match_rules_clear_special_label(struct game_variant *variant)
+{
+    static char const *const base_names[] = { "", "ctf", "slayer", "oddball", "king", "race" };
+    wchar_t const *label;
+    struct game_variant base;
+    if (!variant || variant->game_engine_index <= game_engine_none ||
+        variant->game_engine_index > game_engine_race)
+        return;
+    label = variant->human_readable_game_description;
+    if (ustrncmp(label, L"Gun Game", 8) && ustrncmp(label, L"Zombies", 7) &&
+        ustrncmp(label, L"Infection", 9) && ustrncmp(label, L"Tower Power", 11) &&
+        ustrncmp(label, L"SWAT", 4) && ustrncmp(label, L"Dodgeball", 9) &&
+        ustrncmp(label, L"Native Race", 11) && ustrncmp(label, L"COV vs", 6) &&
+        ustrncmp(label, L"USMC vs", 7) && ustrncmp(label, L"Flood vs", 8))
+        return;
+    game_engine_get_variant_by_name(&base, base_names[variant->game_engine_index]);
+    csmemcpy(variant->human_readable_game_description,
+        base.human_readable_game_description, sizeof(variant->human_readable_game_description));
+}
+
 boolean match_rules_apply_variant_preset(short preset, struct game_variant *variant,
     struct game_variant_options *options)
 {
@@ -392,6 +477,7 @@ boolean match_rules_apply_variant_preset(short preset, struct game_variant *vari
     switch (preset)
     {
     case MATCH_RULES_PRESET_STANDARD:
+        match_rules_clear_special_label(variant);
         set_message("Standard preset applied.");
         return TRUE;
     case MATCH_RULES_PRESET_FACTION:
@@ -457,6 +543,26 @@ boolean match_rules_apply_variant_preset(short preset, struct game_variant *vari
         variant_template(variant, "team_race", "Native Race");
         variant->universal_variant.teams = TRUE;
         break;
+    case MATCH_RULES_PRESET_GUN_GAME:
+        variant_template(variant, "slayer", "Gun Game");
+        variant->universal_variant.teams = FALSE;
+        variant->universal_variant.score_to_win = GUN_GAME_STAGE_COUNT;
+        variant->game_engine_variant.slayer.kill_in_order = FALSE;
+        variant->universal_variant.weapon_set = 10; /* no grenades */
+        variant->universal_variant.vehicle_set = 1; /* none */
+        options->loadout = _loadout_custom;
+        options->primary_weapon = _loadout_weapon_none;
+        options->secondary_weapon = _loadout_weapon_none;
+        options->no_map_weapons = TRUE;
+        options->auto_team_balance = FALSE;
+        for (team = 0; team < 2; team++)
+        {
+            options->vehicle_set[team] = 1;
+            for (vehicle = 0; vehicle < NUMBER_OF_VARIANT_VEHICLES; vehicle++)
+                options->vehicle_counts[team][vehicle] = 0;
+        }
+        set_message("Gun Game: earn one credited enemy kill per stage; deaths keep your stage. The next credited kill after reaching rockets wins.");
+        return TRUE;
     default:
         return FALSE;
     }
@@ -618,6 +724,180 @@ void match_rules_host_player_killed(long dead_player_index)
     set_message("Zombies: this player is infected and will respawn with melee only.");
 }
 
+static boolean gun_game_equip_player_stage(long player_index)
+{
+    struct player_datum *player;
+    struct unit_datum *unit;
+    long unit_index;
+    long definition_index;
+    long weapon_index;
+    long old_weapon_index;
+    int absolute;
+    if (player_index == NONE || game_connection() == _game_connection_network_client ||
+        network_game_distributed_client())
+        return FALSE;
+    absolute = gun_game_bind_player(player_index);
+    if (absolute < 0)
+        return FALSE;
+    player = player_get(player_index);
+    unit_index = player->unit_index;
+    unit = unit_try_and_get(unit_index);
+    if (!unit)
+        return TRUE; /* A credited projectile kill can outlive its owner's unit; respawn equips this stage. */
+    unit->unit.grenade_counts[_unit_grenade_human_fragmentation] = 0;
+    unit->unit.grenade_counts[_unit_grenade_covenant_plasma] = 0;
+    unit->unit.desired_grenade_index = NONE;
+    old_weapon_index = unit->unit.current_weapon_index >= 0 &&
+        unit->unit.current_weapon_index < MAXIMUM_WEAPONS_PER_UNIT ?
+        unit->unit.weapon_object_indices[unit->unit.current_weapon_index] : NONE;
+    definition_index = gun_game_weapon_definition(gun_game_progression_stage(&gun_game_players[absolute]));
+    if (definition_index == NONE)
+    {
+        set_message("Gun Game needs the stock weapon tags loaded by this map; switch maps to continue.");
+        return FALSE;
+    }
+    {
+        struct object_placement_data placement_data;
+        object_placement_data_new(&placement_data, definition_index, NONE);
+        weapon_index = object_new(&placement_data);
+    }
+    if (weapon_index == NONE)
+    {
+        set_message("Gun Game could not create the next stage weapon; progression was held.");
+        return FALSE;
+    }
+    /* Replace only after the new object is valid and passes the normal inventory
+       gate, so an allocation or compatibility failure keeps the current weapon. */
+    if (!unit_add_weapon_to_inventory(unit_index, weapon_index, _unit_add_weapon_replace))
+    {
+        object_delete(weapon_index);
+        set_message("Gun Game could not equip the next stage weapon; progression was held.");
+        return FALSE;
+    }
+    if (old_weapon_index != NONE && old_weapon_index != weapon_index)
+    {
+        if (!unit_drop_current_weapon(unit_index, TRUE))
+        {
+            /* The next weapon is in a noncurrent slot. Remove it and keep the
+               current stage weapon if the engine cannot put that weapon away. */
+            unit_delete_all_weapons(unit_index);
+            set_message("Gun Game could not switch weapons; the current stage is retained.");
+            return FALSE;
+        }
+        if (object_try_and_get(old_weapon_index))
+            object_delete(old_weapon_index);
+    }
+    return TRUE;
+}
+
+void match_rules_host_player_scored_kill(long killer_player_index, long dead_player_index,
+    boolean credited_player_kill)
+{
+    int killer_absolute = -1;
+    int dead_absolute = -1;
+    boolean host = game_connection() != _game_connection_network_client &&
+        !network_game_distributed_client();
+    if (!match_rules_variant_is_gun_game() || !host)
+        return;
+
+    if (killer_player_index != NONE && player_try_and_get(killer_player_index))
+    {
+        killer_absolute = gun_game_bind_player(killer_player_index);
+        if (credited_player_kill && killer_absolute >= 0)
+        {
+            int previous_stage = gun_game_progression_stage(&gun_game_players[killer_absolute]);
+            gun_game_progression_credit_kill(&gun_game_players[killer_absolute], TRUE);
+            if (!gun_game_progression_complete(&gun_game_players[killer_absolute]) &&
+                !gun_game_equip_player_stage(killer_player_index))
+                gun_game_players[killer_absolute].stage = previous_stage;
+            if (gun_game_progression_stage(&gun_game_players[killer_absolute]) == GUN_GAME_STAGE_COUNT - 1 &&
+                !gun_game_progression_complete(&gun_game_players[killer_absolute]))
+                set_message("Gun Game: rocket stage reached; the next credited enemy kill wins.");
+        }
+    }
+
+    if (dead_player_index != NONE && player_try_and_get(dead_player_index))
+    {
+        dead_absolute = gun_game_bind_player(dead_player_index);
+        if (dead_absolute >= 0)
+            game_engine_slayer_set_player_score(dead_player_index,
+                gun_game_progression_score(&gun_game_players[dead_absolute]));
+    }
+    if (killer_player_index != NONE && killer_player_index != dead_player_index &&
+        killer_absolute >= 0)
+        game_engine_slayer_set_player_score(killer_player_index,
+            gun_game_progression_score(&gun_game_players[killer_absolute]));
+}
+
+static long match_rules_zombie_melee_weapon_definition(void)
+{
+    static char const * const candidates[] = {
+        "weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword",
+        "weapons\\ball\\ball",
+        "weapons\\flag\\flag",
+        "weapons\\pistol\\pistol"
+    };
+    short index;
+    for (index = 0; index < NUMBEROF(candidates); index++)
+    {
+        long definition = tag_loaded(WEAPON_DEFINITION_TAG, candidates[index]);
+        if (definition != NONE && nxhalo_zombie_melee_weapon_allowed(definition))
+            return definition;
+    }
+    return NONE;
+}
+
+short match_rules_host_required_spawn_weapons(long player_index, long *definitions, short capacity)
+{
+    short index, needed;
+    long required;
+    if (player_index == NONE || !definitions ||
+        game_connection() == _game_connection_network_client || network_game_distributed_client())
+        return 0;
+    if (match_rules_variant_is_gun_game())
+    {
+        needed = GUN_GAME_WEAPON_STAGE_COUNT;
+        if (capacity < needed)
+            return 0;
+        for (index = 0; index < needed; index++)
+        {
+            definitions[index] = gun_game_weapon_definition(index);
+            if (definitions[index] == NONE)
+                return 0;
+        }
+        return needed;
+    }
+    if (match_rules_preset_get() == MATCH_RULES_PRESET_ZOMBIES)
+    {
+        if (capacity < 1)
+            return 0;
+        if (zombies_player_is_infected(player_index))
+            required = match_rules_zombie_melee_weapon_definition();
+        else
+            required = list_index_to_weapon_definition_index(8);
+        if (required == NONE)
+            return 0;
+        definitions[0] = required;
+        return 1;
+    }
+    if (match_rules_preset_get() == MATCH_RULES_PRESET_SWAT)
+        required = list_index_to_weapon_definition_index(4);
+    else if (match_rules_preset_get() == MATCH_RULES_PRESET_TOWER_OF_POWER)
+        required = list_index_to_weapon_definition_index(8);
+    else
+        return 0;
+    if (required == NONE || capacity < 1)
+        return 0;
+    definitions[0] = required;
+    return 1;
+}
+
+void match_rules_host_note_loadout_fallback(void)
+{
+    if (game_connection() != _game_connection_network_client && !network_game_distributed_client())
+        set_message("The selected character cannot use this mode's weapon loadout; a compatible map character was selected.");
+}
+
 long match_rules_host_spawn_definition(long player_index, long fallback_definition)
 {
     struct player_datum *player;
@@ -671,7 +951,22 @@ boolean match_rules_should_end_game(void)
 {
     long roster[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
     long count, index, human_count = 0;
-    if (match_rules_preset_get() != MATCH_RULES_PRESET_ZOMBIES || !zombies_ready)
+    short preset = match_rules_preset_get();
+    if (preset == MATCH_RULES_PRESET_GUN_GAME && match_rules_variant_is_gun_game())
+    {
+        count = active_roster(roster, HALO_PORT_MAXIMUM_NETWORK_PLAYERS);
+        for (index = 0; index < count; index++)
+        {
+            int absolute = gun_game_bind_player(roster[index]);
+            if (absolute >= 0 && gun_game_progression_complete(&gun_game_players[absolute]))
+            {
+                set_message("Gun Game: a player completed the seven-weapon ladder.");
+                return TRUE;
+            }
+        }
+        return FALSE;
+    }
+    if (preset != MATCH_RULES_PRESET_ZOMBIES || !zombies_ready)
         return FALSE;
     count = active_roster(roster, HALO_PORT_MAXIMUM_NETWORK_PLAYERS);
     if (count < 2)
@@ -699,7 +994,7 @@ static boolean match_rules_variant_is_zombies(void)
 {
 	struct game_variant *variant = game_engine_get_variant();
 	wchar_t const *description;
-	if (!variant)
+	if (!variant || variant->game_engine_index != game_engine_slayer)
 		return FALSE;
 	description = variant->human_readable_game_description;
 	return (description[0] == L'Z' && description[1] == L'o' && description[2] == L'm' &&
@@ -714,7 +1009,7 @@ static boolean match_rules_variant_is_tower_of_power(void)
 {
     struct game_variant *variant = game_engine_get_variant();
     wchar_t const *description;
-    if (!variant)
+    if (!variant || variant->game_engine_index != game_engine_slayer)
         return FALSE;
     description = variant->human_readable_game_description;
     return description[0] == L'T' && description[1] == L'o' && description[2] == L'w' &&
@@ -732,8 +1027,21 @@ short match_rules_vehicle_policy(long definition_index)
     return -1;
 }
 
+static boolean match_rules_variant_is_gun_game(void)
+{
+    struct game_variant *variant = game_engine_get_variant();
+    wchar_t const *description;
+    if (!variant || variant->game_engine_index != game_engine_slayer)
+        return FALSE;
+    description = variant->human_readable_game_description;
+    return description[0] == L'G' && description[1] == L'u' && description[2] == L'n' &&
+        description[3] == L' ' && description[4] == L'G' && description[5] == L'a' &&
+        description[6] == L'm' && description[7] == L'e';
+}
+
 boolean match_rules_weapon_allowed_for_unit(long unit_index, long weapon_definition_index)
 {
+    boolean gun_game = match_rules_variant_is_gun_game();
     boolean zombies = match_rules_variant_is_zombies();
     boolean tower = match_rules_variant_is_tower_of_power();
     struct unit_datum *vehicle_unit = tower && unit_index != NONE ? vehicle_try_and_get(unit_index) : NULL;
@@ -743,6 +1051,24 @@ boolean match_rules_weapon_allowed_for_unit(long unit_index, long weapon_definit
     boolean infected;
     boolean melee_weapon;
 
+    if (gun_game)
+    {
+        long owner = unit_index != NONE ? player_index_from_unit_index(unit_index) : NONE;
+        int absolute;
+        int stage;
+        /* Clients receive the host inventory over the existing weapon-object
+           messages; only the host decides whether a pickup is permitted. */
+        if (game_connection() == _game_connection_network_client || network_game_distributed_client())
+            return TRUE;
+        if (owner == NONE)
+            return FALSE;
+        absolute = gun_game_bind_player(owner);
+        if (absolute < 0)
+            return FALSE;
+        stage = gun_game_progression_stage(&gun_game_players[absolute]);
+        return !gun_game_progression_complete(&gun_game_players[absolute]) &&
+            stage < GUN_GAME_WEAPON_STAGE_COUNT && weapon_definition_index == gun_game_weapon_definition(stage);
+    }
     if (weapon_definition_index == NONE)
         return !zombies && !tower;
     player_index = unit_index != NONE ? player_index_from_unit_index(unit_index) : NONE;
@@ -758,7 +1084,8 @@ boolean match_rules_weapon_allowed_for_unit(long unit_index, long weapon_definit
 boolean match_rules_grenade_pickup_allowed(long unit_index)
 {
     (void)unit_index;
-    return !match_rules_variant_is_zombies() && !match_rules_variant_is_tower_of_power();
+    return !match_rules_variant_is_zombies() && !match_rules_variant_is_tower_of_power() &&
+        !match_rules_variant_is_gun_game();
 }
 
 boolean match_rules_player_melee_only(long player_index)
@@ -776,6 +1103,24 @@ boolean match_rules_player_melee_only(long player_index)
 	absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
 	return absolute >= 0 && absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS &&
 		zombies_ready && zombies_player_is_infected(player_index);
+}
+
+boolean match_rules_player_lunge_active(long player_index)
+{
+    short absolute;
+    unsigned long duration;
+    long now;
+
+    if (player_index == NONE || TICKS_PER_SECOND <= 0)
+        return FALSE;
+    absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+    if (absolute < 0 || absolute >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS ||
+        lunge_tracked_player[absolute] != player_index || lunge_started_tick[absolute] == NONE)
+        return FALSE;
+    duration = (unsigned long)((TICKS_PER_SECOND + 9) / 10);
+    now = game_time_get();
+    return now >= lunge_started_tick[absolute] &&
+        (unsigned long)(now - lunge_started_tick[absolute]) < duration;
 }
 
 void match_rules_host_apply_infected_lunge(long player_index, struct unit_control_data *control,
@@ -809,7 +1154,7 @@ void match_rules_host_apply_infected_lunge(long player_index, struct unit_contro
         lunge_direction[absolute] = *global_zero_vector3d;
     }
     if (!match_rules_player_melee_only(player_index) ||
-        game_connection() == _game_connection_network_client || network_game_distributed_client() ||
+        !network_distributed_player_lunge_supported(player_index) ||
         !player || player->unit_index == NONE)
     {
         lunge_button_held[absolute] = FALSE;
@@ -969,6 +1314,10 @@ void match_rules_host_postspawn_player(long player_index)
             if (!nxhalo_give_zombie_melee_weapon(unit_index))
                 set_message("Melee weapon could not be equipped; infected still cannot fire or throw grenades.");
         }
+    }
+    else if (preset == MATCH_RULES_PRESET_GUN_GAME)
+    {
+        gun_game_equip_player_stage(player_index);
     }
     else if (preset == MATCH_RULES_PRESET_TOWER_OF_POWER)
     {

@@ -1,0 +1,4 @@
+{
+  "host": "halo-linux: match_player: unix=1791501983 match=1 event=final tick=1335 slot=2 name=\"Player 2\" team=1 local=1 departed=0 result=win score=7 kills=7 deaths=1 assists=0 betrayals=1 suicides=1 shots_fired=0 shots_hit=0",
+  "client": "halo-linux: match_player: unix=1791501983 match=1 event=final tick=1340 slot=2 name=\"Player 2\" team=1 local=0 departed=0 result=win score=7 kills=7 deaths=1 assists=0 betrayals=1 suicides=1 shots_fired=0 shots_hit=0"
+}

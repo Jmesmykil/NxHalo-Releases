@@ -1,0 +1,18 @@
+{
+  "stable_296_rollback": "/home/deck/Games/HaloCE/halo.before-host-rules-297-20261008T232054Z",
+  "version": "2.9.7",
+  "runtime_sha256": "090807f68d38770fbd78d40a1f9ebe4e6e230f6f7a37600d0059722bc77988a7",
+  "prior_runtime_sha256": "c8c480c44e18107c115ddf3cf341e9085f4c0f6868b1188d06a5ab847a2ecc8f",
+  "rollback": "/home/deck/Games/HaloCE/halo.before-host-rules-297-20261008T233119Z",
+  "device": "Jupiter",
+  "uptime": "263483.79 1785503.23",
+  "original_shortcut": 9521247926039347200,
+  "config_unchanged": true,
+  "launcher_unchanged": true,
+  "volume": "Volume: 0.90",
+  "installed_while_idle": true,
+  "candidate_gameplay_proof": "/home/deck/Games/HaloCE/runtime-proof/host-rules-input-090807f68d38-20261008T232533Z",
+  "config_sha256": "577c713731527e1b7124da17e65b02246c7c079dfb2df7808358c8c0440b81e3",
+  "launcher_sha256": "9ea947ee4e95d1f3084497366716526321f8edf88b724da0adb145e6faaa8f57",
+  "maps_saves_controllers_untouched": true
+}

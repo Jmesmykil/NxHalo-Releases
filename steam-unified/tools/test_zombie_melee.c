@@ -4,7 +4,7 @@ static int failures;
 #define CHECK(expression) do { if (!(expression)) failures++; } while (0)
 static void zero(void *buffer, unsigned long size) { unsigned char *p = buffer; while (size--) *p++ = 0; }
 
-static struct weapon_definition definitions[4];
+static struct weapon_definition definitions[5];
 static struct unit_datum test_unit;
 static struct object_datum test_weapon_object;
 static struct object_datum old_weapon_object;
@@ -14,6 +14,7 @@ static long old_weapon_index = 88;
 static boolean ball_present;
 static boolean flag_present;
 static boolean pistol_present;
+static boolean sword_present;
 static boolean spawn_succeeds;
 static boolean add_succeeds;
 static boolean deleted_weapon;
@@ -27,6 +28,7 @@ static boolean same_string(char const *a, char const *b)
 long tag_loaded(long group_tag, const char *name)
 {
 	(void)group_tag;
+	if (same_string(name, "weapons\\nxhalo_zombie_sword\\nxhalo_zombie_sword") && sword_present) return 4;
 	if (same_string(name, "weapons\\ball\\ball") && ball_present) return 1;
 	if (same_string(name, "weapons\\flag\\flag") && flag_present) return 2;
 	if (same_string(name, "weapons\\pistol\\pistol") && pistol_present) return 3;
@@ -36,7 +38,7 @@ long tag_loaded(long group_tag, const char *name)
 void *tag_get(long group_tag, long tag_index)
 {
 	(void)group_tag;
-	return tag_index > 0 && tag_index < 4 ? &definitions[tag_index] : NULL;
+	return tag_index > 0 && tag_index < 5 ? &definitions[tag_index] : NULL;
 }
 
 void object_placement_data_new(struct object_placement_data *data, long definition_index, long owner_object_index)
@@ -83,6 +85,7 @@ void *object_get_and_verify_type(long object_index, unsigned long valid_type_fla
 static void set_melee_refs(struct weapon_definition *weapon)
 {
 	weapon->weapon.melee_attack_damage.index = 3;
+	weapon->weapon.melee_attack_response.index = 6;
 	weapon->weapon.interface_definition.first_person_model.index = 4;
 	weapon->weapon.interface_definition.first_person_animations.index = 5;
 }
@@ -102,6 +105,7 @@ static void reset_case(void)
 	ball_present = TRUE;
 	flag_present = FALSE;
 	pistol_present = FALSE;
+	sword_present = FALSE;
 	spawn_succeeds = TRUE;
 	add_succeeds = TRUE;
 	deleted_weapon = FALSE;
@@ -114,6 +118,29 @@ int main(void)
 	CHECK(!nxhalo_zombie_melee_weapon_available());
 	CHECK(!nxhalo_give_zombie_melee_weapon(fake_unit_index));
 	CHECK(test_unit.unit.weapon_object_indices[0] == old_weapon_index);
+
+	reset_case();
+	sword_present = TRUE;
+	set_melee_refs(&definitions[4]);
+	CHECK(!TEST_FLAG(definitions[4].weapon.flags, _weapon_must_be_readied_bit));
+	CHECK(nxhalo_zombie_melee_weapon_available());
+	CHECK(nxhalo_zombie_melee_weapon_allowed(4));
+	CHECK(nxhalo_give_zombie_melee_weapon(fake_unit_index));
+	CHECK(test_weapon_object.definition_index == 4);
+
+	reset_case();
+	sword_present = TRUE;
+	set_melee_refs(&definitions[4]);
+	definitions[4].weapon.flags |= 1UL << _weapon_detonates_when_dropped_bit;
+	CHECK(nxhalo_zombie_melee_weapon_available());
+	CHECK(nxhalo_zombie_melee_weapon_allowed(1));
+
+	reset_case();
+	sword_present = TRUE;
+	set_melee_refs(&definitions[4]);
+	definitions[4].weapon.triggers.count = 1;
+	CHECK(nxhalo_zombie_melee_weapon_available());
+	CHECK(nxhalo_zombie_melee_weapon_allowed(1));
 
 	reset_case();
 	definitions[1].weapon.interface_definition.first_person_animations.index = NONE;

@@ -1,0 +1,18 @@
+{
+  "version": "2.9.7",
+  "tag": "v0.2.9.7-steamdeck-host-rules",
+  "runtime": "090807f68d38770fbd78d40a1f9ebe4e6e230f6f7a37600d0059722bc77988a7",
+  "assets": {
+    "NxHalo-SteamDeck-unified-runtime-2.9.7-host-rules.tar.gz": {
+      "sha256": "b583a14027a5aab78b27e2e4ad27f8c1005f67936fd5db12fee47315065f677b",
+      "bytes": 22239626
+    },
+    "NxHalo-Unified-source-2.9.7-host-rules.zip": {
+      "sha256": "8d10fcad801963a24949e388be4e3035a1255daaf410e09f2a42813e2eaf5679",
+      "bytes": 17967991
+    }
+  },
+  "source_entries": 2277,
+  "platform": "Steam Deck/Linux",
+  "switch_runtime_changed": false
+}

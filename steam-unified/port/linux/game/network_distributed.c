@@ -72,6 +72,8 @@ machine (their datum identifiers need not be).
 #include "units/bipeds.h"
 #include "network_coop.h"
 #include "network_distributed.h"
+#include "match_rules.h"
+#include "lunge_capability_state.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -223,6 +225,8 @@ enum
 	/* (alive) camouflaged, and doubly so */
 	_distributed_unit_camouflaged_bit = 0,
 	_distributed_unit_super_camouflaged_bit,
+	/* Existing unit-flags byte: old clients safely ignore this hint. */
+	_distributed_unit_lunge_correction_bit,
 };
 
 /* a unit state's parts on the wire: which of those that are not always
@@ -249,6 +253,7 @@ host has it (no further than that: between the two they would disagree for
 good, the host's player somewhere its own is not) */
 #define HOST_ACCEPT_TOLERANCE 3.5f
 #define LOCAL_CORRECTION_TOLERANCE 3.0f
+#define LUNGE_OWNER_CORRECTION_LIMIT 3.0f
 /* how fast a client's own player's unit moves at most (world units a tick) */
 #define MAXIMUM_PREDICTED_SPEED 2.0f
 /* ... on foot: this many times as fast as a player runs and jumps, or as
@@ -541,6 +546,16 @@ static real distributed_own_round_trip;
 /* the host: the players each machine had when it last told the host that it
 had loaded (a machine new at its index has none of the old one's state) */
 static long distributed_machine_players[HALO_PORT_MAXIMUM_NETWORK_MACHINES][MAXIMUM_LOCAL_PLAYERS];
+/* Capability is granted only to a player that opted in over its
+authenticated machine stream. Full datums prevent slot reuse inheritance. */
+static struct lunge_capability_host_state distributed_lunge_capabilities[MAXIMUM_TRACKED_PLAYERS];
+/* Each client retries the reliable request at a bounded rate until ACK. */
+static struct lunge_capability_client_state distributed_client_lunge_capabilities[MAXIMUM_LOCAL_PLAYERS];
+struct distributed_lunge_capability_message
+{
+	struct distributed_message_header header;
+	byte player_index;
+};
 /* the host: what each player's unit was last sent as (a change goes to
 every client at once) */
 static struct
@@ -1177,6 +1192,98 @@ boolean distributed_machine_has_player(
 	return FALSE;
 }
 
+/* A client asks once a second until each local player is confirmed. */
+static void distributed_client_lunge_capability_tick(void)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		struct lunge_capability_client_state *capability =
+			&distributed_client_lunge_capabilities[local_player_index];
+		long player_index = local_player_get_player_index(local_player_index);
+		struct distributed_lunge_capability_message message;
+
+		lunge_capability_client_set_player(capability, player_index, NONE);
+		if (!lunge_capability_client_should_send(capability, player_index, game_time_get(),
+			MAX(1, TICKS_PER_SECOND), 8, NONE))
+			continue;
+
+		message.player_index = distributed_player_to_byte(player_index);
+		distributed_send(&message, _distributed_message_infected_lunge_capability, 1,
+			sizeof(message), _distributed_to_host_reliably);
+		lunge_capability_client_mark_sent(capability, game_time_get());
+	}
+}
+
+static void distributed_client_lunge_capability_acknowledge(byte player_byte)
+{
+	long player_index = distributed_player_from_byte(player_byte);
+	struct player_datum *player = player_index != NONE ? player_try_and_get(player_index) : NULL;
+	short local_player_index;
+
+	if (!player || player->local_player_index < 0 ||
+		player->local_player_index >= MAXIMUM_LOCAL_PLAYERS)
+		return;
+	local_player_index = player->local_player_index;
+	lunge_capability_client_ack(&distributed_client_lunge_capabilities[local_player_index],
+		player_index, distributed_handling_stream_message);
+}
+
+static void distributed_host_lunge_capability_request(long machine_index, byte player_byte, byte count)
+{
+	struct distributed_lunge_capability_message message;
+	struct player_datum *player;
+	long player_index = distributed_player_from_byte(player_byte);
+	short absolute;
+
+	if (machine_index < 0 || machine_index >= HALO_PORT_MAXIMUM_NETWORK_MACHINES ||
+		player_index == NONE)
+		return;
+	player = player_try_and_get(player_index);
+	if (!player)
+		return;
+	absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+	if (absolute < 0 || absolute >= MAXIMUM_TRACKED_PLAYERS ||
+		!lunge_capability_host_grant(&distributed_lunge_capabilities[absolute],
+			player_index, machine_index, count, NONE, distributed_handling_stream_message,
+			distributed_machine_has_player(machine_index, player_byte),
+			player->local_player_index == NONE, !player->quit_out_of_game))
+		return;
+	message.player_index = player_byte;
+	distributed_send_to_machine_reliably(machine_index, &message,
+		_distributed_message_infected_lunge_capability_ack, 1, sizeof(message));
+}
+
+boolean network_distributed_player_lunge_supported(long player_index)
+{
+	struct player_datum *player = player_index != NONE ? player_try_and_get(player_index) : NULL;
+	long absolute;
+
+	if (!player || player->quit_out_of_game)
+		return FALSE;
+	if (game_connection() != _game_connection_network_client &&
+		game_connection() != _game_connection_network_server &&
+		!network_game_distributed_client())
+		return TRUE;
+	if (game_connection() == _game_connection_network_client || network_game_distributed_client())
+	{
+		short local_player_index = player->local_player_index;
+		return local_player_index >= 0 && local_player_index < MAXIMUM_LOCAL_PLAYERS &&
+			lunge_capability_client_supports(&distributed_client_lunge_capabilities[local_player_index],
+				player_index, TRUE, player->quit_out_of_game);
+	}
+	absolute = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+	if (absolute < 0 || absolute >= MAXIMUM_TRACKED_PLAYERS)
+		return FALSE;
+	return lunge_capability_host_supports(&distributed_lunge_capabilities[absolute], player_index,
+		distributed_lunge_capabilities[absolute].machine_index, distributed_player_machines[absolute],
+		distributed_lunge_capabilities[absolute].machine_index >= 0 &&
+			distributed_lunge_capabilities[absolute].machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES &&
+			distributed_machine_has_player(distributed_lunge_capabilities[absolute].machine_index, (short)absolute),
+		player->local_player_index != NONE, player->quit_out_of_game);
+}
+
 /* whether the machine's players are this machine's (the host's own machine
 is in the game as its clients are) */
 static boolean distributed_machine_is_local(
@@ -1245,6 +1352,13 @@ static boolean distributed_machine_loaded(
 	}
 	csmemcpy(distributed_machine_players[machine_index], player_list,
 		sizeof(distributed_machine_players[machine_index]));
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		struct lunge_capability_host_state *capability = &distributed_lunge_capabilities[player_index];
+		lunge_capability_host_prune(capability, machine_index,
+			distributed_player_from_byte((byte)player_index),
+			distributed_machine_has_player(machine_index, player_index), NONE);
+	}
 	for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
 		distributed_received_times[machine_index][type] = NONE;
 	csmemset(&distributed_round_trips[machine_index], 0, sizeof(distributed_round_trips[machine_index]));
@@ -1366,6 +1480,9 @@ static void distributed_state_from_player(
 			TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit));
 		SET_FLAG(state->unit_flags, _distributed_unit_super_camouflaged_bit,
 			TEST_FLAG(unit->unit.flags, _unit_super_camouflaged_bit));
+		SET_FLAG(state->unit_flags, _distributed_unit_lunge_correction_bit,
+			game_connection() == _game_connection_network_server &&
+			match_rules_player_lunge_active(DATUM_INDEX_NEW(player_index, player->identifier)));
 		camouflage = camouflage > 1.0f ? 1.0f : camouflage < 0.0f ? 0.0f : camouflage;
 		state->active_camouflage = (byte)(long)floor(camouflage * 255.0f + 0.5f);
 		/* (the host) a client's player where the client had them: at which of
@@ -1645,6 +1762,19 @@ static void distributed_correct_own_unit(
 	if (network_coop_active() && scenario_leaf_index_from_point(&state->position) == NONE &&
 		scenario_leaf_index_from_point(&object_get(unit_index)->object.position) != NONE)
 	{
+		return;
+	}
+	/* A compatible host marks the short infected lunge window. Apply the
+	bounded owner correction through the normal object reconciliation path;
+	never correct an owner farther than three world units. */
+	if (TEST_FLAG(state->unit_flags, _distributed_unit_lunge_correction_bit))
+	{
+		struct object_datum *object = object_get(unit_index);
+		real dx = state->position.x - object->object.position.x;
+		real dy = state->position.y - object->object.position.y;
+		real dz = state->position.z - object->object.position.z;
+		if (lunge_correction_within_limit(dx, dy, dz, LUNGE_OWNER_CORRECTION_LIMIT))
+			distributed_apply_state(unit_index, state, &state->position, 0.0f, 0.0f, 0.0f, 0.0f);
 		return;
 	}
 	if (TEST_FLAG(state->flags, _distributed_unit_predicted_bit) &&
@@ -2008,11 +2138,18 @@ static void distributed_take_prediction(
 	struct distributed_on_foot_bound const *bound)
 {
 	struct distributed_unit_state const *state = &distributed_predictions[player_index].state;
+	struct player_datum *player = distributed_player(player_index);
 	struct object_datum *object = object_get(unit_index);
 	long now = game_time_get();
 	real dx = state->position.x - object->object.position.x;
 	real dy = state->position.y - object->object.position.y;
 	real dz = state->position.z - object->object.position.z;
+
+	/* During a negotiated lunge, host collision simulation owns this short
+	window. Do not apply a stale pre-lunge client position. */
+	if (player && match_rules_player_lunge_active(
+		DATUM_INDEX_NEW(player_index, player->identifier)))
+		return;
 
 	if (!(dx * dx + dy * dy + dz * dz <= HOST_ACCEPT_TOLERANCE * HOST_ACCEPT_TOLERANCE))
 		return;
@@ -3240,6 +3377,18 @@ void network_distributed_new_game(
 	csmemset(distributed_input_facings, 0, sizeof(distributed_input_facings));
 	csmemset(distributed_client_clocks, 0, sizeof(distributed_client_clocks));
 	csmemset(distributed_client_identities, 0, sizeof(distributed_client_identities));
+	csmemset(distributed_lunge_capabilities, 0, sizeof(distributed_lunge_capabilities));
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		lunge_capability_host_clear(&distributed_lunge_capabilities[player_index], NONE);
+	}
+	for (player_index = 0; player_index < MAXIMUM_LOCAL_PLAYERS; player_index++)
+	{
+		distributed_client_lunge_capabilities[player_index].player_index = NONE;
+		distributed_client_lunge_capabilities[player_index].last_sent_tick = NONE;
+		distributed_client_lunge_capabilities[player_index].attempts = 0;
+		distributed_client_lunge_capabilities[player_index].acknowledged = FALSE;
+	}
 	distributed_identity_sent = FALSE;
 	{
 		short machine_index;
@@ -3357,6 +3506,7 @@ void network_distributed_tick(
 	}
 	else if (connection == _game_connection_network_client)
 	{
+		distributed_client_lunge_capability_tick();
 		distributed_note_own_positions();
 		distributed_client_send_inputs();
 		distributed_client_send_predictions();
@@ -3919,6 +4069,8 @@ void network_distributed_handle_message(
 	case _distributed_message_coop_screen_effect: entry_size = network_coop_screen_effect_entry_size(); break;
 	case _distributed_message_coop_device_states: entry_size = network_coop_device_state_entry_size(); break;
 	case _distributed_message_pickups: entry_size = sizeof(struct distributed_pickup); break;
+	case _distributed_message_infected_lunge_capability:
+	case _distributed_message_infected_lunge_capability_ack: entry_size = sizeof(byte); break;
 	case _distributed_message_player_inputs: entry_size = sizeof(struct distributed_player_input); break;
 	case _distributed_message_relayed_actions: entry_size = DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE; break;
 	case _distributed_message_game_state:
@@ -3932,6 +4084,14 @@ void network_distributed_handle_message(
 	}
 	if (header.type == 0 || header.type >= NUMBER_OF_DISTRIBUTED_MESSAGES ||
 		size < sizeof(header) + header.count * entry_size)
+	{
+		return;
+	}
+	/* Capability and ACK are state-changing reliable messages; reject
+	datagrams before stale-time or sender-clock state can be touched. */
+	if ((header.type == _distributed_message_infected_lunge_capability ||
+		header.type == _distributed_message_infected_lunge_capability_ack) &&
+		!distributed_handling_stream_message)
 	{
 		return;
 	}
@@ -3960,6 +4120,7 @@ void network_distributed_handle_message(
 	case _distributed_message_vehicle_prediction:
 	case _distributed_message_player_inputs:
 	case _distributed_message_coop_skip_vote:
+	case _distributed_message_infected_lunge_capability:
 		if (machine_index == NONE || game_connection() != _game_connection_network_server)
 			return;
 		break;
@@ -3992,6 +4153,14 @@ void network_distributed_handle_message(
 
 	switch (header.type)
 	{
+	case _distributed_message_infected_lunge_capability:
+		if (header.count == 1)
+			distributed_host_lunge_capability_request(machine_index, *(byte const *)entries, header.count);
+		break;
+	case _distributed_message_infected_lunge_capability_ack:
+		if (distributed_handling_stream_message && header.count == 1)
+			distributed_client_lunge_capability_acknowledge(*(byte const *)entries);
+		break;
 	case _distributed_message_player_prediction:
 		distributed_handle_predictions(machine_index, header.game_time, (byte const *)entries,
 			(byte const *)message + size, header.count);
@@ -4168,9 +4337,9 @@ void network_distributed_handle_message(
 	}
 }
 
-/* (the host: network_server_message_handler.c) a client machine's message
-of the distributed kind that came over its stream, which no other machine
-can send as it: as network_distributed_handle_message */
+/* A distributed message received over the authenticated reliable stream:
+a client machine on the host, or the host on a client; datagrams use the
+ordinary handler and cannot grant lunge capability. */
 void network_distributed_handle_stream_message(
 	long machine_index,
 	word const *message,

@@ -960,6 +960,7 @@
 		<string text="Every time you kill another player, you will run a\nlittle slower. An entertaining handicap for the\nsharp-eyed marksman."/>
 		<string text="You will always run at the same speed, no matter how\nmany other players you kill."/>
 		<string text="Scoring a mere five kills will win the game for you."/>
+		<string text="Gun Game's seven credited kills complete the weapon ladder."/>
 		<string text="First player to plug ten enemies wins."/>
 		<string text="At the end of this game there will be fifteen angry\nmen. Angry because the winning player killed them."/>
 		<string text="You'll need to secure twenty-five kills in order to\nwin the game."/>
@@ -997,6 +998,7 @@
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_kills_to_win">
 		<string text="5"/>
+		<string text="7"/>
 		<string text="10"/>
 		<string text="15"/>
 		<string text="25"/>

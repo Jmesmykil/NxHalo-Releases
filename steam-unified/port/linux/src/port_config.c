@@ -266,7 +266,7 @@ static const struct config_setting config_settings[] =
 		"Host multiplayer biped preset: 0 is the map's normal multiplayer character. The selected biped must be loaded by the current multiplayer map; clients follow the host." },
 
 	{ "mods.match_preset", _config_integer, "0", "HALO_MATCH_PRESET", _environment_value, _platform_all,
-		"Host match preset: Standard, faction teams, SWAT, Tower of Power, grenade Dodgeball, Zombies or native Race." },
+		"Host match preset: Standard, faction teams, SWAT, Tower of Power, grenade Dodgeball, Zombies, native Race or seven-weapon Gun Game." },
 	{ "mods.faction_matchup", _config_integer, "0", "HALO_FACTION_MATCHUP", _environment_value, _platform_all,
 		"Faction pairing: 0 Covenant/USMC, 1 USMC/Flood, 2 Flood/Covenant. Models must be loaded by the map." },
 

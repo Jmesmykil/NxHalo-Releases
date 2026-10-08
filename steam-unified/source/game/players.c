@@ -239,6 +239,7 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "nxhalo_custom_content.h" /* port: map-loaded campaign and host biped presets */
 #include "match_rules.h" /* port: host-authoritative factions and variant presets */
+#include "match_rules_action.h" /* infected attack input before weapon-drop handling */
 #include "halo_network_profile.h" /* port: retain legacy BSP triggers outside profile 21 */
 #include "cutscene/cinematics.h" /* port: network co-op's first spawns */
 #include "editor/editor_stubs.h"
@@ -1379,6 +1380,11 @@ static void player_spawn(
 	long saved_unit_index;
 	long weapon_index;
 	long unit_definition_index;
+	long host_stock_definition_index;
+	long host_fallback_definition_index;
+	long host_required_weapons[8];
+	short host_required_weapon_count;
+	short host_required_weapon_index;
 	long unit_index;
 	long starting_equipment_count;
 	short starting_location_index;
@@ -1458,8 +1464,44 @@ static void player_spawn(
 					if (game_connection() == _game_connection_local ||
 						game_connection() == _game_connection_network_server)
 					{
+						host_stock_definition_index = unit_definition_index;
 						unit_definition_index = nxhalo_multiplayer_character_definition(unit_definition_index);
 						unit_definition_index = match_rules_host_spawn_definition(player_index, unit_definition_index);
+						host_required_weapon_count = match_rules_host_required_spawn_weapons(player_index, host_required_weapons, 8);
+						if (host_required_weapon_count > 0)
+						{
+							boolean selected_supports_loadout = TRUE;
+							for (host_required_weapon_index = 0; host_required_weapon_index < host_required_weapon_count; ++host_required_weapon_index)
+							{
+								if (!unit_definition_can_use_weapon(unit_definition_index, host_required_weapons[host_required_weapon_index]))
+									selected_supports_loadout = FALSE;
+							}
+							if (!selected_supports_loadout)
+							{
+								host_fallback_definition_index = match_rules_host_spawn_definition(player_index, host_stock_definition_index);
+								selected_supports_loadout = TRUE;
+								for (host_required_weapon_index = 0; host_required_weapon_index < host_required_weapon_count; ++host_required_weapon_index)
+								{
+									if (!unit_definition_can_use_weapon(host_fallback_definition_index, host_required_weapons[host_required_weapon_index]))
+										selected_supports_loadout = FALSE;
+								}
+								if (!selected_supports_loadout)
+								{
+									host_fallback_definition_index = host_stock_definition_index;
+									selected_supports_loadout = TRUE;
+									for (host_required_weapon_index = 0; host_required_weapon_index < host_required_weapon_count; ++host_required_weapon_index)
+									{
+										if (!unit_definition_can_use_weapon(host_fallback_definition_index, host_required_weapons[host_required_weapon_index]))
+											selected_supports_loadout = FALSE;
+									}
+								}
+								if (selected_supports_loadout)
+								{
+									unit_definition_index = host_fallback_definition_index;
+									match_rules_host_note_loadout_fallback();
+								}
+							}
+						}
 					}
 				}
 				else
@@ -4559,6 +4601,13 @@ void players_update_before_game(
 				unit = unit_get(player->unit_index);
 				if (!players_globals->input_disabled)
 				{
+					if (match_rules_player_melee_only(iterator.datum_index))
+					{
+						action->control_flags = match_rules_infected_action_flags(TRUE, action->control_flags);
+						action->primary_trigger = 0.f;
+						action->desired_weapon_index = unit->unit.current_weapon_index;
+						action->desired_grenade_index = NONE;
+					}
 					network_player_log_idle_action(iterator.datum_index, action->control_flags);
 					/* port: not for the keyboard's action key, which only acts
 					(units.h, UNIT_CONTROL_PORT_ACTION_ONLY_BIT) */

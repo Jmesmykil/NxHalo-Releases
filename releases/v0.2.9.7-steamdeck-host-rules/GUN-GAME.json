@@ -1,0 +1,110 @@
+{
+  "candidate_sha256": "090807f68d38770fbd78d40a1f9ebe4e6e230f6f7a37600d0059722bc77988a7",
+  "unchanged_client_sha256": "e3cdc7999eb273329daca96b90201b8263f20b0963902f1d036170670f474bec",
+  "result": "PASS final13 natural mode selection/reset and actual seven-kill native match",
+  "map": "original Xbox Blood Gulch, unchanged",
+  "map_sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+  "fixture": "stock original XboxBloodGulch; private GunGame preset env + native network-test lobby start; existing native BSP-checked position-only gather + synthetic aim; actual XTest mousefire/reload causes allkills; no scripted damage/kill/rank/score writes",
+  "audio": "dummy voiceoff",
+  "transitions": [
+    {
+      "credited_kill": 1,
+      "host_score": 1,
+      "client_immediate_score": 1,
+      "new_weapon": "weapons\\assault rifle\\assault rifle",
+      "shared_weapon_datum": "0xe2af0032",
+      "weapon_count_each": 1
+    },
+    {
+      "credited_kill": 2,
+      "host_score": 2,
+      "client_immediate_score": 1,
+      "new_weapon": "weapons\\plasma rifle\\plasma rifle",
+      "shared_weapon_datum": "0xe2c40036",
+      "weapon_count_each": 1
+    },
+    {
+      "credited_kill": 3,
+      "host_score": 3,
+      "client_immediate_score": 3,
+      "new_weapon": "weapons\\needler\\needler",
+      "shared_weapon_datum": "0xe2d2003c",
+      "weapon_count_each": 1
+    },
+    {
+      "credited_kill": 4,
+      "host_score": 4,
+      "client_immediate_score": 4,
+      "new_weapon": "weapons\\shotgun\\shotgun",
+      "shared_weapon_datum": "0xe2e50042",
+      "weapon_count_each": 1
+    },
+    {
+      "credited_kill": 5,
+      "host_score": 5,
+      "client_immediate_score": 4,
+      "new_weapon": "weapons\\sniper rifle\\sniper rifle",
+      "shared_weapon_datum": "0xe2fb003a",
+      "weapon_count_each": 1
+    },
+    {
+      "credited_kill": 6,
+      "host_score": 6,
+      "client_immediate_score": 6,
+      "new_weapon": "weapons\\rocket launcher\\rocket launcher",
+      "shared_weapon_datum": "0xe3010033",
+      "weapon_count_each": 1
+    }
+  ],
+  "native_winner_both": {
+    "host": "halo-linux: match_player: unix=1791501983 match=1 event=final tick=1335 slot=2 name=\"Player 2\" team=1 local=1 departed=0 result=win score=7 kills=7 deaths=1 assists=0 betrayals=1 suicides=1 shots_fired=0 shots_hit=0",
+    "client": "halo-linux: match_player: unix=1791501983 match=1 event=final tick=1340 slot=2 name=\"Player 2\" team=1 local=0 departed=0 result=win score=7 kills=7 deaths=1 assists=0 betrayals=1 suicides=1 shots_fired=0 shots_hit=0"
+  },
+  "runner_error": null,
+  "cleanup": {
+    "xvfb-host": 0,
+    "host": 0,
+    "xvfb-client": 0,
+    "client": 0
+  },
+  "ui": {
+    "run": "/mnt/storage/data/nxhalo-multiplayer-lab22/runtime-proof/gungame-ui-090807f68d38-20261008/gungame-modes",
+    "resolution": "640x480",
+    "mode_selection": "PASS Main/Multiplayer/Create/Host/BloodGulch/SelectGametype/MODES/Combat/GunGame; actual mouse choice saved7; return+OK retained7 and rendered ServerSetup GunGame(SLAYER)",
+    "explicit_base_reset": "PASS ServerSetup GameType/Slayer reset saved preset7->0 and restored ordinary editable Slayer rows (score7/teamsNO/killorderNO visible)",
+    "explicit_standard_reset": "Source verified; no separate live Standard action assertion",
+    "fixed_gun_fields": "Source-only verified disabled and sanitized7/FFA/killorder. Natural GameType options path first explicitly resets base; no live disabled-fields assertion.",
+    "evidence": [
+      "gun-selected.json",
+      "return-gametype.json",
+      "server-gun.bmp",
+      "server-gun.json",
+      "base-picker.json",
+      "base-slayer-reset.bmp",
+      "base-slayer-reset.json"
+    ]
+  },
+  "source_review": "Narrow pending-mode callback fix reviewed read-only; Standard/base clears remain, native predicate engine guard and score7 normalization retained; no new source blocker.",
+  "prior_fixture_notes": "c8 gameplay original StopIteration retained independently; final13 runner instead requires both native winner7 logs. Initial final13 batched UI clicks did not select mode; retained, corrected fixture pacing with separately captured steps.",
+  "not_runtime_verified": [
+    "ordinary mid-ladder shooter death/respawn retention",
+    "late join/salted datum reuse/reset",
+    "allocation failure rollback",
+    "separate controlled friendly-fire event",
+    "disabled GunGame rules screen reachable without explicit base-engine change"
+  ],
+  "ui_cleanup": {
+    "xvfb-host": 0,
+    "game": 0
+  },
+  "owned_processes_absent": {
+    "254660": true,
+    "254715": true,
+    "254758": true
+  },
+  "owned_displays_released": {
+    "192": true,
+    "194": true,
+    "195": true
+  }
+}

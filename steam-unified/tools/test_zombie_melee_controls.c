@@ -3,6 +3,22 @@
 int main(void)
 {
     struct unit_control_data control;
+    unsigned long flags, extra = FLAG(_unit_control_use_equipment_bit) | (1UL << 20);
+    if (match_rules_infected_action_flags(FALSE, 0xFFFFFFFFUL) != 0xFFFFFFFFUL ||
+        match_rules_infected_action_flags(TRUE, 0) != 0 ||
+        match_rules_infected_action_flags(TRUE, extra) != extra)
+        return 5;
+    flags = match_rules_infected_action_flags(TRUE,
+        FLAG(_unit_control_weapon_primary_trigger_bit) |
+        FLAG(_unit_control_throw_grenade_bit) |
+        FLAG(_unit_control_weapon_reload_bit) |
+        FLAG(_unit_control_swap_weapons_bit) | (1UL << 20));
+    if (flags != (FLAG(_unit_control_use_equipment_bit) | (1UL << 20)))
+        return 6;
+    if (match_rules_infected_action_flags(TRUE, FLAG(_unit_control_weapon_secondary_trigger_bit)) !=
+        FLAG(_unit_control_use_equipment_bit))
+        return 7;
+
     control.control_flags = 0xFFFF;
     control.primary_trigger = 1.0f;
     control.grenade_index = 1;

@@ -1,6 +1,6 @@
-## NxHalo Steam Deck/Linux update: 2.9.6
+## NxHalo Steam Deck/Linux update: 2.9.7
 
-[Runtime and source](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.9.6-steamdeck-native-mods). Read the [content guide and validation limits](docs/NATIVE-MODS-2.9.6.md). Supply your own game data.
+[Runtime and source](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.9.7-steamdeck-host-rules). Read the [host rules guide](docs/HOST-RULES-2.9.7.md) and [content guide](docs/NATIVE-MODS-2.9.6.md). Supply your own game data.
 
 Upstream project documentation follows.
 

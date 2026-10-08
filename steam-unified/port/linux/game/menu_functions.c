@@ -5002,8 +5002,8 @@ static struct gametype_option const gametype_options[] =
 	{ "kill_in_order_spinner", _option_byte, VARIANT_FIELD(game_engine_variant.slayer.no_kill_penalty), 0, 2,
 		{ 0, 1 } },
 	/* (up to 500, for big games: tools/port_settings.py's STRING_INSERTS) */
-	{ "kills_to_win_spinner", _option_long, VARIANT_FIELD(universal_variant.score_to_win), 0, 11,
-		{ 5, 10, 15, 25, 50, 75, 100, 150, 200, 250, 500 } },
+	{ "kills_to_win_spinner", _option_long, VARIANT_FIELD(universal_variant.score_to_win), 0, 12,
+		{ 5, 7, 10, 15, 25, 50, 75, 100, 150, 200, 250, 500 } },
 	/* team options */
 	{ "friendly_fire_spinner", _option_short, OPTIONS_FIELD(friendly_fire), 0, 4,
 		{ _friendly_fire_off, _friendly_fire_on, _friendly_fire_shields_only, _friendly_fire_explosives_only } },
@@ -5251,11 +5251,44 @@ static void vehicles_update(struct widget_instance *list)
 }
 
 /* "mp profile init X" (the list's creation): its spinners from the gametype */
+static boolean gametype_editing_gun_game(void)
+{
+	struct game_variant *variant = edit_variant();
+	return variant && variant->game_engine_index == game_engine_slayer &&
+		!ustrncmp(variant->human_readable_game_description, L"Gun Game", 8);
+}
+
+/* "mp profile init X" (the list's creation): its spinners from the gametype */
 static boolean gametype_options_init(struct widget_instance *list)
 {
-	if (!edit_variant())
+	struct game_variant *variant = edit_variant();
+	struct widget_instance *spinner;
+	if (!variant)
 		return campaign_fail();
+	if (gametype_editing_gun_game())
+	{
+		variant->universal_variant.teams = FALSE;
+		variant->universal_variant.score_to_win = 7;
+		variant->game_engine_variant.slayer.kill_in_order = FALSE;
+	}
 	gametype_options_each(list, FALSE);
+	{
+		boolean gun_game = gametype_editing_gun_game();
+		if ((spinner = named(list, "kills_to_win_spinner", 0)) != NULL)
+			spinner->disabled = gun_game;
+		if ((spinner = named(list, "team_play_spinner", 0)) != NULL)
+			spinner->disabled = gun_game;
+		if ((spinner = named(list, "kill_penalty_spinner", 0)) != NULL)
+			spinner->disabled = gun_game;
+		/* These rows are fixed only for Gun Game. Restore ordinary Slayer
+		 * labels when the editor reuses the screen for another profile. */
+		text_set(named(list, "kills_to_win_label", 0),
+			gun_game ? L"STAGES TO WIN (FIXED):" : L"KILLS TO WIN:");
+		text_set(named(list, "team_play_label", 0),
+			gun_game ? L"FREE FOR ALL (FIXED):" : L"TEAM PLAY:");
+		text_set(named(list, "kill_penalty_label", 0),
+			gun_game ? L"KILL IN ORDER (FIXED):" : L"KILL IN ORDER:");
+	}
 	if (named(list, "op_team", 0))
 		vehicles_show(list);
 	return TRUE;
@@ -5271,6 +5304,14 @@ static boolean gametype_options_save(struct widget_instance *widget)
 	if (named(list, "op_team", 0))
 		vehicles_keep(list);
 	gametype_options_each(list, TRUE);
+	if (gametype_editing_gun_game())
+	{
+		struct game_variant *variant = edit_variant();
+		variant->universal_variant.teams = FALSE;
+		variant->universal_variant.score_to_win = 7;
+		variant->game_engine_variant.slayer.kill_in_order = FALSE;
+		gametype_options_each(list, FALSE);
+	}
 	return TRUE;
 }
 
@@ -5505,6 +5546,7 @@ static char const *const engine_items[] =
 	"gametype_select_oddball_item", "gametype_select_race_item"
 };
 static long const engine_of_item[] = { 1, 4, 2, 3, 5 };
+static char const *const base_variant_of_item[] = { "ctf", "king", "slayer", "oddball", "race" };
 
 /* "mp profile init game engine": the gametype's type focused */
 static boolean gametype_engine_init(struct widget_instance *list)
@@ -5535,12 +5577,19 @@ static boolean gametype_engine_set(struct widget_instance *item)
 	{
 		if (!strcmp(item->name, engine_items[index]))
 		{
-			/* An explicit base-type choice supersedes a saved special preset. */
-			if (gametype_edit.setup && !gametype_setup_select_preset(MATCH_RULES_PRESET_STANDARD))
+			/* An explicit base-type choice supersedes any special preset and
+			 * clears its inherited display label, even when Slayer was selected. */
+			if (!gametype_setup_select_preset(MATCH_RULES_PRESET_STANDARD))
 				return FALSE;
 			if (variant->game_engine_index != engine_of_item[index])
 				csmemset(&variant->game_engine_variant, 0, sizeof(variant->game_engine_variant));
 			variant->game_engine_index = engine_of_item[index];
+			{
+				struct game_variant base;
+				game_engine_get_variant_by_name(&base, base_variant_of_item[index]);
+				csmemcpy(variant->human_readable_game_description,
+					base.human_readable_game_description, sizeof(variant->human_readable_game_description));
+			}
 			return TRUE;
 		}
 	}
