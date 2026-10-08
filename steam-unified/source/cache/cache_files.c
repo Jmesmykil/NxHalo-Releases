@@ -483,8 +483,8 @@ static boolean cache_file_tag_header_verify(
 
 /* port: whether a structure bsp reference (the scenario's) may be loaded:
 its bytes lie in the map and fit the tag cache after the tag data, where
-they are read to (rounded up to whole sectors, as the read is), and it
-names a structure bsp tag */
+they are read to (sector-rounded for Xbox cache files, exact for CE maps),
+and it names a structure bsp tag */
 static boolean cache_file_structure_bsp_reference_verify(
 	struct scenario_structure_bsp_reference *reference)
 {
@@ -512,7 +512,12 @@ static boolean cache_file_structure_bsp_reference_verify(
 		return FALSE;
 	}
 
-	read_size = (reference->file_size + CACHE_FILE_SECTOR_SIZE - 1) & ~(CACHE_FILE_SECTOR_SIZE - 1);
+	read_size = reference->file_size;
+#ifdef HALO_CUSTOM_EDITION
+	/* Custom Edition reads the BSP to its exact file size (cache_file_read). */
+	if (!cache_file_is_ce)
+#endif
+		read_size = (reference->file_size + CACHE_FILE_SECTOR_SIZE - 1) & ~(CACHE_FILE_SECTOR_SIZE - 1);
 	if (!cache_file_region_contains(
 		tag_cache_base_address + tag_data_size,
 		tag_cache_size - tag_data_size,

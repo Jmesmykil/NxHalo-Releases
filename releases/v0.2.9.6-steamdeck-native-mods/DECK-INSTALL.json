@@ -1,0 +1,12 @@
+{
+  "version": "2.9.6",
+  "runtime_sha256": "e3cdc7999eb273329daca96b90201b8263f20b0963902f1d036170670f474bec",
+  "previous_sha256": "b3d735a6f78fa495464c6589043245fcf8330580931b949e4f099299e3e1c1db",
+  "backup": "/home/deck/Games/HaloCE/halo.before-native-mods-296-20261008T204700Z",
+  "installed_utc": "20261008T204700Z",
+  "config_sha256": "577c713731527e1b7124da17e65b02246c7c079dfb2df7808358c8c0440b81e3",
+  "launcher_sha256": "9ea947ee4e95d1f3084497366716526321f8edf88b724da0adb145e6faaa8f57",
+  "volume": "Volume: 0.90 [MUTED]",
+  "device": "Jupiter",
+  "state": "idle; original shortcut and user data preserved"
+}

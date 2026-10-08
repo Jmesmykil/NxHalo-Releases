@@ -1,6 +1,6 @@
-## NxHalo Steam Deck/Linux update: 2.9.5
+## NxHalo Steam Deck/Linux update: 2.9.6
 
-[Runtime and source](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.9.5-steamdeck-lobby-modes). Read the [feature guide and validation limits](docs/LOBBIES-MODES-CONTENT-2.9.5.md). Supply your own game data.
+[Runtime and source](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.9.6-steamdeck-native-mods). Read the [content guide and validation limits](docs/NATIVE-MODS-2.9.6.md). Supply your own game data.
 
 Upstream project documentation follows.
 

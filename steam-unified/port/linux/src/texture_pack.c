@@ -30,6 +30,8 @@ static unsigned long cache_clock, cache_bytes;
 static char selected[PACK_ROOT_MAX];
 static unsigned long config_seen = (unsigned long)-1;
 static int enabled_seen;
+/* Workers only publish a generation; GL cleanup stays on the render thread. */
+static unsigned int install_revision, render_install_revision;
 
 static int safe_component(const char *s, size_t max)
 {
@@ -220,7 +222,7 @@ static GLuint load_texture(const char *path, unsigned long *levels, unsigned lon
 		width=be32(data+16); height=be32(data+20); format="PNG";
 		tex=hud_hires_png_texture(data,size,levels);
 	}
-	else if(size>=4&&!memcmp(data,"DDS ",4)) {
+	else if(size>=128&&!memcmp(data,"DDS ",4)) {
 		width=le32(data+16); height=le32(data+12); format="DDS-BC1/2/3";
 		if (le32(data+84)==0x31545844) block_bytes=8;
 		else if (le32(data+84)==0x33545844 || le32(data+84)==0x35545844) block_bytes=16;
@@ -249,6 +251,13 @@ unsigned int texture_pack_override(const char *tag, long bitmap, unsigned long *
 {
 	char key[PACK_ROOT_MAX], path[PACK_ROOT_MAX]; int i,slot=-1; GLuint texture;
 	refresh_config(); if(!enabled_seen||!selected[0]||!levels)return 0;
+    {
+        unsigned int revision=__atomic_load_n(&install_revision,__ATOMIC_ACQUIRE);
+        if(revision!=render_install_revision) {
+            for(int c=0;c<PACK_CACHE_MAX;c++)cache_evict(c);
+            render_install_revision=revision;
+        }
+    }
 	if(!path_tag(key,sizeof(key),tag,bitmap))return 0;
 	for(i=0;i<3;i++) {
 		char full[PACK_ROOT_MAX]; const char *ext=i==0?".png":i==1?".tga":".dds";
@@ -292,45 +301,107 @@ int texture_pack_list(texture_pack_list_callback cb,void *ctx)
 	if(!cb||!pack_base(base,sizeof(base))||(dir=posix_directory_open(base))==NULL)return 0;
 	while(posix_directory_next(dir,name,sizeof(name))){
 		char p[PACK_ROOT_MAX];
-		if(!safe_component(name,sizeof(name))||snprintf(p,sizeof(p),"%s/%s",base,name)>=(int)sizeof(p)||!directory_nofollow(p))continue;
+		if(name[0]=='.'||!safe_component(name,sizeof(name))||snprintf(p,sizeof(p),"%s/%s",base,name)>=(int)sizeof(p)||!directory_nofollow(p))continue;
 		cb(name,ctx);count++;
 	}
 	posix_directory_close(dir);return count;
 }
 
-/* Bounded recursive importer, accepts image files only and rejects symlinks. */
-static int copy_tree(const char *src,const char *dst,unsigned int depth,unsigned long *total,unsigned int *files)
+/* Descriptor-relative copies reject symlinks at every component. The private
+   staging directory is published only after a complete bounded copy. */
+static int copy_tree_fd(int src, int dst, unsigned int depth,
+    unsigned long *total, unsigned int *files)
 {
-	void *dir; char name[256];
-	if(depth>12||!directory_nofollow(src)||(dir=posix_directory_open(src))==NULL)return 0;
-	if(!posix_make_directory(dst)&&!directory_nofollow(dst)){posix_directory_close(dir);return 0;}
-	while(posix_directory_next(dir,name,sizeof(name))){
-		char a[PACK_ROOT_MAX],b[PACK_ROOT_MAX];int in_fd,out_fd;unsigned char buf[16384];ssize_t n;unsigned long copied=0;struct posix_file_information info;const char *ext;
-		if(!safe_component(name,sizeof(name))||snprintf(a,sizeof(a),"%s/%s",src,name)>=(int)sizeof(a)||
-			snprintf(b,sizeof(b),"%s/%s",dst,name)>=(int)sizeof(b)){posix_directory_close(dir);return 0;}
-		if(directory_nofollow(a)){if(!copy_tree(a,b,depth+1,total,files)){posix_directory_close(dir);return 0;}continue;}
-		if(!regular_file_nofollow(a,&in_fd,&info)||info.size_high||!info.size_low||
-			++*files>512||(*total+=info.size_low)>256UL*1024*1024){posix_directory_close(dir);return 0;}
-		ext=strrchr(name,'.');
-		if(!ext||(strcmp(ext,".png")&&strcmp(ext,".tga")&&strcmp(ext,".dds"))){close(in_fd);posix_directory_close(dir);return 0;}
-		out_fd=open(b,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW,0600);
-		if(out_fd<0){close(in_fd);posix_directory_close(dir);return 0;}
-		while((n=read(in_fd,buf,sizeof(buf)))>0){
-			ssize_t offset=0;
-			while(offset<n){ssize_t written=write(out_fd,buf+offset,(size_t)(n-offset));if(written<=0){close(in_fd);close(out_fd);posix_directory_close(dir);return 0;}offset+=written;}
-			copied+=(unsigned long)n;
-		}
-		close(in_fd);close(out_fd);
-		if(n<0||copied!=info.size_low){posix_directory_close(dir);return 0;}
-	}
-	posix_directory_close(dir);return 1;
+    void *dir; char name[256]; int ok = 1;
+    if (depth > 12 || !(dir = posix_directory_open_fd(src))) return 0;
+    while (ok && posix_directory_next(dir, name, sizeof(name))) {
+        int in = -1, out = -1, sub = -1; struct posix_file_information info;
+        unsigned long copied = 0; unsigned char buf[16384]; ssize_t n;
+        const char *ext;
+        if (!safe_component(name, sizeof(name))) { ok = 0; break; }
+        in = openat(src, name, O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
+        if (in >= 0) {
+            if (posix_make_private_directory_at(dst, name) ||
+                (sub = openat(dst, name, O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC)) < 0)
+                ok = 0;
+            else ok = copy_tree_fd(in, sub, depth+1, total, files);
+            if (sub >= 0) close(sub);
+            close(in); continue;
+        }
+        in = openat(src, name, O_RDONLY|O_NOFOLLOW|O_NONBLOCK|O_CLOEXEC);
+        if (in < 0) { ok = 0; break; }
+        ext = strrchr(name, '.');
+        if (posix_fstat(in,&info) || !posix_file_is_regular(in) ||
+            info.size_high || !info.size_low || info.size_low > PACK_FILE_MAX ||
+            *files >= 512 || info.size_low > 256UL*1024*1024 - *total ||
+            !ext || (strcmp(ext,".png") && strcmp(ext,".tga") && strcmp(ext,".dds"))) {
+            close(in); ok = 0; break;
+        }
+        out = openat(dst, name, O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+        if (out < 0) { close(in); ok = 0; break; }
+        while ((n = read(in, buf, sizeof(buf))) > 0) {
+            ssize_t offset = 0;
+            if ((unsigned long)n > info.size_low - copied) { ok = 0; break; }
+            while (offset < n) {
+                ssize_t wrote = write(out, buf+offset, (size_t)(n-offset));
+                if (wrote <= 0) { ok = 0; break; }
+                offset += wrote;
+            }
+            if (!ok) break;
+            copied += (unsigned long)n;
+        }
+        if (n < 0 || copied != info.size_low || fsync(out)) ok = 0;
+        close(in); if (close(out)) ok = 0;
+        if (ok) { *total += copied; ++*files; }
+    }
+    posix_directory_close(dir);
+    return ok;
+}
+
+/* Only visits our private stage through held descriptors, never follows links. */
+static void remove_stage_contents(int fd)
+{
+    void *dir = posix_directory_open_fd(fd); char name[256];
+    if (!dir) return;
+    while (posix_directory_next(dir,name,sizeof(name))) {
+        int child = openat(fd,name,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
+        if (child >= 0) {
+            remove_stage_contents(child); close(child);
+            unlinkat(fd,name,AT_REMOVEDIR);
+        } else unlinkat(fd,name,0);
+    }
+    posix_directory_close(dir);
 }
 
 int texture_pack_install(const char *name,const char *source)
 {
-	char dst[PACK_ROOT_MAX],base[PACK_ROOT_MAX];unsigned long total=0;unsigned int files=0;
-	if(!source||!pack_path(dst,sizeof(dst),name)||!pack_base(base,sizeof(base))||!directory_nofollow(source)||directory_nofollow(dst))return 0;
-	if(!posix_make_directory(base)&&!directory_nofollow(base))return 0;
-	if(!copy_tree(source,dst,0,&total,&files)||!files)return 0;
-	return 1;
+    char dst[PACK_ROOT_MAX],base[PACK_ROOT_MAX],stage[64];
+    unsigned long total=0; unsigned int files=0; unsigned int nonce[2];
+    int src=-1,basefd=-1,stagefd=-1,ok=0,created=0;
+    if (!source || !name || name[0]=='.' ||
+        !pack_path(dst,sizeof(dst),name) || !pack_base(base,sizeof(base))) return 0;
+    src=open(source,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
+    if (src<0) return 0;
+    if (posix_make_directory(base) && errno!=EEXIST) goto out;
+    basefd=open(base,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
+    if (basefd<0) goto out;
+    posix_random_bytes((unsigned char *)nonce,sizeof(nonce));
+    snprintf(stage,sizeof(stage),".install-%08x-%08x",nonce[0],nonce[1]);
+    if (posix_make_private_directory_at(basefd,stage)) goto out;
+    created=1;
+    stagefd=openat(basefd,stage,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
+    if (stagefd<0) goto out;
+    if (!copy_tree_fd(src,stagefd,0,&total,&files) || !files || fsync(stagefd)) goto out;
+    if (posix_rename_noreplace_at(basefd,stage,name)) goto out;
+    created=0; ok=1;
+    __atomic_add_fetch(&install_revision,1,__ATOMIC_RELEASE);
+    /* The directory entry has committed; a filesystem sync error cannot safely
+       turn it into a failed install and invite replacement of user content. */
+    fsync(basefd);
+out:
+    if (created && stagefd>=0) remove_stage_contents(stagefd);
+    if (stagefd>=0) close(stagefd);
+    if (created && basefd>=0) unlinkat(basefd,stage,AT_REMOVEDIR);
+    if (basefd>=0) close(basefd);
+    close(src); return ok;
 }

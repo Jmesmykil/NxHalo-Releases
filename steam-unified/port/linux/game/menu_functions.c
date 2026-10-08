@@ -5,6 +5,7 @@
 #include "halo_ui_map_list.h"
 #include "community_map_download.h"
 #include "../src/ui_overlay.h"
+#include "../src/native_mod_catalog.h"
 /*
 MENU_FUNCTIONS.C
 
@@ -2201,6 +2202,29 @@ static void text_field_begin_masked(struct widget_instance *row, char const *tex
 	text_field.masked = TRUE;
 }
 
+/* Native text widgets do not wrap paragraphs. Bound each detail line so
+   requirements and license information remain readable at 640x480. */
+static void modshop_wrap(const char *in,char *out,size_t cap,int width)
+{
+    size_t used=0;int column=0;
+    while(in && *in && used+3<cap) {
+        const char *end=in;size_t word;
+        while(*end && *end!=' ')end++;
+        word=(size_t)(end-in);
+        if(column && column+1+(int)word>width) {
+            out[used++]='\r';out[used++]='\n';column=0;
+        } else if(column) {out[used++]=' ';column++;}
+        while(word-- && used+3<cap) {
+            if(column>=width){out[used++]='\r';out[used++]='\n';column=0;}
+            out[used++]=*in++;column++;
+        }
+        while(*in==' ')in++;
+    }
+    out[used]=0;
+}
+static struct native_mod_catalog_entry modshop_selected;
+static int modshop_has_selection;
+static void modshop_search_done(char const *text) { native_mod_catalog_set_query(text); }
 static void content_catalog_search_done(char const *text) { extern void content_setup_catalog_set_query(const char *); content_setup_catalog_set_query(text); }
 static void content_texture_pack_search_done(char const *text) { extern void content_setup_texture_pack_set_query(const char *); content_setup_texture_pack_set_query(text); }
 
@@ -5802,7 +5826,13 @@ boolean pc_menu_event_function_invoke(
             extern void content_setup_catalog_sort_cycle(void);
             extern const char *content_setup_texture_pack_query(void);
             extern int content_setup_texture_pack_page_move(int);
-            if (content_widget_named(widget, "mods_import")) {
+            if (content_widget_named(widget, "modshop_search")) {
+                if (text_field_editing(widget)) text_field_end(TRUE);
+                else text_field_begin(widget,native_mod_catalog_query(),47,modshop_search_done);
+            } else if (content_widget_named(widget, "modshop_refresh")) native_mod_catalog_refresh();
+            else if (content_widget_named(widget, "modshop_prev")) native_mod_catalog_page_move(-1);
+            else if (content_widget_named(widget, "modshop_next")) native_mod_catalog_page_move(1);
+            else if (content_widget_named(widget, "mods_import")) {
                 extern void content_setup_texture_pack_import(void); content_setup_texture_pack_import();
             } else if (content_widget_named(widget, "mods_search")) {
                 if (text_field_editing(widget)) text_field_end(TRUE);
@@ -5841,7 +5871,13 @@ boolean pc_menu_event_function_invoke(
         }
 		else if (!strcmp(name, "port content download")) {
             extern void content_setup_download_clipboard(void), content_setup_catalog_download_row(int);
-            if (content_widget_name_starts_with(widget, "browser_map_")) { const char *last=strrchr(widget->name,'_'); if(last)content_setup_catalog_download_row(atoi(last+1)); }
+            if (content_widget_name_starts_with(widget, "modshop_item_")) {
+                const char *last=strrchr(widget->name,'_');
+                modshop_has_selection=last && native_mod_catalog_result(atoi(last+1),&modshop_selected);
+                return modshop_has_selection;
+            } else if (content_widget_named(widget, "modshop_install")) {
+                return modshop_has_selection && native_mod_catalog_install_entry(&modshop_selected);
+            } else if (content_widget_name_starts_with(widget, "browser_map_")) { const char *last=strrchr(widget->name,'_'); if(last)content_setup_catalog_download_row(atoi(last+1)); }
             else if (content_widget_name_starts_with(widget, "mods_pack_")) {
                 extern int content_setup_texture_pack_select_row(int);
                 const char *last=strrchr(widget->name,'_');
@@ -6055,6 +6091,36 @@ void pc_menu_game_data_function_invoke(
             extern void content_setup_catalog_poll(void);
             extern int content_setup_catalog_result(int,char *,size_t,char *,size_t), content_setup_catalog_installed(const char *);
             wchar_t message[512]; char line[512],map[64],type[16]; int row;
+            if (content_widget_name_starts_with(widget, "modshop_")) {
+                struct native_mod_catalog_entry entry;
+                native_mod_catalog_poll();
+                if (content_widget_named(widget,"modshop_search")) {
+                    snprintf(line,sizeof(line),"SEARCH TEXTURES: %s",native_mod_catalog_query());
+                    text_field_show(widget,line,text_field_editing(widget)); return;
+                }
+                if (content_widget_name_starts_with(widget,"modshop_item_")) {
+                    const char *last=strrchr(widget->name,'_');
+                    if (last && native_mod_catalog_result(atoi(last+1),&entry)) {
+                        snprintf(line,sizeof(line),"%.44s%s",entry.title,entry.installed?" [INSTALLED]":"");
+                        widget->disabled=FALSE;
+                    } else { line[0]=0;widget->disabled=TRUE; }
+                } else if (content_widget_named(widget,"modshop_details")) {
+                    if (modshop_has_selection) {
+                        char scope[320],by[196],wrapped_by[230],title[120];
+                        modshop_wrap(modshop_selected.title,title,sizeof(title),62);
+                        snprintf(by,sizeof(by),"By %s | %s",modshop_selected.author,modshop_selected.license);
+                        modshop_wrap(by,wrapped_by,sizeof(wrapped_by),62);
+                        modshop_wrap(modshop_selected.map_scope,scope,sizeof(scope),62);
+                        snprintf(line,sizeof(line),"%s\r\n%s\r\nVersion %.30s | %.1f MiB download\r\n\r\nRequires:\r\n%s\r\n\r\nEnable after install in Installed Packs.",
+                            title,wrapped_by,modshop_selected.version,
+                            modshop_selected.compressed_limit/1048576.0,scope);
+                    } else snprintf(line,sizeof(line),"Select a texture pack to see its requirements.");
+                } else if (content_widget_named(widget,"modshop_install")) {
+                    snprintf(line,sizeof(line),"%s",native_mod_catalog_install_running()?"INSTALLING...":"INSTALL PACK");
+                    widget->disabled=!modshop_has_selection||native_mod_catalog_install_running();
+                } else snprintf(line,sizeof(line),"%.240s",native_mod_catalog_status());
+                text_to_wide(line,message,NUMBEROF(message));text_set_length(widget,message,NUMBEROF(message));return;
+            }
             if (content_widget_name_starts_with(widget, "mods_")) {
                 extern int content_setup_deck_upscaling_available(void), content_setup_texture_pack_count(void), content_setup_texture_pack_name(int,char *,size_t);
                 extern const char *content_setup_texture_pack_status(void), *content_setup_texture_pack_query(void);

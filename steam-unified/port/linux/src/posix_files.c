@@ -14,6 +14,7 @@ the host ABI and _FILE_OFFSET_BITS=64.
 #include <sys/statvfs.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/syscall.h>
 
 #include "posix.h"
 
@@ -233,6 +234,27 @@ static DIR *directory_from_handle(void *handle, int release)
 void *posix_directory_open(const char *path)
 {
 	return directory_handle_new(opendir(path));
+}
+
+void *posix_directory_open_fd(int descriptor)
+{
+    int copy = dup(descriptor);
+    DIR *stream;
+    if (copy < 0) return NULL;
+    stream = fdopendir(copy);
+    if (!stream) { close(copy); return NULL; }
+    return directory_handle_new(stream);
+}
+
+int posix_rename_noreplace_at(int directory, const char *source, const char *destination)
+{
+    if (!directory_component(source) || !directory_component(destination)) return -1;
+#if defined(SYS_renameat2)
+    return (int)syscall(SYS_renameat2, directory, source, directory, destination, 1 /* RENAME_NOREPLACE */);
+#else
+    errno = ENOTSUP;
+    return -1;
+#endif
 }
 
 int posix_directory_next(void *directory, char *name, posix_ulong name_size)

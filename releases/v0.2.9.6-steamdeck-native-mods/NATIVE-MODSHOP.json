@@ -1,0 +1,49 @@
+{
+  "status": "PASS native Linux UI; Deck/GPU acceptance separate",
+  "install_candidate": "aee86eac05de0de2a10071273829fad3730f2455a092f8ba0ebafda705f6285c",
+  "detail_candidate": "e3cdc7999eb273329daca96b90201b8263f20b0963902f1d036170670f474bec",
+  "scope": "Private prefs, maps linked read-only, dummy audio and actual XTest UI",
+  "default_https_catalog": "https://raw.githubusercontent.com/Jmesmykil/NxHalo-Releases/main/catalog/native-mods.toml",
+  "package_sha256": "b7b6697105d01a33d2fa2005f147c58d116d5c217d7e479f0eea95651a2e1710",
+  "png_sha256": "427f3190c9a72139e11f030a75619b0a44d6e1d67bdab68f65c482ec8711b110",
+  "author": "csauve",
+  "license": "CC-BY-NC-4.0",
+  "map_scope": "Alpine map with levels/alpine/bitmaps/alpine_cliff_detail; does not change stock maps",
+  "proof": [
+    "default HTTPS catalogue fetch",
+    "row opens authored/license/map details",
+    "explicit Install downloads verified public ZIP",
+    "exact PNG and credit bytes preserved",
+    "install retains Off and empty selected path",
+    "library row selects without enabling",
+    "explicit toggle enables",
+    "active removal blocked",
+    "disable stages bounded removal",
+    "cancel preserves installed pack",
+    "confirm moves private pack to recovery; exact PNG survives",
+    "final08 complete details visible at 640x480"
+  ],
+  "recovered_png": "/mnt/storage/data/nxhalo-multiplayer-lab22/runtime-proof/native-modshop-ui-aee86eac05de-20261008/modshop-resume/texture-packs-removed/66130-1/pack/levels/alpine/bitmaps/alpine_cliff_detail__0.png",
+  "credits_directory": "/mnt/storage/data/nxhalo-multiplayer-lab22/runtime-proof/native-modshop-ui-aee86eac05de-20261008/modshop-resume/native-mod-receipts/alpine-cliff-detail-1-e3daf57a1d6b",
+  "results": [
+    "/mnt/storage/data/nxhalo-multiplayer-lab22/runtime-proof/native-modshop-ui-aee86eac05de-20261008/modshop-resume/RESULT.json",
+    "/mnt/storage/data/nxhalo-multiplayer-lab22/runtime-proof/native-modshop-ui-aee86eac05de-20261008/modshop-resume/RESULT-manager.json",
+    "/mnt/storage/data/nxhalo-multiplayer-lab22/runtime-proof/native-modshop-ui-e3cdc7999eb2-20261008/modshop08/RESULT.json"
+  ],
+  "final_details_frame": "/mnt/storage/data/nxhalo-multiplayer-lab22/runtime-proof/native-modshop-ui-e3cdc7999eb2-20261008/modshop08/final08-details-640.bmp",
+  "exit_codes": [
+    {
+      "xvfb-host": 0,
+      "game": 0
+    },
+    {
+      "xvfb-host": 0,
+      "game": 0
+    },
+    {
+      "xvfb-host": 0,
+      "game": 0
+    }
+  ],
+  "canonical_source_mutations": "NONE during UI acceptance"
+}

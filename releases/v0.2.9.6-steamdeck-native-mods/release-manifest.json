@@ -1,0 +1,18 @@
+{
+  "version": "2.9.6",
+  "tag": "v0.2.9.6-steamdeck-native-mods",
+  "runtime": "e3cdc7999eb273329daca96b90201b8263f20b0963902f1d036170670f474bec",
+  "assets": {
+    "NxHalo-SteamDeck-unified-runtime-2.9.6-native-mods.tar.gz": {
+      "sha256": "b3bf33ad2235139e792e949be061afaf035236d1da166f7d3620c294e053e3d9",
+      "bytes": 22271879
+    },
+    "NxHalo-Unified-source-2.9.6-native-mods.zip": {
+      "sha256": "3054714aab78897e4797d2713fe9d7145ae5921294183a569217c56d6b0fc732",
+      "bytes": 17952262
+    }
+  },
+  "source_entries": 2270,
+  "platform": "Steam Deck/Linux",
+  "switch_runtime_changed": false
+}

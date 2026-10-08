@@ -86,6 +86,10 @@ int posix_make_directory(const char *path);
 
 /* directory enumeration; the handle is opaque */
 void *posix_directory_open(const char *path);
+/* Enumerates a duplicated directory descriptor; caller keeps descriptor. */
+void *posix_directory_open_fd(int descriptor);
+/* Atomic publication, never replaces an existing destination. */
+int posix_rename_noreplace_at(int directory, const char *source, const char *destination);
 /* copies the next entry name (excluding . and ..); returns 0 at the end */
 int posix_directory_next(void *directory, char *name, posix_ulong name_size);
 void posix_directory_close(void *directory);

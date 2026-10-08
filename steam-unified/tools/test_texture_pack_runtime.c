@@ -127,5 +127,36 @@ int main(void)
 		if(!write_bytes(entry,&byte,1)){ok &= require(0,"write cap fixture");break;}
 	}
 	ok &= require(!texture_pack_install("over-cap",file),"512-file import cap enforced");
+
+    /* Rejected imports never publish a partial directory; retry stays possible. */
+    snprintf(file,sizeof(file),"%s/cfg/texture-packs/over-cap",root);
+    ok &= require(access(file,F_OK)!=0,"over-cap rollback leaves no installed directory");
+    snprintf(file,sizeof(file),"%s/cfg/texture-packs/symlink",root);
+    ok &= require(access(file,F_OK)!=0,"symlink rollback leaves no installed directory");
+    ok &= require(!texture_pack_install("fixture",src),"existing immutable pack is never replaced");
+    ok &= require(texture_pack_install("symlink",src),"failed install can be retried with valid content");
+    ok &= require(!texture_pack_install(".hidden",src),"hidden names reserved for private staging");
+    snprintf(file,sizeof(file),"%s/empty",root);make_dir(file);
+    ok &= require(!texture_pack_install("empty",file),"empty pack rejected");
+    snprintf(file,sizeof(file),"%s/cfg/texture-packs/empty",root);
+    ok &= require(access(file,F_OK)!=0,"empty rollback leaves no installed directory");
+    /* A four-byte DDS magic must never cause a header read past its allocation. */
+    snprintf(file,sizeof(file),"%s/shortdds",root);make_dir(file);
+    snprintf(badfile,sizeof(badfile),"%s/short__0.dds",file);write_bytes(badfile,(const unsigned char *)"DDS ",4);
+    ok &= require(texture_pack_install("shortdds",file)&&texture_pack_select("shortdds"),"install truncated DDS fallback fixture");
+    ok &= require(texture_pack_override("short",0,&levels)==0,"truncated DDS safely falls back");
+    /* A removed/reimported name must not keep old path-keyed GPU contents. */
+    ok &= require(texture_pack_select("fixture"),"select original cache fixture");
+    tex=texture_pack_override("ui/shell/synthetic texture",0,&levels);
+    {
+        unsigned int old_texture=tex;
+        snprintf(file,sizeof(file),"%s/cfg/texture-packs/fixture",root);
+        snprintf(sub,sizeof(sub),"%s/cfg/retired-fixture",root);
+        ok &= require(rename(file,sub)==0,"simulate recoverable removal of old pack");
+        ok &= require(texture_pack_install("fixture",src),"reimport same name");
+        tex=texture_pack_override("ui/shell/synthetic texture",0,&levels);
+        ok &= require(tex!=0&&tex!=old_texture,"same-name reimport invalidates old GL cache on render thread");
+    }
+    puts(ok?"PASS: native texture runtime and atomic installation":"FAIL");
 	return ok?0:1;
 }
