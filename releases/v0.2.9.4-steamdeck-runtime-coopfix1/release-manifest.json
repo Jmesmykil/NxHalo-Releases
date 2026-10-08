@@ -2,7 +2,7 @@
   "release": "v0.2.9.4-steamdeck-runtime-coopfix1",
   "title": "2.9.4 co-op lifecycle update",
   "runtime_executable_sha256": "05fb520d15722a1954dcd884702ebff49dddc59b1aada4b39f6770ac8fdefed0",
-  "runtime_archive_sha256": "06783340ed89aa79cab2529e1f5c8b298e031b95363441f425a0a3d3499fb6b0",
+  "runtime_archive_sha256": "1b114487e283567a77acd5e3824b7835537b46a9cb42aab425027a9c43c3df2e",
   "source_archive_sha256": "84b4828dce4f7b1ec9f9ee82ba7ee9a64390e93f9d2e0410f3a7f1f49601b941",
   "source_archive_bytes": 17906140,
   "source_archive_entries": 2261,
