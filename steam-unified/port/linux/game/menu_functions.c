@@ -2282,6 +2282,8 @@ static char map_download_invite[96];
 static short map_download_controller;
 static char map_download_map[256];
 static boolean map_download_retry_pending;
+static unsigned long map_download_room_missing_since;
+static unsigned long map_download_room_gone_time;
 static short server_view = SERVER_VIEW_CAMPAIGN;
 static boolean campaign_host_selected;
 
@@ -3412,6 +3414,23 @@ static void lobby_browser_update(struct widget_instance *list)
 			short room = NONE, index;
 			for (index = 0; index < lobby_browser.count; index++)
 				if (!strcmp(lobby_browser.games[index].invite, map_download_invite)) { room = index; break; }
+			/* A directory refresh can briefly hide a room. Give it five seconds
+			 * to return, then release the retry while retaining the installed map. */
+			if (room == NONE) {
+				if (!map_download_room_missing_since)
+					map_download_room_missing_since = now ? now : 1;
+				else if ((unsigned long)(now - map_download_room_missing_since) >= 5000) {
+					community_map_download_clear();
+					map_download_invite[0] = map_download_map[0] = map_ready_invite[0] = 0;
+					map_download_retry_pending = FALSE;
+					map_download_room_missing_since = 0;
+					map_download_room_gone_time = now ? now : 1;
+					network_profile_clear_room();
+					platform_log("menus: custom map saved, original lobby no longer listed; retry released");
+				}
+			} else {
+				map_download_room_missing_since = map_download_room_gone_time = 0;
+			}
 			if (room != NONE && _stricmp(lobby_browser.games[room].map, map_download_map)) {
 				char file[64];
 				short family=map_family_parse(lobby_browser.games[room].map,file,sizeof(file));
@@ -3441,6 +3460,7 @@ static void lobby_browser_update(struct widget_instance *list)
 			}
 		}
 		else if (state==COMMUNITY_MAP_DOWNLOAD_FAILED && map_download_retry_pending) {
+			map_download_room_missing_since = 0;
 			map_download_invite[0] = map_download_map[0] = 0;
 			map_download_retry_pending = FALSE;
 			network_profile_clear_room();
@@ -3596,6 +3616,11 @@ static void lobby_browser_update(struct widget_instance *list)
 		{
 			char progress[256]; int state=community_map_download_status(progress,sizeof(progress));
 			if (state==COMMUNITY_MAP_DOWNLOAD_RUNNING || state==COMMUNITY_MAP_DOWNLOAD_FAILED) { text_to_wide(progress,text,NUMBEROF(text)); text_set(named(list,"ticker_player_info",0),text); }
+			else if (map_download_retry_pending && map_download_room_missing_since) {
+				text_set(named(list,"ticker_player_info",0),L"Map saved. Waiting for the original lobby...");
+			} else if (map_download_room_gone_time && now - map_download_room_gone_time < 5000) {
+				text_set(named(list,"ticker_player_info",0),L"Map saved. Lobby closed; choose another game.");
+			}
 		}
 		text_set(named(list, "ticker_rules_info", 0), L"");
 	}

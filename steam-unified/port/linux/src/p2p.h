@@ -56,6 +56,15 @@ int p2p_send_datagram(unsigned short source_port, unsigned long address, unsigne
 returns their count */
 int p2p_broadcast_datagram(unsigned short source_port, unsigned short port, const void *data, int size);
 
+/* Compatible native voice frames carried by the authenticated tunnel. Disabled
+ * by default; enabling resets the bounded receive queue. No microphone/playback
+ * devices are opened here. Sender identity is returned from transport state,
+ * never trusted from a payload. Poll drops old/disconnected frames. Send returns
+ * one for an attempted encrypted UDP send, not a delivery acknowledgement. */
+void p2p_voice_enable(int enabled);
+int p2p_voice_send(const unsigned char *destination, const unsigned char *wire, int size);
+int p2p_voice_poll(unsigned char *sender, unsigned char *wire, int capacity);
+
 /* the game's socket has this local port: bound, given one, or listening
 (stream and listening: it is hosting). Peers reach only these ports (a
 stream's only while it listens), and datagram ports it sent them from */

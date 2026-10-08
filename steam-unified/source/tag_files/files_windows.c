@@ -162,7 +162,13 @@ static void file_error(
 
 static char drive_path[]= "?:\\";
 
+/* Directory scans occur on both filesystem and UI threads. A new scan must
+ * never reset or close another thread's search handles. */
+#if defined(__linux__) && !defined(HALO_ANDROID)
+static __thread struct find_files_state find_files_globals =
+#else
 static struct find_files_state find_files_globals =
+#endif
 {
 	0,
 	NONE,

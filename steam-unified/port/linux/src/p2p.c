@@ -58,6 +58,7 @@ only look up and create stand-ins.
 #include "port_config.h"
 #include "p2p_internal.h"
 #include "ikcp.h"
+#include "native_voice_wire.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -144,6 +145,8 @@ enum
 	_packet_datagram,
 	_packet_stream,
 	_packet_bye,
+	/* Existing tunnel message numbers stay unchanged. Old clients ignore this. */
+	_packet_voice,
 };
 
 /* the messages of a stream, inside KCP */
@@ -191,6 +194,10 @@ struct peer
 	unsigned long endpoint_heard_time;
 	unsigned long sent_time;
 	unsigned long round_trip;
+	unsigned long voice_received_time;
+	int voice_received_once;
+	uint32_t voice_sequence[4];
+	unsigned char voice_sequence_seen[4];
 };
 
 /* a UDP stand-in for one port of a peer */
@@ -2160,6 +2167,102 @@ static void stream_writeable(struct stream *stream)
 	stream_flush_pending(stream);
 }
 
+/* Opt-in compatible-client voice foundation. Only authenticated, current
+ * tunnel peers can enqueue frames. Capture/playback is supplied separately;
+ * this path opens no audio device and sends nothing while disabled. */
+enum { MAXIMUM_VOICE_QUEUE = 64, VOICE_MAXIMUM_AGE = 250, VOICE_MINIMUM_SPACING = 10 };
+static struct {
+    int enabled, head, count;
+    struct {
+        unsigned char identifier[P2P_IDENTIFIER_SIZE];
+        unsigned long received;
+        unsigned char wire[NATIVE_VOICE_FRAME_BYTES];
+    } frames[MAXIMUM_VOICE_QUEUE];
+} native_voice_queue;
+
+void p2p_voice_enable(int enabled)
+{
+    pthread_mutex_lock(&p2p_lock);
+    memset(&native_voice_queue, 0, sizeof(native_voice_queue));
+    native_voice_queue.enabled = !!enabled;
+    pthread_mutex_unlock(&p2p_lock);
+}
+
+int p2p_voice_send(const unsigned char *destination, const unsigned char *wire, int size)
+{
+    struct native_voice_frame checked;
+    unsigned char inner[1 + NATIVE_VOICE_FRAME_BYTES];
+    struct peer *peer;
+    int sent = 0;
+    if (!destination || size != NATIVE_VOICE_FRAME_BYTES ||
+        !native_voice_decode(&checked, wire, (size_t)size))
+        return 0;
+    inner[0] = _packet_voice;
+    memcpy(inner + 1, wire, NATIVE_VOICE_FRAME_BYTES);
+    pthread_mutex_lock(&p2p_lock);
+    peer = find_peer(destination);
+    if (native_voice_queue.enabled && p2p.tunnel_socket >= 0 && peer && peer->connected) {
+        peer_send(peer, inner, sizeof(inner));
+        sent = 1;
+    }
+    pthread_mutex_unlock(&p2p_lock);
+    return sent;
+}
+
+static void voice_received(struct peer *peer, const unsigned char *wire, int size)
+{
+    struct native_voice_frame checked;
+    unsigned long now = p2p_now();
+    int tail;
+    if (!native_voice_queue.enabled || !peer->connected || size != NATIVE_VOICE_FRAME_BYTES ||
+        !native_voice_decode(&checked, wire, (size_t)size))
+        return;
+    if (peer->voice_received_once && now - peer->voice_received_time < VOICE_MINIMUM_SPACING)
+        return;
+    if (peer->voice_sequence_seen[checked.controller] &&
+        !native_voice_sequence_newer(checked.sequence, peer->voice_sequence[checked.controller]))
+        return;
+    peer->voice_sequence[checked.controller] = checked.sequence;
+    peer->voice_sequence_seen[checked.controller] = 1;
+    peer->voice_received_time = now;
+    peer->voice_received_once = 1;
+    /* Prefer recent audio over an old backlog; total memory stays bounded. */
+    if (native_voice_queue.count == MAXIMUM_VOICE_QUEUE) {
+        native_voice_queue.head = (native_voice_queue.head + 1) % MAXIMUM_VOICE_QUEUE;
+        native_voice_queue.count--;
+    }
+    tail = (native_voice_queue.head + native_voice_queue.count) % MAXIMUM_VOICE_QUEUE;
+    memcpy(native_voice_queue.frames[tail].identifier, peer->identifier, P2P_IDENTIFIER_SIZE);
+    native_voice_queue.frames[tail].received = now;
+    memcpy(native_voice_queue.frames[tail].wire, wire, NATIVE_VOICE_FRAME_BYTES);
+    native_voice_queue.count++;
+}
+
+int p2p_voice_poll(unsigned char *sender, unsigned char *wire, int capacity)
+{
+    int result = 0;
+    unsigned long now;
+    if (!sender || !wire || capacity < NATIVE_VOICE_FRAME_BYTES)
+        return 0;
+    pthread_mutex_lock(&p2p_lock);
+    now = p2p_now();
+    while (native_voice_queue.enabled && native_voice_queue.count) {
+        int slot = native_voice_queue.head;
+        struct peer *peer = find_peer(native_voice_queue.frames[slot].identifier);
+        native_voice_queue.head = (slot + 1) % MAXIMUM_VOICE_QUEUE;
+        native_voice_queue.count--;
+        if (now - native_voice_queue.frames[slot].received > VOICE_MAXIMUM_AGE ||
+            !peer || !peer->connected)
+            continue;
+        memcpy(sender, native_voice_queue.frames[slot].identifier, P2P_IDENTIFIER_SIZE);
+        memcpy(wire, native_voice_queue.frames[slot].wire, NATIVE_VOICE_FRAME_BYTES);
+        result = NATIVE_VOICE_FRAME_BYTES;
+        break;
+    }
+    pthread_mutex_unlock(&p2p_lock);
+    return result;
+}
+
 /* ---------- the tunnel */
 
 static void tunnel_received(const unsigned char *packet, int size, const struct sockaddr_in *from)
@@ -2225,6 +2328,9 @@ static void tunnel_received(const unsigned char *packet, int size, const struct 
 		break;
 	case _packet_stream:
 		stream_received(peer, inner + 1, inner_size - 1);
+		break;
+	case _packet_voice:
+		voice_received(peer, inner + 1, inner_size - 1);
 		break;
 	case _packet_bye:
 		drop_peer(peer, "left");

@@ -1,3 +1,7 @@
+## Current additive runtime update
+
+The current native Linux runtime is the additive **v0.2.9.4 editor stability update**. Download the [runtime and matching filtered source snapshot](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.4-steamdeck-runtime-editfix1). Runtime SHA-256: `64761e21783c861123469b8827716690843d878b98e674252edfbe24043f080d`. The matching source is mirrored in [`steam-unified/`](steam-unified) and its release asset SHA-256 is `9b318a3037cb41a986d78323867f1aff05306d171a03c92d239fbce10b096ead`. This update fixes playlist/profile initialization synchronization and Linux file-enumeration handle lifecycle. It does not include game data, maps, saves, keys, or resource files. See [release notes](releases/v0.2.9.4-steamdeck-runtime-editfix1/release-notes.md) and [verification limits](releases/v0.2.9.4-steamdeck-runtime-editfix1/VERIFICATION-EVIDENCE.md).
+
 # NxHalo — Halo: Combat Evolved for Switch and Steam Deck
 
 NxHalo is a native Halo: Combat Evolved port with separate Nintendo Switch and Steam Deck/Linux builds. Releases include offline setup tools and player support. Supply your own legally obtained game data; no game content or console keys are included.

@@ -290,11 +290,22 @@ void playlist_profiles_enumerate_available_to_local_player_index(
 	word *number_of_profiles,
 	long *playlist_profile_indices)
 {
+	/* The filesystem worker and the editor can enumerate simultaneously.
+	 * Keep the check, destructive default-folder setup and flag publication
+	 * in one critical section; later lifecycle resets still work normally. */
+#if defined(__linux__) && !defined(HALO_ANDROID)
+	void platform_playlist_defaults_lock(void);
+	void platform_playlist_defaults_unlock(void);
+	platform_playlist_defaults_lock();
+#endif
 	if (playlist_profile_default_data.first_time == TRUE)
 	{
 		playlist_profile_create_default_profiles_on_disk();
 		playlist_profile_default_data.first_time = FALSE;
 	}
+#if defined(__linux__) && !defined(HALO_ANDROID)
+	platform_playlist_defaults_unlock();
+#endif
 
 	saved_game_files_enumerate_available_to_local_player_index(
 		local_player_index,
