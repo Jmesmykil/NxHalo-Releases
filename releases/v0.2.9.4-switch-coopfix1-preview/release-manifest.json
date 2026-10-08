@@ -15,7 +15,7 @@
   "sanitized_source_sha256": "13743eeeacd5bd4007fe18d279b5c5e01f4c9fef9a8c62f274f026d9f99d3dd6",
   "source_archive_entries": 2305,
   "source_hash_manifest_sha256": "c40e1875f6442db7e1b072c46b9bc0635bc8a4a5c3fe933cb1a195ef3595b3e6",
-  "source_mirror_commit": "6f630ed9ab0b048b1b3d2cec9cb95aa5ef2066c0",
+  "source_mirror_commit": "bfc413c1acb9da02ec0f04ca657e9f8877891155",
   "switch_sd_staging_verified": true,
   "staging_readback_hash_verified": true,
   "safe_eject_verified": false,

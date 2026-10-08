@@ -19,4 +19,4 @@ The public source omits generated `rasterizer_xbox_vertex_shaders_data.inc`. A p
 
 The built NRO was atomically staged to `switch/NxHalo-Content29/halo.nro`, read back, and hash-checked against the build. The replaced NRO was preserved for rollback. macOS refused to unmount the SD volume; it was left mounted. No forced unmount was attempted. No Switch hardware launch or gameplay acceptance was performed. This release contains no NSP or HOME-menu forwarder.
 
-Matching main-source mirror commit: `92590db9e91f902f31517d3e5535c6d817f0eb88`.
+Matching complete main-source folder commit: `bfc413c1acb9da02ec0f04ca657e9f8877891155`.
