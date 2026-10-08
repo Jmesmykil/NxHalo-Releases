@@ -1,0 +1,16 @@
+schema_version = 1
+
+[[mods]]
+id = "alpine-cliff-detail"
+version = "1-e3daf57a1d6b"
+title = "Alpine cliff detail (one texture)"
+author = "csauve"
+license = "CC-BY-NC-4.0"
+source = "https://github.com/csauve/alpine/tree/e3daf57a1d6bf3888166921c1df0c45414977892"
+archive = "https://raw.githubusercontent.com/Jmesmykil/NxHalo-Releases/main/catalog/packages/alpine-cliff-detail-1-e3daf57a1d6b.zip"
+sha256 = "b7b6697105d01a33d2fa2005f147c58d116d5c217d7e479f0eea95651a2e1710"
+compressed_limit = 261326
+unpacked_limit = 263221
+file_count = 1
+native_format = "tag-ordinal-images-v1"
+map_scope = "Alpine map with levels/alpine/bitmaps/alpine_cliff_detail; does not change stock maps"
