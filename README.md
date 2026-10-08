@@ -28,15 +28,7 @@ NxHalo is a native Halo: Combat Evolved port with separate Nintendo Switch and S
 
 **Stable Switch build: Build14 / v0.1.1.** [Build14](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.1.1-build14) remains the stable campaign baseline and latest non-prerelease. It is a separate title from Profile33 and remains available for rollback.
 
-## Current Steam Deck/Linux update: 2.9.4 native voice foundation
-
-[Download runtime and matching source](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.4-steamdeck-runtime-nativevoice1). Executable SHA-256: `4a083770b6920d2a1f7372ba701967bcf02b840e0d2c3e9bfe7d55bf646964c0`. This exact build is installed on the Steam Deck.
-
-Adds default-OFF compatible-native proximity voice with authenticated joined-player routing, spatial mixing, push-to-talk V/X/C, and expiry after release. Audio Settings spinner arrow hitboxes now match their drawn controls; click OK to save. Compatible native clients are required for voice; unchanged clients and the Switch runtime do not gain voice from this release.
-
-Exact candidate passed a private Deck GPU multiplayer session with a native Linux peer. Two actual native clients passed generated-PCM capture-to-encrypted-transport-to-spatial-mixer testing with dummy audio and waveform analysis: 605 frames received/mapped, zero mapping drops, no sender loopback, and expiry after PTT release. Actual menu writes and fresh-process reload passed. No physical microphone or external audio was used.
-
-Retains confirmed controller fixes, map download/autojoin, match customization and co-op lifecycle fixes. Voice is still a foundation: physical microphone/human PTT, third-client fanout, persistent Friends, natural campaign completion, physical Switch acceptance and real 128-player capacity remain open. The mixer has 16 active stream slots; the tunnel rate budget is roughly five continuously transmitting speakers, not 128-person voice. [Release evidence](releases/v0.2.9.4-steamdeck-runtime-nativevoice1/release-notes.md).
+See the current Steam Deck/Linux update at the top of this page.
 
 Menu routes: Multiplayer → Join/Create/Local Split/Edit Game Types; Create Game → Game Modes (Combat/Factions/Race/Standard) or Network Options; Custom Maps & Mods → Custom Maps → Browse; Characters remains separate. The editor saves game types, weapons, players, vehicles and scoring. Zombies melee uses a sword on maps with the required loaded tag/assets and falls back to stock Oddball melee otherwise. Map-dependent visuals and loadouts remain bounded; failed loadout grants preserve inventory. A two-client Zombies end-round was verified on predecessor 0f6, but other presets have not been broadly tested in live matches.
 
