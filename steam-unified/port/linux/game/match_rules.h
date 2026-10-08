@@ -20,6 +20,7 @@ char const *match_rules_matchup_name(short matchup);
 boolean match_rules_preset_supported(short preset);
 boolean match_rules_preset_available(short preset, char *reason, int reason_size);
 boolean match_rules_validate_loaded_map(void);
+void match_rules_update_map_notice(void);
 short match_rules_preset_get(void);
 boolean match_rules_preset_set(short preset);
 short match_rules_matchup_get(void);

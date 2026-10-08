@@ -8,6 +8,9 @@
 #include "game/game_engine.h"
 #include "game/game_globals.h"
 #include "game/players.h"
+#include "cutscene/cinematics.h"
+#include "interface/hud_messaging.h"
+#include "interface/player_ui.h"
 #include "math/real_math.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
@@ -22,11 +25,17 @@
 #include "nxhalo_custom_content.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void platform_log(char const *format, ...);
 
 enum { _faction_none, _faction_covenant, _faction_usmc, _faction_flood };
 static char match_rules_message[192];
 static unsigned long cached_local_seed;
 static boolean local_seed_valid;
+static boolean race_warning_pending;
+static short race_warning_last_wait_reason = -1;
 static boolean zombies_initialized;
 static boolean zombies_ready;
 static boolean zombies_infected[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
@@ -108,6 +117,8 @@ char const *match_rules_status(void) { return match_rules_message; }
 void match_rules_reset(void)
 {
     set_message("");
+    race_warning_pending = FALSE;
+    race_warning_last_wait_reason = -1;
     local_seed_valid = FALSE;
     cached_local_seed = 0;
     zombies_initialized = FALSE;
@@ -240,7 +251,29 @@ static void variant_template(struct game_variant *variant, char const *name, cha
 boolean match_rules_validate_loaded_map(void)
 {
     char reason[160];
+    struct game_variant *variant = game_engine_get_variant();
+    boolean host_authority = game_connection() != _game_connection_network_client &&
+        !network_game_distributed_client();
     short preset = match_rules_preset_get();
+
+    race_warning_pending = FALSE;
+    race_warning_last_wait_reason = -1;
+    /* Validate the running variant: host setup can override the saved preset. */
+    if (variant && variant->game_engine_index == game_engine_race)
+    {
+        if (count_race_track_markers() < 2)
+        {
+            if (host_authority)
+            {
+                set_message("Race needs a map with at least two Race Track checkpoints.");
+                race_warning_pending = TRUE;
+            }
+            return FALSE;
+        }
+        if (host_authority)
+            set_message("Native Race map requirements are satisfied.");
+        return TRUE;
+    }
     if (preset == MATCH_RULES_PRESET_STANDARD)
     {
         set_message("Standard preset selected.");
@@ -256,6 +289,68 @@ boolean match_rules_validate_loaded_map(void)
     else
         set_message("Selected map loaded; preset requirements are satisfied.");
     return TRUE;
+}
+
+/* Publish only when the local HUD can accept and render this transient notice. */
+void match_rules_update_map_notice(void)
+{
+    char const *trace = getenv("HALO_NETWORK_TEST_TRACE");
+    boolean trace_enabled = trace && !strcmp(trace, "1");
+    short local;
+    short wait_reason = -1;
+    short chosen_local = NONE;
+    long chosen_player = NONE;
+    const char *wait_name = NULL;
+
+    if (!race_warning_pending)
+        return;
+    if (game_time_get() < TICKS_PER_SECOND)
+        return;
+    if (cinematic_in_progress())
+    {
+        wait_reason = 1;
+        wait_name = "cinematic";
+    }
+    else
+    {
+        for (local = local_player_get_next(NONE); local != NONE;
+            local = local_player_get_next(local))
+        {
+            long player = local_player_get_player_index(local);
+            if (player == NONE)
+                continue;
+            if (game_engine_hud_draw_messages(player))
+            {
+                chosen_local = local;
+                chosen_player = player;
+                break;
+            }
+            wait_reason = 2;
+            wait_name = "hud-masked";
+        }
+        if (chosen_local == NONE && wait_reason == -1)
+        {
+            wait_reason = 0;
+            wait_name = "no-local-player";
+        }
+    }
+
+    if (chosen_local == NONE)
+    {
+        if (trace_enabled && race_warning_last_wait_reason != wait_reason)
+            platform_log("network trace: race_hud_notice state=waiting reason=%s tick=%ld",
+                wait_name ? wait_name : "unknown", game_time_get());
+        race_warning_last_wait_reason = wait_reason;
+        return;
+    }
+
+    hud_print_message(chosen_local,
+        L"Race needs 2 checkpoints. Return to lobby and change map.");
+    if (trace_enabled)
+        platform_log("network trace: race_hud_notice state=enqueued local=%d player=%ld tick=%ld",
+            chosen_local, chosen_player, game_time_get());
+    race_warning_pending = FALSE;
+    race_warning_last_wait_reason = -1;
 }
 
 boolean match_rules_apply_variant_preset(short preset, struct game_variant *variant,

@@ -144,6 +144,7 @@ struct game_options;
 #include "game/player_queues_new.h"
 #include "game/player_rumble.h"
 #include "game/players.h"
+#include "match_rules.h" /* port: map requirement notices */
 #include "nxhalo_custom_content.h" /* port: campaign character updates */
 #include "hs/hs.h"
 #include "input/input_abstraction.h"
@@ -369,6 +370,7 @@ void game_tick(
 	objects_update();
 	players_update_after_game();
 	hud_update();
+	match_rules_update_map_notice();
 	player_effect_update();
 	/* port: and at its end, before the frame draws the lights */
 	game_state_check_data_arrays();
