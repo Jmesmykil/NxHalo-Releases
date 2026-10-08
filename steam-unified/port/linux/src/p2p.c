@@ -147,6 +147,7 @@ enum
 	_packet_bye,
 	/* Existing tunnel message numbers stay unchanged. Old clients ignore this. */
 	_packet_voice,
+	_packet_voice_relay,
 };
 
 /* the messages of a stream, inside KCP */
@@ -194,8 +195,10 @@ struct peer
 	unsigned long endpoint_heard_time;
 	unsigned long sent_time;
 	unsigned long round_trip;
-	unsigned long voice_received_time;
-	int voice_received_once;
+	struct { unsigned long second_start, burst_start; unsigned int second_count, burst_count; unsigned char initialized; } voice_raw_pacing[4];
+	struct { unsigned long second_start, burst_start; unsigned int second_count, burst_count; unsigned char initialized; } voice_relay_pacing[128];
+	unsigned long voice_budget_window;
+	unsigned int voice_budget_count;
 	uint32_t voice_sequence[4];
 	unsigned char voice_sequence_seen[4];
 };
@@ -2170,11 +2173,40 @@ static void stream_writeable(struct stream *stream)
 /* Opt-in compatible-client voice foundation. Only authenticated, current
  * tunnel peers can enqueue frames. Capture/playback is supplied separately;
  * this path opens no audio device and sends nothing while disabled. */
-enum { MAXIMUM_VOICE_QUEUE = 64, VOICE_MAXIMUM_AGE = 250, VOICE_MINIMUM_SPACING = 10 };
+enum { MAXIMUM_VOICE_QUEUE = 64, VOICE_MAXIMUM_AGE = 250, VOICE_STREAM_RATE_PER_SECOND = 60, VOICE_STREAM_BURST_FRAMES = 3, VOICE_PEER_BUDGET_PER_SECOND = 256 };
+
+/* Allows a few frames when a 30 Hz game update drains multiple 20 ms audio
+ * packets, while bounding each stream to 60 frames/s and each tunnel peer to
+ * 256 frames/s (about five sustained 50 Hz speakers). */
+static int voice_pacing_allow(unsigned long now, unsigned long *second_start, unsigned int *second_count,
+    unsigned long *burst_start, unsigned int *burst_count, unsigned char *initialized)
+{
+    if (!*initialized) {
+        *second_start = *burst_start = now;
+        *second_count = *burst_count = 0;
+        *initialized = 1;
+    } else {
+        unsigned long replenished = (now - *burst_start) / 20;
+        if (now - *second_start >= 1000) {
+            *second_start = now;
+            *second_count = 0;
+        }
+        if (replenished) {
+            *burst_count = replenished >= *burst_count ? 0 : *burst_count - (unsigned int)replenished;
+            *burst_start += replenished * 20;
+        }
+    }
+    if (*second_count >= VOICE_STREAM_RATE_PER_SECOND || *burst_count >= VOICE_STREAM_BURST_FRAMES) return 0;
+    (*second_count)++; (*burst_count)++;
+    return 1;
+}
 static struct {
     int enabled, head, count;
     struct {
         unsigned char identifier[P2P_IDENTIFIER_SIZE];
+        unsigned char speaker[P2P_IDENTIFIER_SIZE];
+        unsigned char relayed;
+        unsigned char speaker_slot;
         unsigned long received;
         unsigned char wire[NATIVE_VOICE_FRAME_BYTES];
     } frames[MAXIMUM_VOICE_QUEUE];
@@ -2182,9 +2214,17 @@ static struct {
 
 void p2p_voice_enable(int enabled)
 {
+    int i;
     pthread_mutex_lock(&p2p_lock);
     memset(&native_voice_queue, 0, sizeof(native_voice_queue));
     native_voice_queue.enabled = !!enabled;
+    for (i = 0; i < P2P_MAXIMUM_PEERS; i++) {
+        struct peer *peer = &p2p.peers[i];
+        memset(peer->voice_raw_pacing, 0, sizeof(peer->voice_raw_pacing));
+        memset(peer->voice_relay_pacing, 0, sizeof(peer->voice_relay_pacing));
+        peer->voice_budget_window = 0;
+        peer->voice_budget_count = 0;
+    }
     pthread_mutex_unlock(&p2p_lock);
 }
 
@@ -2209,6 +2249,104 @@ int p2p_voice_send(const unsigned char *destination, const unsigned char *wire, 
     return sent;
 }
 
+int p2p_voice_send_host(const unsigned char *wire, int size)
+{
+    struct native_voice_frame checked;
+    unsigned char inner[1 + NATIVE_VOICE_FRAME_BYTES];
+    int index, sent = 0;
+    if (!wire || size != NATIVE_VOICE_FRAME_BYTES || !native_voice_decode(&checked, wire, (size_t)size)) return 0;
+    inner[0] = _packet_voice; memcpy(inner + 1, wire, NATIVE_VOICE_FRAME_BYTES);
+    pthread_mutex_lock(&p2p_lock);
+    if (native_voice_queue.enabled && !p2p.hosting && p2p.tunnel_socket >= 0) {
+        for (index = 0; index < P2P_MAXIMUM_PEERS; index++) {
+            struct peer *peer = &p2p.peers[index];
+            if (peer->used && peer->connected && peer->is_host) { peer_send(peer, inner, sizeof(inner)); sent = 1; break; }
+        }
+    }
+    pthread_mutex_unlock(&p2p_lock); return sent;
+}
+
+int p2p_voice_send_relay(const unsigned char *destination, const unsigned char *speaker,
+    int speaker_slot, const unsigned char *wire, int size)
+{
+    struct native_voice_frame checked;
+    unsigned char inner[2 + P2P_IDENTIFIER_SIZE + NATIVE_VOICE_FRAME_BYTES];
+    struct peer *peer; int sent = 0;
+    if (!destination || !speaker || !wire || speaker_slot < 0 || speaker_slot > 127 ||
+        size != NATIVE_VOICE_FRAME_BYTES || !native_voice_decode(&checked, wire, (size_t)size)) return 0;
+    inner[0] = _packet_voice_relay;
+    inner[1] = (unsigned char)speaker_slot;
+    memcpy(inner + 2, speaker, P2P_IDENTIFIER_SIZE);
+    memcpy(inner + 2 + P2P_IDENTIFIER_SIZE, wire, NATIVE_VOICE_FRAME_BYTES);
+    pthread_mutex_lock(&p2p_lock);
+    peer = find_peer(destination);
+    if (native_voice_queue.enabled && p2p.hosting && p2p.tunnel_socket >= 0 && peer && peer->connected && !peer->is_host) {
+        peer_send(peer, inner, sizeof(inner)); sent = 1;
+    }
+    pthread_mutex_unlock(&p2p_lock); return sent;
+}
+
+int p2p_voice_session_host(unsigned char *identifier)
+{
+    int index, found = 0;
+    if (!identifier) return 0;
+    memset(identifier, 0, P2P_IDENTIFIER_SIZE);
+    pthread_mutex_lock(&p2p_lock);
+    if (p2p.hosting) {
+        memcpy(identifier, p2p_identifier(), P2P_IDENTIFIER_SIZE);
+        found = 1;
+    } else {
+        for (index = 0; index < P2P_MAXIMUM_PEERS; index++) {
+            struct peer *peer = &p2p.peers[index];
+            if (peer->used && peer->connected && peer->is_host) {
+                memcpy(identifier, peer->identifier, P2P_IDENTIFIER_SIZE);
+                found = 1;
+                break;
+            }
+        }
+    }
+    pthread_mutex_unlock(&p2p_lock);
+    return found;
+}
+
+/* No advertised-candidate fallback: only a currently connected authenticated
+ * tunnel's observed endpoint can bind a direct LAN game connection. */
+int p2p_voice_peer_addresses(const unsigned char *identifier, unsigned long *virtual_address, unsigned long *endpoint_address)
+{
+    struct peer *peer; int found = 0;
+    if (!identifier || !virtual_address || !endpoint_address || !p2p.running) return 0;
+    pthread_mutex_lock(&p2p_lock);
+    peer = find_peer(identifier);
+    if (peer && peer->used && peer->connected) {
+        *virtual_address = peer->virtual_address;
+        *endpoint_address = peer->endpoint.address;
+        found = 1;
+    }
+    pthread_mutex_unlock(&p2p_lock); return found;
+}
+
+int p2p_voice_peer_for_address(unsigned long address, unsigned char *identifier)
+{
+    int index, found = -1;
+    if (!address || !identifier) return 0;
+    pthread_mutex_lock(&p2p_lock);
+    for (index = 0; index < P2P_MAXIMUM_PEERS; index++) {
+        struct peer *peer = &p2p.peers[index];
+        if (peer->used && peer->connected && peer->virtual_address == address) { found = index; break; }
+    }
+    if (found < 0) {
+        for (index = 0; index < P2P_MAXIMUM_PEERS; index++) {
+            struct peer *peer = &p2p.peers[index];
+            if (peer->used && peer->connected && peer->endpoint.address == address) {
+                if (found >= 0) { found = -1; break; } /* Same-IP peers are ambiguous. */
+                found = index;
+            }
+        }
+    }
+    if (found >= 0) memcpy(identifier, p2p.peers[found].identifier, P2P_IDENTIFIER_SIZE);
+    pthread_mutex_unlock(&p2p_lock); return found >= 0;
+}
+
 static void voice_received(struct peer *peer, const unsigned char *wire, int size)
 {
     struct native_voice_frame checked;
@@ -2217,15 +2355,20 @@ static void voice_received(struct peer *peer, const unsigned char *wire, int siz
     if (!native_voice_queue.enabled || !peer->connected || size != NATIVE_VOICE_FRAME_BYTES ||
         !native_voice_decode(&checked, wire, (size_t)size))
         return;
-    if (peer->voice_received_once && now - peer->voice_received_time < VOICE_MINIMUM_SPACING)
-        return;
     if (peer->voice_sequence_seen[checked.controller] &&
         !native_voice_sequence_newer(checked.sequence, peer->voice_sequence[checked.controller]))
         return;
+    if (peer->voice_budget_window == 0 || now - peer->voice_budget_window >= 1000) {
+        peer->voice_budget_window = now ? now : 1;
+        peer->voice_budget_count = 0;
+    }
+    if (peer->voice_budget_count >= VOICE_PEER_BUDGET_PER_SECOND ||
+        !voice_pacing_allow(now, &peer->voice_raw_pacing[checked.controller].second_start,
+        &peer->voice_raw_pacing[checked.controller].second_count, &peer->voice_raw_pacing[checked.controller].burst_start,
+        &peer->voice_raw_pacing[checked.controller].burst_count, &peer->voice_raw_pacing[checked.controller].initialized)) return;
     peer->voice_sequence[checked.controller] = checked.sequence;
     peer->voice_sequence_seen[checked.controller] = 1;
-    peer->voice_received_time = now;
-    peer->voice_received_once = 1;
+    peer->voice_budget_count++;
     /* Prefer recent audio over an old backlog; total memory stays bounded. */
     if (native_voice_queue.count == MAXIMUM_VOICE_QUEUE) {
         native_voice_queue.head = (native_voice_queue.head + 1) % MAXIMUM_VOICE_QUEUE;
@@ -2233,34 +2376,66 @@ static void voice_received(struct peer *peer, const unsigned char *wire, int siz
     }
     tail = (native_voice_queue.head + native_voice_queue.count) % MAXIMUM_VOICE_QUEUE;
     memcpy(native_voice_queue.frames[tail].identifier, peer->identifier, P2P_IDENTIFIER_SIZE);
+    memcpy(native_voice_queue.frames[tail].speaker, peer->identifier, P2P_IDENTIFIER_SIZE);
+    native_voice_queue.frames[tail].relayed = 0;
+    native_voice_queue.frames[tail].speaker_slot = 255;
     native_voice_queue.frames[tail].received = now;
     memcpy(native_voice_queue.frames[tail].wire, wire, NATIVE_VOICE_FRAME_BYTES);
     native_voice_queue.count++;
 }
 
-int p2p_voice_poll(unsigned char *sender, unsigned char *wire, int capacity)
+int p2p_voice_poll_ex(unsigned char *sender, unsigned char *speaker, int *speaker_slot, int *relayed,
+    unsigned char *wire, int capacity)
 {
-    int result = 0;
-    unsigned long now;
-    if (!sender || !wire || capacity < NATIVE_VOICE_FRAME_BYTES)
-        return 0;
-    pthread_mutex_lock(&p2p_lock);
-    now = p2p_now();
+    int result = 0; unsigned long now;
+    if (!sender || !speaker || !speaker_slot || !relayed || !wire || capacity < NATIVE_VOICE_FRAME_BYTES) return 0;
+    pthread_mutex_lock(&p2p_lock); now = p2p_now();
     while (native_voice_queue.enabled && native_voice_queue.count) {
         int slot = native_voice_queue.head;
         struct peer *peer = find_peer(native_voice_queue.frames[slot].identifier);
-        native_voice_queue.head = (slot + 1) % MAXIMUM_VOICE_QUEUE;
-        native_voice_queue.count--;
-        if (now - native_voice_queue.frames[slot].received > VOICE_MAXIMUM_AGE ||
-            !peer || !peer->connected)
-            continue;
+        native_voice_queue.head = (slot + 1) % MAXIMUM_VOICE_QUEUE; native_voice_queue.count--;
+        if (now - native_voice_queue.frames[slot].received > VOICE_MAXIMUM_AGE || !peer || !peer->connected) continue;
         memcpy(sender, native_voice_queue.frames[slot].identifier, P2P_IDENTIFIER_SIZE);
+        memcpy(speaker, native_voice_queue.frames[slot].speaker, P2P_IDENTIFIER_SIZE);
+        *speaker_slot = native_voice_queue.frames[slot].speaker_slot;
+        *relayed = native_voice_queue.frames[slot].relayed;
         memcpy(wire, native_voice_queue.frames[slot].wire, NATIVE_VOICE_FRAME_BYTES);
-        result = NATIVE_VOICE_FRAME_BYTES;
-        break;
+        result = NATIVE_VOICE_FRAME_BYTES; break;
     }
-    pthread_mutex_unlock(&p2p_lock);
-    return result;
+    pthread_mutex_unlock(&p2p_lock); return result;
+}
+
+int p2p_voice_poll(unsigned char *sender, unsigned char *wire, int capacity)
+{
+    unsigned char speaker[P2P_IDENTIFIER_SIZE]; int speaker_slot = -1, relayed = 0;
+    return p2p_voice_poll_ex(sender, speaker, &speaker_slot, &relayed, wire, capacity);
+}
+
+static void voice_relay_received(struct peer *peer, const unsigned char *payload, int size)
+{
+    struct native_voice_frame checked; unsigned long now = p2p_now(); int tail;
+    if (!native_voice_queue.enabled || !peer->connected || !peer->is_host ||
+        size != 1 + P2P_IDENTIFIER_SIZE + NATIVE_VOICE_FRAME_BYTES || payload[0] > 127 ||
+        !native_voice_decode(&checked, payload + 1 + P2P_IDENTIFIER_SIZE, NATIVE_VOICE_FRAME_BYTES)) return;
+    if (peer->voice_budget_window == 0 || now - peer->voice_budget_window >= 1000) {
+        peer->voice_budget_window = now ? now : 1;
+        peer->voice_budget_count = 0;
+    }
+    if (peer->voice_budget_count >= VOICE_PEER_BUDGET_PER_SECOND ||
+        !voice_pacing_allow(now, &peer->voice_relay_pacing[payload[0]].second_start,
+        &peer->voice_relay_pacing[payload[0]].second_count, &peer->voice_relay_pacing[payload[0]].burst_start,
+        &peer->voice_relay_pacing[payload[0]].burst_count, &peer->voice_relay_pacing[payload[0]].initialized)) return;
+    peer->voice_budget_count++;
+    if (native_voice_queue.count == MAXIMUM_VOICE_QUEUE) {
+        native_voice_queue.head = (native_voice_queue.head + 1) % MAXIMUM_VOICE_QUEUE; native_voice_queue.count--;
+    }
+    tail = (native_voice_queue.head + native_voice_queue.count) % MAXIMUM_VOICE_QUEUE;
+    memcpy(native_voice_queue.frames[tail].identifier, peer->identifier, P2P_IDENTIFIER_SIZE);
+    memcpy(native_voice_queue.frames[tail].speaker, payload + 1, P2P_IDENTIFIER_SIZE);
+    native_voice_queue.frames[tail].speaker_slot = payload[0];
+    native_voice_queue.frames[tail].relayed = 1; native_voice_queue.frames[tail].received = now;
+    memcpy(native_voice_queue.frames[tail].wire, payload + 1 + P2P_IDENTIFIER_SIZE, NATIVE_VOICE_FRAME_BYTES);
+    native_voice_queue.count++;
 }
 
 /* ---------- the tunnel */
@@ -2331,6 +2506,9 @@ static void tunnel_received(const unsigned char *packet, int size, const struct 
 		break;
 	case _packet_voice:
 		voice_received(peer, inner + 1, inner_size - 1);
+		break;
+	case _packet_voice_relay:
+		voice_relay_received(peer, inner + 1, inner_size - 1);
 		break;
 	case _packet_bye:
 		drop_peer(peer, "left");

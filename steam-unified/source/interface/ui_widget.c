@@ -5745,6 +5745,43 @@ static void ui_mouse_note_target(
 #if defined(__linux__) && !defined(HALO_ANDROID)
     ui_widget_port_lobby_bounds(widget,&bounds);
 #endif
+	/* Spinner arrows are drawn from list_header_bounds/list_footer_bounds,
+	which may extend beyond the spinner widget's own bounds. Keep the mouse
+	target aligned with the visible controls. */
+	if (kind == _ui_mouse_target_value)
+	{
+		struct ui_widget_definition const *spinner_definition = definition;
+		rectangle2d arrow_bounds;
+		if (spinner_definition->list_header_bitmap.index != NONE)
+		{
+			arrow_bounds = spinner_definition->list_header_bounds;
+			if (spinner_string_list_extra_count(spinner_definition->text_label_string_list.index))
+			{
+				arrow_bounds.x0 -= SPINNER_EXTRA_WIDTH;
+				arrow_bounds.x1 -= SPINNER_EXTRA_WIDTH;
+			}
+			arrow_bounds.x0 += offset.x;
+			arrow_bounds.y0 += offset.y;
+			arrow_bounds.x1 += offset.x;
+			arrow_bounds.y1 += offset.y;
+			bounds.x0 = MIN(bounds.x0, arrow_bounds.x0);
+			bounds.y0 = MIN(bounds.y0, arrow_bounds.y0);
+			bounds.x1 = MAX(bounds.x1, arrow_bounds.x1);
+			bounds.y1 = MAX(bounds.y1, arrow_bounds.y1);
+		}
+		if (spinner_definition->list_footer_bitmap.index != NONE)
+		{
+			arrow_bounds = spinner_definition->list_footer_bounds;
+			arrow_bounds.x0 += offset.x;
+			arrow_bounds.y0 += offset.y;
+			arrow_bounds.x1 += offset.x;
+			arrow_bounds.y1 += offset.y;
+			bounds.x0 = MIN(bounds.x0, arrow_bounds.x0);
+			bounds.y0 = MIN(bounds.y0, arrow_bounds.y0);
+			bounds.x1 = MAX(bounds.x1, arrow_bounds.x1);
+			bounds.y1 = MAX(bounds.y1, arrow_bounds.y1);
+		}
+	}
 	target = &ui_mouse_targets[ui_mouse_target_count++];
 	target->widget = widget;
 	target->bounds = bounds;

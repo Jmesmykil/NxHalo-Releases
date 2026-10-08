@@ -160,6 +160,8 @@ static const struct config_setting config_settings[] =
 		"of each vertex shows across curved surfaces; false lights each vertex,\n"
 		"as the Xbox does." },
 
+	{ "audio.voice_enabled", _config_boolean, "false", "HALO_VOICE_ENABLED", _environment_value, _platform_desktop,
+		"Enable compatible-client push-to-talk voice. Mic starts only while the PTT key is held." },
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
 	{ "audio.volume", _config_real, "1.0", "HALO_VOLUME", _environment_value, _platform_all,
@@ -189,6 +191,8 @@ static const struct config_setting config_settings[] =
 		"same as input.mouse_sensitivity." },
 
 	/* the keyboard and mouse's own controls (port/linux/src/xinput_sdl.c) */
+	{ "controls.voice_ptt", _config_string, "\"V\"", "HALO_KEY_VOICE_PTT", _environment_value, _platform_desktop,
+		"Keyboard push-to-talk key for optional compatible-client voice." },
 	{ "controls.move_forward", _config_string, "\"W\"", "HALO_KEY_MOVE_FORWARD", _environment_value, _platform_all,
 		"The keyboard and mouse's controls, which Settings > Controls Setup\n"
 		"changes: up to two keys or buttons each, separated by a comma. Keys by\n"

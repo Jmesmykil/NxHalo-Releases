@@ -37,6 +37,7 @@ turns the reverb off; audio.enabled = false skips opening a device
 #include "platform.h"
 #include "sdl_platform.h"
 #include "port_config.h"
+#include "native_voice_runtime.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -1080,6 +1081,7 @@ static void mix(float *output, unsigned long frames)
 		changed = TRUE;
 	}
 	pthread_mutex_unlock(&mixer_lock);
+	native_voice_runtime_mix(output, frames);
 	if (changed)
 		reverb_update(&properties, serial);
 	/* the reverb runs while something reverberates, and stops once it is

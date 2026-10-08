@@ -32,6 +32,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_sensitivity_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="0.25|0.5|0.75|1|1.25|1.5|1.75|2|2.5|3|4" setting="input.mouse_sensitivity" values="0.25|0.5|0.75|1|1.25|1.5|1.75|2|2.5|3|4" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_mouse_vertical_sensitivity" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_vertical_sensitivity_label"/>
@@ -41,6 +42,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_vertical_sensitivity_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SAME|0.25|0.5|0.75|1|1.25|1.5|1.75|2|2.5|3|4" setting="input.mouse_vertical_sensitivity" values="0|0.25|0.5|0.75|1|1.25|1.5|1.75|2|2.5|3|4" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_invert_mouse" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/invert_mouse_label"/>
@@ -50,6 +52,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/invert_mouse_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="YES|NO" setting="input.invert_mouse" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_mouse_aim_assist" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_aim_assist_label"/>
@@ -59,6 +62,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_aim_assist_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="input.mouse_aim_assist" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port settings defaults"/>

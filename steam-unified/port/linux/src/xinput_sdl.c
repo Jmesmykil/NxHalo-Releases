@@ -41,6 +41,7 @@ drive the controller.
 #include "port_config.h"
 #include "halo_keyboard.h"
 #include "gamepad_routes.h"
+#include "native_voice_runtime.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -877,6 +878,11 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		}
 		if (port_gamepad(gamepads, count, 0))
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+		{
+			int ptt_input = halo_input_from_name(config_string("controls.voice_ptt"));
+			int ptt = ptt_input >= 0 && ptt_input < SDL_SCANCODE_COUNT && input.keys[ptt_input];
+			native_voice_runtime_update(ptt, input.menus || console_is_active());
+		}
 		test_input_gamepad(&state->Gamepad);
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
 			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)

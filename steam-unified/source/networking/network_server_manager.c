@@ -3244,6 +3244,55 @@ struct network_game_server_client_machine *network_game_server_get_client_machin
 	return client_machine;
 }
 
+
+/* Native voice stays inside the live joined-machine roster. */
+int network_game_server_port_voice_roster(unsigned long *addresses, int *slots, int capacity)
+{
+    struct network_game_server *server = global_network_game_server_get();
+    int count = 0;
+    long index;
+    if (!server || !addresses || !slots || capacity <= 0 || !network_game_server_playing(server))
+        return 0;
+    for (index = 0; index < MAXIMUM_NETWORK_PLAYER_COUNT && count < capacity; index++) {
+        struct network_player *player = &server->game.players[index];
+        unsigned long address;
+        long machine_index;
+        int prior;
+        if (!network_player_is_valid(player) || !VALID_INDEX(player->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT))
+            continue;
+        machine_index = player->machine_index;
+        address = network_game_server_client_machine_is_local(server, &server->client_machines[machine_index]) ?
+            0 : network_game_server_client_machine_addresses[machine_index];
+        if (!address && !network_game_server_client_machine_is_local(server, &server->client_machines[machine_index]))
+            continue;
+        for (prior = 0; prior < count; prior++)
+            if (addresses[prior] == address) break;
+        if (prior != count) continue;
+        addresses[count] = address;
+        slots[count] = (int)index;
+        count++;
+    }
+    return count;
+}
+
+int network_game_server_port_voice_sender_slot(unsigned long address, int controller, int *slot)
+{
+    struct network_game_server *server = global_network_game_server_get();
+    struct network_game_server_client_machine *machine;
+    long index;
+    if (!server || !address || !slot || controller < 0 || controller > 3 || !network_game_server_playing(server)) return 0;
+    machine = network_game_server_get_client_machine_at_address(server, address);
+    if (!machine) return 0;
+    for (index = 0; index < MAXIMUM_NETWORK_PLAYER_COUNT; index++) {
+        struct network_player *player = &server->game.players[index];
+        if (network_player_is_valid(player) && player->machine_index == machine->machine_index && player->controller_index == controller) {
+            *slot = (int)index;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 boolean network_game_server_game_can_start(
 	struct network_game_server *server)
 {

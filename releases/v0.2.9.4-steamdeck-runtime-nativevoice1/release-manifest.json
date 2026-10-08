@@ -1,0 +1,13 @@
+{
+  "runtime": "4a083770b6920d2a1f7372ba701967bcf02b840e0d2c3e9bfe7d55bf646964c0",
+  "assets": {
+    "NxHalo-SteamDeck-unified-runtime-2.9.4-nativevoice1.tar.gz": {
+      "sha256": "289222d0263d5611311955d311526317580d2b73b981b1c9a926e59ccc25f923",
+      "bytes": 22159404
+    },
+    "NxHalo-Unified-source-2.9.4-nativevoice1.zip": {
+      "sha256": "613956b1c821d61d841b8f1ab9521fc69c9ef5ec71e2180147460c0d8d9316ae",
+      "bytes": 17917447
+    }
+  }
+}

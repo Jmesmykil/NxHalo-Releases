@@ -63,6 +63,17 @@ int p2p_broadcast_datagram(unsigned short source_port, unsigned short port, cons
  * one for an attempted encrypted UDP send, not a delivery acknowledgement. */
 void p2p_voice_enable(int enabled);
 int p2p_voice_send(const unsigned char *destination, const unsigned char *wire, int size);
+/* Session routing helpers: joiners send only to their authenticated host; hosts relay
+ * only to connected peers selected by the live game roster. */
+int p2p_voice_send_host(const unsigned char *wire, int size);
+int p2p_voice_send_relay(const unsigned char *destination, const unsigned char *speaker,
+    int speaker_slot, const unsigned char *wire, int size);
+int p2p_voice_peer_addresses(const unsigned char *identifier, unsigned long *virtual_address, unsigned long *endpoint_address);
+int p2p_voice_peer_for_address(unsigned long address, unsigned char *identifier);
+int p2p_voice_session_host(unsigned char *identifier);
+/* sender is authenticated transport identity; speaker may be host-verified original identity. */
+int p2p_voice_poll_ex(unsigned char *sender, unsigned char *speaker, int *speaker_slot,
+    int *relayed, unsigned char *wire, int capacity);
 int p2p_voice_poll(unsigned char *sender, unsigned char *wire, int capacity);
 
 /* the game's socket has this local port: bound, given one, or listening

@@ -112,6 +112,10 @@ SCREENS = {
              "Echo sounds as the place you are in does, and\nmuffle those behind walls, as the Xbox did.", None),
             ("SOUND:", "audio.enabled", ON_OFF,
              "Play sound at all; from the next time the game\nstarts.", None),
+            ("VOICE CHAT:", "audio.voice_enabled", ON_OFF,
+             "Compatible native clients only. Voice is off by default.\nHold the push-to-talk key to transmit nearby.", None),
+            ("PUSH-TO-TALK:", "controls.voice_ptt", [("V", "V"), ("X", "X"), ("C", "C")],
+             "Hold this keyboard key while playing to transmit.\nMicrophone capture stops when the key is released.", None),
         ],
     },
     "network_setup": {
@@ -269,7 +273,7 @@ def _setting_screen(folder: str, spec: dict) -> list:
                           ("color", "#FF2896FF"), ("align", "center"), ("text_y", 1),
                           ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
                           ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")],
-                         ['<on event="created" run="port setting load"/>'])
+                         ['<on event="created" run="port setting load"/>', '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
     extra += _button(f"{base}/button_defaults", 3, ['<on event="a" run="port settings defaults"/>',
                                                     '<on event="start" run="port settings defaults"/>'])
     extra += _button(f"{base}/button_ok", 1, ['<on event="a" run="port settings save" back="true"/>',
