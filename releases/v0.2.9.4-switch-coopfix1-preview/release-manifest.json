@@ -1,0 +1,66 @@
+{
+  "name": "NxHalo Unified Switch Co-op Lifecycle Preview 2.9.4",
+  "tag": "v0.2.9.4-switch-coopfix1-preview",
+  "prerelease": true,
+  "platform": "Nintendo Switch",
+  "artifact_type": "standalone NRO",
+  "version": "2.9.4-preview",
+  "title_id": "010048414C210000",
+  "nro_sha256": "e98eea315b6733ff1b3d2f6d3b19d4539332540b32157181ec5d8ac328e2c2d0",
+  "embedded_guest_elf_sha256": "a4efefb4a5ce811067daae34330fa2677530573e23c4a816aac1bd189ec65bc4",
+  "embedded_guest_elf_bytes": 19595608,
+  "nro_bytes": 26574102,
+  "nro_header": "NRO0",
+  "embedded_guest_exact_match": true,
+  "sanitized_source_sha256": "1ad42aadb4010542cc3c2a407f10c8492de779fcfc46083cd35d47a94614faba",
+  "source_archive_entries": 2305,
+  "source_hash_manifest_sha256": "6545fbbe87b7242fb7a94076e8c4edf2c8be4a3932cfc6cbd0af08f9b767407e",
+  "source_mirror_commit": "92590db9e91f902f31517d3e5535c6d817f0eb88",
+  "switch_sd_staging_verified": true,
+  "staging_readback_hash_verified": true,
+  "safe_eject_verified": false,
+  "safe_eject_note": "macOS declined to unmount; volume was left mounted",
+  "physical_install_verified": false,
+  "physical_runtime_verified": false,
+  "rollback_preserved": true,
+  "game_data_included": false,
+  "deck_upscaling_enabled": false,
+  "build_warnings": [
+    "vendored miniupnpc miniwget.c char-subscript warning"
+  ],
+  "excluded_content": [
+    "generated shader instruction includes and .inc files",
+    "game maps",
+    "owner resource companions",
+    "console keys",
+    "personal saves",
+    "generated build binaries"
+  ],
+  "features": [
+    "Host-authoritative co-op Revert to Checkpoint and Restart Level paths",
+    "Host returns to correct next-map lobby",
+    "Co-op player cap and friendly-fire setting preserved across map transition"
+  ],
+  "assets": {
+    "halo.nro": {
+      "bytes": 26574102,
+      "sha256": "e98eea315b6733ff1b3d2f6d3b19d4539332540b32157181ec5d8ac328e2c2d0"
+    },
+    "NxHalo-Switch-source-2.9.4-coopfix1.zip": {
+      "bytes": 18157814,
+      "sha256": "1ad42aadb4010542cc3c2a407f10c8492de779fcfc46083cd35d47a94614faba"
+    },
+    "SOURCE-HASHES.sha256": {
+      "bytes": 271817,
+      "sha256": "6545fbbe87b7242fb7a94076e8c4edf2c8be4a3932cfc6cbd0af08f9b767407e"
+    },
+    "RELEASE-NOTES.md": {
+      "bytes": 1594,
+      "sha256": "a863058da8550a5b43a199f3b6eab578019cb0fab57a936d92f44f0ef9d64852"
+    },
+    "BUILD-EVIDENCE.txt": {
+      "bytes": 2219,
+      "sha256": "8c8b66881adbee40100927991781897cdb011ff858979aca8a4c0da5bcd4fb6c"
+    }
+  }
+}

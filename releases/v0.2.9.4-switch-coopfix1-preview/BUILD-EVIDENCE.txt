@@ -1,0 +1,22 @@
+# Build and verification evidence — Switch co-op lifecycle preview 2.9.4
+
+## Cross-build
+
+- Guest configuration: `python3 configure.py --android-ndk "$PWD/ndk-layout" --android-guest-cc /opt/homebrew/opt/llvm/bin/clang --android-switch-guest`
+- Guest build: `ninja -f build.ninja build/android/halo_guest.elf`
+- Host package: `DEVKITPRO=/opt/devkitpro make -C port/switch host`
+- Compiler: Apple Clang 21; PGO requiring Clang 22 was omitted. Rust LLD and devkitPro host toolchain were used.
+- Guest ELF: 19,595,608 bytes; SHA-256 `a4efefb4a5ce811067daae34330fa2677530573e23c4a816aac1bd189ec65bc4`.
+- NRO: 26,574,102 bytes; SHA-256 `e98eea315b6733ff1b3d2f6d3b19d4539332540b32157181ec5d8ac328e2c2d0`.
+- NRO begins with `NRO0` at offset `0x10` and contains the exact guest ELF byte sequence.
+- The only host build warning was the vendored miniupnpc `miniwget.c` char-subscript warning; host packaging completed.
+
+The filtered source archive contains 2,305 entries; its SHA-256 is `1ad42aadb4010542cc3c2a407f10c8492de779fcfc46083cd35d47a94614faba`. ZIP integrity and path checks passed. The archive contains no traversal paths, AppleDouble files, `.inc` files, ELF/Mach-O/PE/NRO binaries, maps, saves, console keys, or NSP files. It records the three co-op lifecycle source hunks in `source/interface/ui_widget.c`, `source/interface/ui_widget_event_handler_functions.c`, and `source/networking/network_server_manager.c`.
+
+The public source omits generated `rasterizer_xbox_vertex_shaders_data.inc`. A preserved local copy was used only in the isolated build candidate; the file and its contents are not in the source archive or release assets. A source-only checkout may need the owner's local shader extraction to rebuild this guest.
+
+## SD staging and limits
+
+The built NRO was atomically staged to `switch/NxHalo-Content29/halo.nro`, read back, and hash-checked against the build. The replaced NRO was preserved for rollback. macOS refused to unmount the SD volume; it was left mounted. No forced unmount was attempted. No Switch hardware launch or gameplay acceptance was performed. This release contains no NSP or HOME-menu forwarder.
+
+Matching main-source mirror commit: `92590db9e91f902f31517d3e5535c6d817f0eb88`.
