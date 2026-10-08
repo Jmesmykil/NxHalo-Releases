@@ -23,7 +23,7 @@ python3 configure.py \
 ninja -f build.ninja build/android/halo_guest.elf
 ```
 
-The 2.9.4 preview was built with the available Clang 21/llvm-ar and Rust LLD on macOS. Profile-guided optimization requiring Clang 22 was therefore omitted. Keep all object output and temporary files on a volume with sufficient free space.
+The earlier Content Preview 2.9.4 NRO (`v0.2.9.4-switch-content-preview`) used Clang 21/llvm-ar. The co-op lifecycle NRO (`v0.2.9.4-switch-coopfix1-preview`) used Homebrew LLVM Clang 22.1.8/llvm-ar, Rust LLD, and devkitPro devkitA64/libnx for the native host. Profile-guided optimization was omitted for the co-op lifecycle build. Keep all object output and temporary files on a volume with sufficient free space.
 
 ## Host NRO
 
