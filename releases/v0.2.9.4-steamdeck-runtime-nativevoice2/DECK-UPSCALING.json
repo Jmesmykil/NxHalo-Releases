@@ -1,0 +1,53 @@
+{
+  "off": {
+    "mode": "off",
+    "gl_probe": "viewport sw=1920 sh=1080 dw=0 dh=0 mask=2 count=14571\nviewport sw=128 sh=128 dw=0 dh=0 mask=3 count=8207\nviewport sw=128 sh=128 dw=0 dh=0 mask=4 count=1\nviewport sw=64 sh=64 dw=0 dh=0 mask=5 count=2732\nblit sw=1920 sh=1080 dw=1280 dh=-720 mask=4000 count=1\nblit sw=1920 sh=1080 dw=1920 dh=-1080 mask=4000 count=3444\n",
+    "sha256": "45a62e4765fed3da8c6c895fb824d2e494bd759d7ec96414d743e790c57afc4d",
+    "installed_baseline": "4a083770b6920d2a1f7372ba701967bcf02b840e0d2c3e9bfe7d55bf646964c0",
+    "checks": {
+      "gameplay": true,
+      "hardware": true,
+      "telemetry": true,
+      "identity": true,
+      "no_resolution_spam": true,
+      "private_online_disabled": true
+    },
+    "frames": 6,
+    "device": "Jupiter",
+    "proof": "/home/deck/Games/HaloCE/runtime-proof/race-upscale-off-20261008T172854Z"
+  },
+  "quality": {
+    "mode": "quality",
+    "gl_probe": "viewport sw=1920 sh=1080 dw=0 dh=0 mask=2 count=6988\nviewport sw=1280 sh=720 dw=0 dh=0 mask=3 count=6375\nviewport sw=1920 sh=1080 dw=0 dh=0 mask=1 count=3783\nviewport sw=128 sh=128 dw=0 dh=0 mask=7 count=2488\nviewport sw=128 sh=128 dw=0 dh=0 mask=8 count=1\nviewport sw=64 sh=64 dw=0 dh=0 mask=9 count=3081\nblit sw=1920 sh=1080 dw=1280 dh=-720 mask=4000 count=1\nblit sw=1920 sh=1080 dw=1920 dh=-1080 mask=4000 count=3792\nblit sw=1280 sh=720 dw=1920 dh=1080 mask=500 count=3783\n",
+    "sha256": "45a62e4765fed3da8c6c895fb824d2e494bd759d7ec96414d743e790c57afc4d",
+    "installed_baseline": "4a083770b6920d2a1f7372ba701967bcf02b840e0d2c3e9bfe7d55bf646964c0",
+    "checks": {
+      "gameplay": true,
+      "hardware": true,
+      "telemetry": true,
+      "identity": true,
+      "no_resolution_spam": true,
+      "private_online_disabled": true
+    },
+    "frames": 7,
+    "device": "Jupiter",
+    "proof": "/home/deck/Games/HaloCE/runtime-proof/race-upscale-quality-20261008T173139Z"
+  },
+  "performance": {
+    "mode": "performance",
+    "gl_probe": "viewport sw=1920 sh=1080 dw=0 dh=0 mask=2 count=6998\nviewport sw=960 sh=540 dw=0 dh=0 mask=3 count=10484\nviewport sw=1920 sh=1080 dw=0 dh=0 mask=1 count=3784\nviewport sw=128 sh=128 dw=0 dh=0 mask=7 count=6571\nviewport sw=128 sh=128 dw=0 dh=0 mask=8 count=1\nviewport sw=64 sh=64 dw=0 dh=0 mask=9 count=3079\nblit sw=1920 sh=1080 dw=1280 dh=-720 mask=4000 count=1\nblit sw=1920 sh=1080 dw=1920 dh=-1080 mask=4000 count=3792\nblit sw=960 sh=540 dw=1920 dh=1080 mask=500 count=3784\n",
+    "sha256": "45a62e4765fed3da8c6c895fb824d2e494bd759d7ec96414d743e790c57afc4d",
+    "installed_baseline": "4a083770b6920d2a1f7372ba701967bcf02b840e0d2c3e9bfe7d55bf646964c0",
+    "checks": {
+      "gameplay": true,
+      "hardware": true,
+      "telemetry": true,
+      "identity": true,
+      "no_resolution_spam": true,
+      "private_online_disabled": true
+    },
+    "frames": 7,
+    "device": "Jupiter",
+    "proof": "/home/deck/Games/HaloCE/runtime-proof/race-upscale-performance-20261008T173427Z"
+  }
+}
