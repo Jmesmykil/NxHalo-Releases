@@ -34,7 +34,7 @@ The Switch must already be configured to run this homebrew title. Setup apps are
 
 ## Validation status
 
-Unified Rules Preview 2.9.3 binary SHA-256 is `2f9929de4467a4e908ec9c6cc3ac25f3ece3f9b10f9ae29f6445496918f6c7c4`. Deck install and current-process status are pending final UI regression confirmation. Previous 2.9.2 and 2.9.1 builds remain available for rollback.
+Unified Rules Preview 2.9.3 binary SHA-256 is `2f9929de4467a4e908ec9c6cc3ac25f3ece3f9b10f9ae29f6445496918f6c7c4`. The 2.9.3 executable is installed and running on the Deck; both destination and process hashes match `e439a36aa08183cf4b27d4e869a5f6b0900c0f8286e9efc9a9aba7d9584f428c`. Previous 2.9.2 and 2.9.1 builds remain available for rollback.
 
 The reviewed native Deck catalog showed a dynamic SEARCH MAPS field, 5,020 matches over 558 pages, and populated results. Parser query behavior was unit-tested; physical search-entry acceptance and optional XTest search are unverified. Texture identity/decode/GL upload was traced for a synthetic TGA but the captured frame did not visibly show the override. Off/Quality/Performance world probes passed on software GL at 1280x800; physical Deck performance is unmeasured. Full 128-player acceptance, live preset matches, Friends and voice remain unverified. [Release notes](releases/v0.2.9.3-steamdeck-rules/release-notes.md) and [native content guide](releases/v0.2.9-steamdeck-content/NATIVE-CONTENT.md).
 

@@ -6,9 +6,9 @@
   "single_executable": true,
   "binary_sha256": "e439a36aa08183cf4b27d4e869a5f6b0900c0f8286e9efc9a9aba7d9584f428c",
   "source_sha256": "edab21fdf0555428f840d369f55f1b56fba21a8c2d1eed6786f80e84e0c8ba47",
-  "deck_install_verified": null,
-  "running_process_binary_sha256": null,
-  "running_process_is_release_binary": null,
+  "deck_install_verified": true,
+  "running_process_binary_sha256": "e439a36aa08183cf4b27d4e869a5f6b0900c0f8286e9efc9a9aba7d9584f428c",
+  "running_process_is_release_binary": true,
   "network_host_profiles": [
     11,
     20,
@@ -78,8 +78,10 @@
       "sha256": "bfc7c9beb983af52c9f28926afec9fb0b6c517cbd0b90ed7c6cb439ba32a893d"
     },
     "release-notes.md": {
-      "bytes": 2060,
-      "sha256": "8f112deb50dd28cdf0c289fcccb1c53a05a01cabd60165f06fc87abd66485f9e"
+      "bytes": 2158,
+      "sha256": "91b371111f1721cb5d60b3b729a19e58605f6b07f4deef3e49c4bc5141d567a4"
     }
-  }
+  },
+  "deck_installed_binary_sha256": "e439a36aa08183cf4b27d4e869a5f6b0900c0f8286e9efc9a9aba7d9584f428c",
+  "rollback_binary": "halo.before-rules293-20261007-235940 (SHA-256 df8033147f53d9f9a632894e7c411889d8490eae6e4d38e97cbb819e80134717)"
 }
