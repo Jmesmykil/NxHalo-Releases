@@ -1,6 +1,6 @@
 # Nintendo Switch community preview build recipe
 
-This tree is the source used for the private Switch candidate NRO. The NRO embeds the matching Android-ABI guest ELF, a Mozilla CA bundle, and its MPL-2.0 license and source notice. It contains no Halo map assets, console keys, or `instructions.inc`.
+This tree contains the source for the Switch 2.9.4 co-op lifecycle preview NRO. The NRO embeds its matching Android-ABI guest ELF, a Mozilla CA bundle, and its MPL-2.0 license and source notice. It contains no Halo map assets, console keys, or `instructions.inc`.
 
 ## Prerequisites
 
@@ -38,7 +38,9 @@ cp build/android/halo_guest.elf port/switch/romfs/halo_guest.elf
 
 ## Preview status
 
-The 2.9.4 NRO was staged at `switch/NxHalo-Content29/halo.nro` on the identified SD volume, with the replaced file retained for rollback. The NRO has not been launched on Switch hardware, and gameplay has not been verified. No HOME-menu NSP forwarder was inspected or verified; this source package includes no NSP.
+The co-op lifecycle NRO is published as `v0.2.9.4-switch-coopfix1-preview`. It was staged and read back at `switch/NxHalo-Content29/halo.nro`; the prior file was retained for rollback. macOS declined to unmount the SD volume, which was left mounted. The NRO has not been launched on Switch hardware, and Switch gameplay has not been verified. No HOME-menu NSP forwarder was inspected or verified; this source package includes no NSP.
+
+The shared co-op lifecycle changes make host pause-menu Revert and Restart authoritative, return the host to the next-map lobby, and preserve the co-op player cap and friendly-fire setting across the transition. These changes cross-compiled for the Switch guest and host. Linux runtime evidence is documented in the separate Steam Deck release; it is not Switch runtime evidence.
 
 ## Trust roots
 

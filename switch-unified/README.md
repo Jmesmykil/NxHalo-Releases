@@ -64,16 +64,18 @@ Each platform has its own instructions:
 
 ### Nintendo Switch preview
 
-A separate NxHalo community preview is available as a standalone homebrew NRO.
+The NxHalo community Switch preview is available as a standalone homebrew NRO
+in [v0.2.9.4-switch-coopfix1-preview](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.4-switch-coopfix1-preview).
 It is not part of the OpenCE release downloads or its standard Linux, Windows,
 and Android CI builds. The NRO does not include Halo game maps, resource maps,
 console keys, or an NSP installer. See [BUILD-SWITCH.md](BUILD-SWITCH.md) for
 the Switch host/guest build recipe and the preview's acceptance limits.
 
-The 2.9.4 preview is staged on SD at
-`switch/NxHalo-Content29/halo.nro`. That is the standalone NRO path; a HOME-menu
-NSP forwarder target has not been established, and no Switch runtime launch or
-gameplay acceptance is claimed for this preview.
+The co-op lifecycle 2.9.4 preview was staged and read back at
+`switch/NxHalo-Content29/halo.nro`; safe unmount was declined and the volume was
+left mounted. That is the standalone NRO path; a HOME-menu NSP forwarder target
+has not been established, and no Switch runtime launch or gameplay acceptance
+is claimed for this preview.
 
 The Linux README also gives the controls, the settings and the multiplayer
 functions. These are almost the same on all platforms.
