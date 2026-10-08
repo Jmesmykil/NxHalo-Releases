@@ -6,7 +6,7 @@ Adds default-OFF compatible-native proximity voice with authenticated joined-pla
 
 Exact candidate passed a private Deck GPU multiplayer session with a native Linux peer. Two actual native clients passed generated-PCM capture-to-encrypted-transport-to-spatial-mixer testing with dummy audio and waveform analysis: 605 frames received/mapped, zero mapping drops, no sender loopback, and expiry after PTT release. Actual menu writes and fresh-process reload passed. No physical microphone or external audio was used.
 
-Retains confirmed controller fixes, map download/autojoin, match customization and co-op lifecycle fixes. Voice is still a foundation: physical microphone/human PTT, third-client fanout, persistent Friends, natural campaign completion, physical Switch acceptance and real 128-player capacity remain open. The mixer has 16 active stream slots; the tunnel rate budget is roughly five continuously transmitting speakers, not 128-person voice. [Release evidence](releases/v0.2.9.4-steamdeck-runtime-nativevoice1/release-notes.md).
+Retains confirmed controller fixes, map download/autojoin, match customization and co-op lifecycle fixes. Voice is still a foundation: physical microphone/human PTT, persistent Friends, natural campaign completion, physical Switch acceptance and real 128-player capacity remain open. The mixer has 16 active stream slots; the tunnel rate budget is roughly five continuously transmitting speakers, not 128-person voice. [Release evidence](releases/v0.2.9.4-steamdeck-runtime-nativevoice1/release-notes.md).
 
 ## Current additive releases
 
@@ -61,3 +61,6 @@ Keep your imported game data, saves and settings. Back up the SD game folder bef
 For a bug report, include the release version, map or mission, player count, wired or Wi-Fi connection and reproducible steps. Remove personal information from logs before posting. Do not upload game images, maps, executables, keys or saves.
 
 This is an independent community project and is not endorsed by the original game or console publishers.
+
+
+**Additional validation, October 8:** Three actual native campaign clients joined and remained alive. Host relayed 606 generated voice frames; the third client received and spatially mixed 596 with zero player-mapping drops. Both receivers passed waveform signal and PTT-expiry checks; the sender had no loopback. All six owned game/display processes exited cleanly. This is a private generated-PCM test, not physical microphone or capacity acceptance. [Metrics](releases/v0.2.9.4-steamdeck-runtime-nativevoice1/THREE-CLIENT-VOICE.json).
