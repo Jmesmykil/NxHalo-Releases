@@ -1,0 +1,70 @@
+{
+  "host": {
+    "baseline": {
+      "windows": 38,
+      "mean": 0.0025392424285713058,
+      "max": 0.011427850163979632
+    },
+    "voice": {
+      "windows": 94,
+      "mean": 0.0687025929888006,
+      "max": 0.13134403682379248
+    },
+    "after": {
+      "windows": 40,
+      "mean": 0.0037878678456234154,
+      "max": 0.04932915385887033
+    },
+    "last_voice_counter": "halo-linux: native voice: enabled=1 ptt=0 menus=0 host=1 roster=3 capture=0 sent=606 received=606 spatial=606 mapping_drop=0 mixed=558016"
+  },
+  "client": {
+    "baseline": {
+      "windows": 38,
+      "mean": 0.002326426978100768,
+      "max": 0.008890915381729626
+    },
+    "voice": {
+      "windows": 94,
+      "mean": 0.003079575101576828,
+      "max": 0.007744590986704394
+    },
+    "after": {
+      "windows": 40,
+      "mean": 0.0032352103208463994,
+      "max": 0.007580821731331172
+    },
+    "last_voice_counter": "halo-linux: native voice: enabled=1 ptt=0 menus=0 host=1 roster=0 capture=606 sent=606 received=0 spatial=0 mapping_drop=0 mixed=0"
+  },
+  "third": {
+    "baseline": {
+      "windows": 38,
+      "mean": 0.003618089384764061,
+      "max": 0.013250311131131641
+    },
+    "voice": {
+      "windows": 94,
+      "mean": 0.06074795070258538,
+      "max": 0.10211879583988935
+    },
+    "after": {
+      "windows": 38,
+      "mean": 0.005598003966936727,
+      "max": 0.04089586940487006
+    },
+    "last_voice_counter": "halo-linux: native voice: enabled=1 ptt=0 menus=0 host=1 roster=0 capture=0 sent=0 received=596 spatial=596 mapping_drop=0 mixed=554048"
+  },
+  "receiver_signal_pass": true,
+  "sender_no_loopback_pass": true,
+  "post_ptt_expiry_pass": true,
+  "exit": {
+    "x-host": 0,
+    "x-client": 0,
+    "x-third": 0,
+    "host": 0,
+    "client": 0,
+    "third": 0
+  },
+  "candidate_sha256": "4a083770b6920d2a1f7372ba701967bcf02b840e0d2c3e9bfe7d55bf646964c0",
+  "scope": "Three actual private native campaign clients, dummy audio, generated PCM; no physical microphone or external audio; all three living/gameplay advancing before PTT",
+  "transport_note": "606 frames host received/relayed; third received596. Mappingdrops0 onboth receivers; these counts do not establish lossless delivery orcapacity."
+}
