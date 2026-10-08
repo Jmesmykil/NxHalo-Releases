@@ -4151,7 +4151,7 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
     if(!selected_player) for(index=0;index<lobby_player_count;index++)
         if(lobby_players[index]->machine_index==lobby_selected_machine) { selected_player=lobby_players[index]; break; }
 
-	/* Session information, with the full map name and status kept readable. */
+	/* Show the received game variant, never the joining client's own preset. */
 	ui_overlay_rect(right, 88, right_width, 332, 7, 0x0B1B31F4);
 	ui_overlay_outline(right, 88, right_width, 332, 7, 1, 0x2E5F9FFF);
 	ui_overlay_text(UI_FONT_BOLD, 10, right + 14, 101, UI_ALIGN_LEFT, 0x85B8FFFF, "MATCH DETAILS");
@@ -4162,38 +4162,60 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
 	lobby_utf8(engine_names[PIN(game->variant.game_engine_index, 0, 5)], engine, sizeof(engine));
 	if (!title[0])
 		csstrncpy(title, engine, sizeof(title) - 1);
-	ui_overlay_text(UI_FONT_BOLD, 13, right + 14, 136, UI_ALIGN_LEFT, 0xF0F4FAFF, title);
-	snprintf(text, sizeof(text), "MODE  %s", engine);
-	ui_overlay_text(UI_FONT_REGULAR, 10, right + 14, 164, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
-	snprintf(text, sizeof(text), "MAP  %s", game->map.name);
-	ui_overlay_text(UI_FONT_REGULAR, 10, right + 14, 186, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
-	snprintf(text, sizeof(text), "CAPACITY  %d PLAYERS", game->maximum_players);
-	ui_overlay_text(UI_FONT_REGULAR, 10, right + 14, 208, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+	ui_overlay_text(UI_FONT_BOLD, 13, right + 14, 134, UI_ALIGN_LEFT, 0xF0F4FAFF, title);
+	snprintf(text, sizeof(text), "%s  |  %d PLAYERS", engine, game->maximum_players);
+	ui_overlay_text(UI_FONT_REGULAR, 9, right + 14, 159, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+	snprintf(text, sizeof(text), "MAP  %s", tag_name_strip_path(game->map.name));
+	ui_overlay_text(UI_FONT_REGULAR, 9, right + 14, 178, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+	if (game->variant.game_engine_index)
+	{
+		static char const *weapon_sets[] = { "Map weapons", "Pistols", "Assault rifles", "Plasma",
+			"Snipers", "No snipers", "Rockets", "Shotguns", "Short range", "Human",
+			"No grenades", "Covenant", "Classic", "Heavy" };
+		snprintf(text, sizeof(text), "%s  |  %.0f%% HEALTH  |  SCORE %ld",
+			game->variant.universal_variant.flags & FLAG(_game_variant_no_shields_bit) ? "NO SHIELDS" : "SHIELDS",
+			game->variant.universal_variant.health * 100.0f, game->variant.universal_variant.score_to_win);
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 200, UI_ALIGN_LEFT, 0xD9E8FFFF, text);
+		static char const *loadout_weapons[] = { "None", "Random", "AR", "Pistol", "Shotgun",
+			"Sniper", "Rockets", "Plasma pistol", "Plasma rifle", "Needler" };
+		static char const *friendly_fire[] = { "ON", "OFF", "SHIELDS ONLY", "EXPLOSIVES ONLY" };
+		if (!ustrncmp(game->variant.human_readable_game_description, L"Zombies", 7) ||
+			!ustrncmp(game->variant.human_readable_game_description, L"Infection", 9))
+			snprintf(text, sizeof(text), "INFECTED: MELEE  |  %s", weapon_sets[PIN(game->variant.universal_variant.weapon_set, 0, 13)]);
+		else if (game->variant_options.loadout == _loadout_custom)
+			snprintf(text, sizeof(text), "WEAPONS  %s / %s",
+				loadout_weapons[PIN(game->variant_options.primary_weapon, 0, 9)],
+				loadout_weapons[PIN(game->variant_options.secondary_weapon, 0, 9)]);
+		else
+			snprintf(text, sizeof(text), "WEAPONS  %s", weapon_sets[PIN(game->variant.universal_variant.weapon_set, 0, 13)]);
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 218, UI_ALIGN_LEFT, 0xD9E8FFFF, text);
+		if (game->variant_options.time_limit > 0)
+			snprintf(text, sizeof(text), "%d MIN  |  FRIENDLY FIRE %s", game->variant_options.time_limit,
+				friendly_fire[PIN(game->variant_options.friendly_fire, 0, NUMBER_OF_FRIENDLY_FIRE_MODES - 1)]);
+		else
+			snprintf(text, sizeof(text), "NO TIME LIMIT  |  FRIENDLY FIRE %s",
+				friendly_fire[PIN(game->variant_options.friendly_fire, 0, NUMBER_OF_FRIENDLY_FIRE_MODES - 1)]);
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 236, UI_ALIGN_LEFT, 0xD9E8FFFF, text);
+	}
 	if (seconds > 0)
 		snprintf(text, sizeof(text), "STARTING IN  %d SECONDS", seconds);
-	else if (game->machine_count < 2)
-		snprintf(text, sizeof(text), "WAITING FOR ANOTHER CONSOLE OR PLAYER");
 	else
-		snprintf(text, sizeof(text), "LOBBY OPEN  |  READY WHEN YOU ARE");
-	ui_overlay_rect(right + 12, 242, right_width - 24, 48, 5, 0x123266FF);
-	ui_overlay_text(UI_FONT_BOLD, 10, right + right_width / 2, 258, UI_ALIGN_CENTER, 0x87C6FFFF, text);
-	ui_overlay_text(UI_FONT_BOLD, 9, right + 14, 310, UI_ALIGN_LEFT, 0x85B8FFFF, "SELECTED PLAYER");
+		snprintf(text, sizeof(text), "LOBBY OPEN  |  WAITING FOR PLAYERS");
+	ui_overlay_rect(right + 12, 260, right_width - 24, 34, 5, 0x123266FF);
+	ui_overlay_text(UI_FONT_BOLD, 9, right + right_width / 2, 270, UI_ALIGN_CENTER, 0x87C6FFFF, text);
+	ui_overlay_text(UI_FONT_BOLD, 9, right + 14, 308, UI_ALIGN_LEFT, 0x85B8FFFF, "SELECTED PLAYER");
 	if (selected_player)
 	{
 		ustrncpy(wide, selected_player->name, NUMBEROF(wide) - 1);
 		wide[NUMBEROF(wide) - 1] = 0;
 		lobby_utf8(wide, title, sizeof(title));
 		ui_overlay_text(UI_FONT_BOLD, 11, right + 14, 328, UI_ALIGN_LEFT, 0xF0F4FAFF, title);
-		snprintf(text, sizeof(text), "PLAYER SLOT  %d", (int)selected_player->player_list_index + 1);
-		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 350, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
-		if (game->variant.universal_variant.teams)
-			snprintf(text, sizeof(text), "TEAM  %s", selected_player->team_index ? "BLUE" : "RED");
-		else
-			snprintf(text, sizeof(text), "TEAM  FREE-FOR-ALL");
-		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 368, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+		snprintf(text, sizeof(text), "PLAYER SLOT  %d  |  %s", (int)selected_player->player_list_index + 1,
+			game->variant.universal_variant.teams ? (selected_player->team_index ? "BLUE" : "RED") : "FREE-FOR-ALL");
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 351, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
 		snprintf(text, sizeof(text), "CONSOLE  %d  |  %s", (int)selected_player->machine_index + 1,
 			selected_player->machine_index == network_game_client_get_local_machine_index() ? "LOCAL" : "REMOTE");
-		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 386, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 373, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
 	}
 	else
 		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 333, UI_ALIGN_LEFT, 0xAFC4E0FF,
@@ -5179,6 +5201,18 @@ static boolean gametype_setup_apply(void)
 	return applied;
 }
 
+/* A mode choice made while Server Setup is already open must update its
+ * cached host copy now; earlier choices are applied when that copy begins. */
+static boolean gametype_setup_select_preset(short preset)
+{
+	if (!match_rules_preset_set(preset))
+		return FALSE;
+	if (gametype_edit.setup)
+		return match_rules_apply_variant_preset(
+			preset, &gametype_edit.setup_variant, &gametype_edit.setup_options);
+	return TRUE;
+}
+
 /* the game type row's: the gametype's name and type */
 static void gametype_setup_type(wchar_t *text)
 {
@@ -5661,13 +5695,14 @@ boolean pc_menu_event_function_invoke(
 			return profile_choose(controller);
 		}
 		else if (!strcmp(name, "port match preset")) {
-			char const *last=strrchr(widget->name,'_'); return last && match_rules_preset_set((short)atoi(last+1));
+			char const *last=strrchr(widget->name,'_');
+			return last && gametype_setup_select_preset((short)atoi(last+1));
 		}
 		else if (!strcmp(name, "port faction matchup")) {
 			char const *last=strrchr(widget->name,'_');
 			return last &&
 				match_rules_matchup_set((short)atoi(last+1)) &&
-				match_rules_preset_set(MATCH_RULES_PRESET_FACTION);
+				gametype_setup_select_preset(MATCH_RULES_PRESET_FACTION);
 		}
 		else if (!strcmp(name, "port character select")) {
 			extern boolean nxhalo_character_choice_set(boolean,long); char const *last=strrchr(widget->name,'_');
@@ -5874,12 +5909,18 @@ void pc_menu_game_data_function_invoke(
 		preview_update(widget);
 	else if (!strcmp(name, "port match status")) {
 			char line[512]; wchar_t text[512];
-			if (match_rules_preset_get() == MATCH_RULES_PRESET_FACTION)
-                snprintf(line,sizeof(line),"Selected: %s\r\n%.160s",match_rules_matchup_name(match_rules_matchup_get()),match_rules_status());
-            else
-                snprintf(line,sizeof(line),"Selected: %s\r\n%.160s",match_rules_preset_name(match_rules_preset_get()),match_rules_status());
+			char const *selected = match_rules_preset_get() == MATCH_RULES_PRESET_FACTION ?
+				match_rules_matchup_name(match_rules_matchup_get()) :
+				match_rules_preset_name(match_rules_preset_get());
+			if (gametype_edit.setup)
+				snprintf(line, sizeof(line), "Selected: %s\r\nApplied to current Server Setup.\r\n%.120s",
+					selected, match_rules_status());
+			else
+				snprintf(line, sizeof(line), "Selected: %s\r\nApplies in Server Setup after map and gametype selection.\r\n%.90s",
+					selected, match_rules_status());
 			text_to_wide(line,text,NUMBEROF(text));text_set_length(widget,text,NUMBEROF(text));return;
 		}
+
 		else if (!strcmp(name, "port character status")) {
 			extern long nxhalo_character_choice(boolean); extern char const *nxhalo_character_name(short);
 			boolean host=strstr(widget->name,"host_")!=NULL; char line[256]; wchar_t text[256];

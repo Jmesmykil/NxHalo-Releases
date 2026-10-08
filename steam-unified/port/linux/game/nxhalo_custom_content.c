@@ -225,45 +225,38 @@ long nxhalo_multiplayer_character_definition(long fallback_definition)
     return nxhalo_character_definition_for_context(TRUE, fallback_definition);
 }
 
-static long nxhalo_zombie_sword_definition(void)
+static long nxhalo_zombie_melee_weapon_definition(void)
 {
-	static char const * const tag_suffixes[] = {
-		"\\energy sword\\energy sword",
-		"\\energy sword\\energy_sword",
-		"\\energy_sword\\energy sword",
-		"\\energy_sword\\energy_sword",
-		"\\energy blade\\energy blade",
-		"\\energy blade\\energy_blade",
-		"\\energy_blade\\energy blade",
-		"\\energy_blade\\energy_blade"
+	static char const * const tag_paths[] = {
+		"weapons\\ball\\ball",
+		"weapons\\flag\\flag",
+		"weapons\\pistol\\pistol"
 	};
-	struct tag_iterator iterator;
-	long definition_index;
-	tag_iterator_new(&iterator, WEAPON_DEFINITION_TAG);
-	while ((definition_index = tag_iterator_next(&iterator)) != NONE)
+	short index;
+	for (index = 0; index < NUMBEROF(tag_paths); index++)
 	{
-		struct weapon_definition *definition = weapon_definition_get(definition_index);
-		short suffix;
-		if (definition->weapon.melee_attack_damage.index == NONE ||
-			definition->weapon.interface_definition.first_person_model.index == NONE ||
-			definition->weapon.interface_definition.first_person_animations.index == NONE ||
-			TEST_FLAG(definition->weapon.flags, _weapon_prevents_melee_attack_bit))
+		long definition_index = tag_loaded(WEAPON_DEFINITION_TAG, tag_paths[index]);
+		struct weapon_definition *definition;
+		if (definition_index == NONE)
 			continue;
-		for (suffix = 0; suffix < NUMBEROF(tag_suffixes); suffix++)
-			if (string_ends_with(tag_get_name(definition_index), tag_suffixes[suffix]))
-				return definition_index;
+		definition = weapon_definition_get(definition_index);
+		if (definition->weapon.melee_attack_damage.index != NONE &&
+			definition->weapon.interface_definition.first_person_model.index != NONE &&
+			definition->weapon.interface_definition.first_person_animations.index != NONE &&
+			!TEST_FLAG(definition->weapon.flags, _weapon_prevents_melee_attack_bit))
+			return definition_index;
 	}
 	return NONE;
 }
 
-boolean nxhalo_zombie_sword_available(void)
+boolean nxhalo_zombie_melee_weapon_available(void)
 {
-	return nxhalo_zombie_sword_definition() != NONE;
+	return nxhalo_zombie_melee_weapon_definition() != NONE;
 }
 
-boolean nxhalo_give_zombie_sword(long unit_index)
+boolean nxhalo_give_zombie_melee_weapon(long unit_index)
 {
-	long definition_index = nxhalo_zombie_sword_definition();
+	long definition_index = nxhalo_zombie_melee_weapon_definition();
 	long weapon_index;
 	short slot;
 	struct object_placement_data placement_data;

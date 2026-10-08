@@ -56,6 +56,8 @@ being hit looks and feels like on the clients).
 #include "scenario/scenario.h"
 #include "units/units.h"
 #include "network_distributed.h"
+#include "match_rules.h" /* infected players cannot deal ranged/grenade/collision damage */
+#include "match_rules_melee.h"
 #include "halo_network_profile.h"
 
 #include <math.h>
@@ -1823,6 +1825,8 @@ static boolean distributed_report_valid(
 	{
 		return FALSE;
 	}
+	if (!match_rules_infected_damage_allowed(match_rules_player_melee_only(player_index), melee))
+		return FALSE;
 	/* ... no harder than it can be (all of it, but an airborne melee
 	blow's) */
 	if (!(report->damage.scale >= 0.0f && report->damage.scale <= (melee ? REPORT_MAXIMUM_MELEE_SCALE : 1.0f)))

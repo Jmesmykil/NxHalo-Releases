@@ -4619,6 +4619,7 @@ void players_update_before_game(
 					control_data.zoom_level = action->desired_zoom_level;
 					control_data.aiming_speed = 0;
 
+					match_rules_filter_player_control(iterator.datum_index, &control_data);
 					match_assert(
 						"c:\\halo\\SOURCE\\game\\players.c",
 						0x2E3,

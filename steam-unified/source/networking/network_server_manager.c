@@ -1434,7 +1434,7 @@ static void network_game_server_list(
 	struct network_game *game = &server->game;
 	short state = network_game_server_get_state(server, NULL);
 	char name[NUMBEROF(game->name) + 1];
-	char gametype[NUMBEROF(game->variant.human_readable_game_description) + 1];
+	char gametype[25]; /* public listing: 24 characters plus terminator */
 	boolean in_progress = state != _network_game_server_state_pregame || network_game_server_game_is_loading(server);
 	boolean open = state == _network_game_server_state_ingame ? network_game_server_accepts_late_joins(server) :
 		network_game_server_game_is_open(server) && network_game_has_free_player_slot(game);
@@ -1449,6 +1449,20 @@ static void network_game_server_list(
 		size_t length = strlen(gametype);
 
 		snprintf(gametype + length, sizeof(gametype) - length, " %s", difficulty_names[game->difficulty]);
+	}
+	/* Advertise the actual variant, so clients can recognize custom rules
+	without changing the signed lobby protocol or replacing the host name. */
+	if (game->variant.game_engine_index)
+	{
+		size_t length = strlen(gametype);
+		if (game->variant.universal_variant.flags & FLAG(_game_variant_no_shields_bit))
+		{
+			snprintf(gametype + length, sizeof(gametype) - length, " NS");
+			length = strlen(gametype);
+		}
+		if (game->variant.universal_variant.health != 1.0f)
+			snprintf(gametype + length, sizeof(gametype) - length, " %.0f%%HP",
+				game->variant.universal_variant.health * 100.0f);
 	}
 	/* (the scenario's name, not its path: the listing has 32 characters) */
 	p2p_set_game_listing(name, tag_name_strip_path(game->map.name), gametype, game->variant.game_engine_index, open,

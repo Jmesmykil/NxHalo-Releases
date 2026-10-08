@@ -1,0 +1,85 @@
+{
+  "name": "NxHalo Unified Rules Preview 2.9.3",
+  "tag": "v0.2.9.3-steamdeck-rules",
+  "prerelease": true,
+  "platform": "Steam Deck/Linux",
+  "single_executable": true,
+  "binary_sha256": "e439a36aa08183cf4b27d4e869a5f6b0900c0f8286e9efc9a9aba7d9584f428c",
+  "source_sha256": "edab21fdf0555428f840d369f55f1b56fba21a8c2d1eed6786f80e84e0c8ba47",
+  "deck_install_verified": null,
+  "running_process_binary_sha256": null,
+  "running_process_is_release_binary": null,
+  "network_host_profiles": [
+    11,
+    20,
+    21
+  ],
+  "game_data_included": false,
+  "previous_releases": [
+    "v0.2.9-steamdeck-content",
+    "v0.2.9.1-steamdeck-content",
+    "v0.2.9.2-steamdeck-menus"
+  ],
+  "source_archive_entries": 2251,
+  "acceptance": {
+    "production_32bit_build": true,
+    "preset_application_harness": true,
+    "client_host_mode_guard": true,
+    "replicated_lobby_fields": [
+      "shields",
+      "health",
+      "score",
+      "weapon_category",
+      "time_limit",
+      "friendly_fire"
+    ],
+    "public_listing_fields": [
+      "custom_mode_name",
+      "NS",
+      "HP"
+    ],
+    "zombies_stock_sequence": [
+      "Oddball",
+      "Flag",
+      "pistol"
+    ],
+    "infected_melee_only_host_enforced": true,
+    "failed_loadout_preserves_inventory": true,
+    "final_cached_preset_ui_test": "TeamSWAT; private config 0 to 2; Selected SWAT and Applied current Server Setup shown; keyboard/XTest path passed",
+    "final_short_status_text_capture": false,
+    "real_controller_input_tested": false,
+    "populated_lobby_display_tested": false,
+    "old_client_skull_objective_tested": false,
+    "deck_network_debug_observed_24_players": true,
+    "game_maps_included": false
+  },
+  "excluded_content": [
+    "game maps",
+    "owner resource companions",
+    "shader instruction tokens",
+    "console keys",
+    "personal saves"
+  ],
+  "assets": {
+    "NxHalo-SteamDeck-unified-content-preview2.9.3.tar.gz": {
+      "bytes": 22119629,
+      "sha256": "a18c55fcb0d9ddc024962a11af5b0db8a60d3cff1f414f15a31e940d0c65d450"
+    },
+    "NxHalo-Unified-source-2.9.3.zip": {
+      "bytes": 17892684,
+      "sha256": "edab21fdf0555428f840d369f55f1b56fba21a8c2d1eed6786f80e84e0c8ba47"
+    },
+    "NATIVE-CONTENT.md": {
+      "bytes": 3308,
+      "sha256": "783c086c08170ef1ab845a385d5ab67e64d4e7673cc2055491dd5167180255a4"
+    },
+    "SUPPORTED-MODS.md": {
+      "bytes": 2211,
+      "sha256": "bfc7c9beb983af52c9f28926afec9fb0b6c517cbd0b90ed7c6cb439ba32a893d"
+    },
+    "release-notes.md": {
+      "bytes": 2060,
+      "sha256": "8f112deb50dd28cdf0c289fcccb1c53a05a01cabd60165f06fc87abd66485f9e"
+    }
+  }
+}
