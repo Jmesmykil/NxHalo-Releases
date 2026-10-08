@@ -4,7 +4,7 @@ NxHalo is a native Halo: Combat Evolved port with separate Nintendo Switch and S
 
 ## Current builds
 
-**Newest Switch candidate: Unified Content Preview 2.9 / v0.2.9-switch-content (pre-release).** The [candidate release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9-switch-content) contains a standalone NRO and final sanitized source/build records. NRO SHA-256: `2a60465f0c928ed8007bfbe4e5b6fce7c1bad2c6713261515fb5e1158523d646`. The NRO and source builds completed, but the NRO was staged to the identified SD card and hash-verified, but no HOME-menu install or Switch runtime test was performed. It uses the existing title ID (`010048414C210000`), so keep a prior NRO for rollback. SD message-box browsing for map/ZIP and texture-pack folders is compiled in; Deck-only upscaling is disabled in the Switch guest. No game maps, resources, keys or saves are included.
+**Newest Switch candidate: Unified Content Preview 2.9.4 / v0.2.9.4-switch-content-preview (pre-release).** The [candidate release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.4-switch-content-preview) contains a standalone NRO, sanitized source and build records. NRO SHA-256: `95146cf80828d3c7da2b450a7c677b2ce79caab03acfe72b456d35945aa5404b`. The NRO was staged at `sdmc:/switch/NxHalo-Content29/halo.nro` on an identified SD card, read back by hash and safely ejected. It has **not** been launched on Switch hardware. This is a Homebrew Menu NRO: it is not an NSP, has no DBI installer or HOME-menu forwarder, and does not create a HOME icon. For game data, provide your own compatible Halo CE data under `sdmc:/switch/halo/`, including its `maps/` directory; the preview recognizes data builds `01.01.14.2342` and `01.10.12.2276`. Saves are written under `sdmc:/switch/halo/save-community24/`. No game maps, resources, keys or saves are included in the release.
 
 **Previous unified Switch candidate: Preview 2.8 / v0.2.8-switch-unified8 (pre-release).** The [candidate release](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.8-switch-unified8) provides a standalone NRO and matching source/build records. NRO SHA-256: `5b18c2b201ee6ab62785911f307197bd7ba13543f6be64161f82b86c2013e376`. This candidate has not been staged through UMS or installed/run on physical Switch hardware; hardware acceptance is unverified. It uses the same title ID (`010048414C210000`) as Profile33, so retain the Profile33 NRO separately for rollback. It is not an NSP and includes no full-memory title override. Game data is read from `sdmc:/switch/halo` when the candidate has no usable `romfs:/maps/ui.map`; saves use `sdmc:/switch/halo/save-community24`. No game maps, resources, keys or saves are included. See [`switch-unified/BUILD-SWITCH.md`](switch-unified/BUILD-SWITCH.md).
 
@@ -26,9 +26,9 @@ Campaign, multiplayer, all-community, current/legacy native versions, broker and
 
 ## Play with your own game
 
-1. Download the setup app from [Releases](https://github.com/Jmesmykil/NxHalo-Releases/releases).
-2. Run the importer with your own compatible original Xbox Halo image or extracted game folder and select your mounted Switch SD root. It prepares the required game data locally.
-3. Install the Switch runtime through DBI and launch Halo CE from HOME. Profile33 is a separate title from Build14; keep Build14 installed if you want the stable rollback available.
+1. Download the setup app from [Releases](https://github.com/Jmesmykil/NxHalo-Releases/releases), then use it with your own compatible original Xbox Halo image or extracted game folder.
+2. For the Switch preview, put the compatible game data on the SD card under `switch/halo/` with its `maps/` directory. Copy the standalone NRO to `switch/NxHalo-Content29/halo.nro` and launch it from Homebrew Menu. DBI and HOME-menu installation do not apply to this NRO.
+3. The Switch preview writes saves under `switch/halo/save-community24/`. Keep backups of existing game data and previous NROs. Build14 and Profile33 remain separate releases.
 
 The Switch must already be configured to run this homebrew title. Setup apps are available for **Windows x64** and **Apple Silicon macOS**. These preview apps are unsigned. Other computers can use the importer source with Python 3.10 or newer with Tk. Halo PC, Custom Edition, Anniversary, MCC and Switch 2 are outside the Switch release.
 
