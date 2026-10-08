@@ -776,6 +776,8 @@ static void network_game_server_remove_players_gone_while_loading(
 /* port: the map for the next co-op round after a win
 (network_game_server_port_cooperative_won); empty when there is none */
 static char network_game_server_cooperative_next_map[sizeof(((struct network_game *)NULL)->map.name)];
+static short network_game_server_cooperative_next_maximum_players;
+static short network_game_server_cooperative_next_friendly_fire;
 
 struct network_game_server network_game_server_memory_do_not_use_directly;
 boolean network_game_server_memory_do_not_use_directly_in_use = FALSE;
@@ -1279,6 +1281,8 @@ void network_game_server_dispose(
 
 	/* port: a won co-op round's next level belongs to this server alone */
 	network_game_server_cooperative_next_map[0] = 0;
+	network_game_server_cooperative_next_maximum_players = 0;
+	network_game_server_cooperative_next_friendly_fire = 0;
 
 	switch (server->state)
 	{
@@ -4004,6 +4008,9 @@ void network_game_server_port_cooperative_won(
 	csstrncpy(network_game_server_cooperative_next_map, next_map ? next_map : server->game.map.name,
 		sizeof(network_game_server_cooperative_next_map) - 1);
 	network_game_server_cooperative_next_map[sizeof(network_game_server_cooperative_next_map) - 1] = 0;
+	/* Capture the chosen limits before playlist setup replaces them. */
+	network_game_server_cooperative_next_maximum_players = server->game.maximum_players;
+	network_game_server_cooperative_next_friendly_fire = server->game.variant_options.friendly_fire;
 	network_game_server_switch_to_postgame(server);
 	/* Back to the lobby at once, with the next level set up there to start
 	or change. Multiplayer leaves the postgame when the host presses a button
@@ -4019,7 +4026,7 @@ static void network_game_server_cooperative_round(
 	struct network_game_server *server)
 {
 	struct game_variant variant;
-	short friendly_fire = server->game.variant_options.friendly_fire;
+	short friendly_fire = network_game_server_cooperative_next_friendly_fire;
 
 	if (!network_game_server_cooperative_next_map[0])
 		return;
@@ -4030,11 +4037,15 @@ static void network_game_server_cooperative_round(
 	network_game_server_variant_options(&server->game.variant, &server->game.variant_options);
 	/* (Server Setup's FRIENDLY FIRE, for every level of the game) */
 	server->game.variant_options.friendly_fire = friendly_fire;
+	if (network_game_server_cooperative_next_maximum_players > 0)
+		server->game.maximum_players = MIN(network_game_server_cooperative_next_maximum_players, MAXIMUM_NETWORK_PLAYER_COUNT);
 	csstrncpy(server->game.map.name, network_game_server_cooperative_next_map, sizeof(server->game.map.name) - 1);
 	server->game.map.name[sizeof(server->game.map.name) - 1] = 0;
 	main_set_multiplayer_map_name(server->game.map.name);
 	server->game.maximum_teams = 1;
 	network_game_server_cooperative_next_map[0] = 0;
+	network_game_server_cooperative_next_maximum_players = 0;
+	network_game_server_cooperative_next_friendly_fire = 0;
 }
 
 void network_game_server_port_set_cooperative(

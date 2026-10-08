@@ -661,6 +661,7 @@ struct widget_instance;
 #include "networking/network_client_manager.h"
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
+#include "networking/network_game_manager.h"
 #include "networking/network_server_manager.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "rasterizer/rasterizer.h"
@@ -4645,10 +4646,20 @@ void network_game_reset_to_pregame_ui(
 	{
 		if (global_network_game_server_get())
 		{
+			struct network_game *game = network_game_get_game();
+			char const *screen = "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper";
+
+			/* The network campaign already selected its next mission. Keep
+			that map and the connected players in the lobby; the multiplayer
+			picker would show the previous campaign map. The host still
+			chooses when to start the next mission. */
+			if (game && !game->variant.game_engine_index && game->difficulty >= 0 && game->difficulty < 4)
+				screen = "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen";
+
 			network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
 			/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */
 			if (!ui_widget_load_by_name_or_tag(
-				pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper"),
+				pc_menus_screen(screen),
 				NONE, NULL, NONE, NONE, NONE, NONE))
 			{
 				error(_error_silent, "failed to load map select postgame screen");

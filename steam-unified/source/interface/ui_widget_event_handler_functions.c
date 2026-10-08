@@ -2024,8 +2024,9 @@ static boolean pause_game_restart_at_checkpoint(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	/* port: in co-op this would revert only this machine */
-	if (network_coop_active())
+	/* The host main-loop revert restamps its clock and resends the saved
+	state to every co-op client. A remote client cannot choose a checkpoint. */
+	if (network_coop_active() && game_connection() != _game_connection_network_server)
 		return FALSE;
 	main_revert_map();
 	return TRUE;
@@ -2036,9 +2037,16 @@ static boolean pause_game_restart_level(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	/* port: in co-op this would restart only this machine */
+	/* A host restart uses the synchronized round transition on the same
+	mission, without marking that mission completed in the player profile.
+	The connected lobby lets the host start when everyone is ready. */
 	if (network_coop_active())
-		return FALSE;
+	{
+		if (game_connection() != _game_connection_network_server)
+			return FALSE;
+		network_game_server_port_cooperative_won(NULL);
+		return TRUE;
+	}
 	main_reset_map();
 	return TRUE;
 }
