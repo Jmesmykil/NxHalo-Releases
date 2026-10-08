@@ -383,8 +383,7 @@ These are the differences from the Xbox:
 - In campaign and in games of up to 16 players, the game removes garbage
   (bodies, dropped weapons) as on the Xbox. In larger games, it keeps more
   garbage, in proportion to the players.
-- The lobby shows the local machine and the first three remote machines.
-  The other machines are also in the game.
+- The lobby roster pages through remote machines, so entries beyond the first three are visible. A 128-slot UI check displayed and selected the final entry using 127 synthetic peers; this does not establish 128 real clients or a 128-player match.
 - In free-for-all games, each player is a team.
 
 Linux, Windows and Android machines can play in the same game. Each machine

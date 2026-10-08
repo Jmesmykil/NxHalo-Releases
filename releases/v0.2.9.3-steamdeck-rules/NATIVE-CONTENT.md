@@ -2,7 +2,7 @@
 
 ## Find maps in game
 
-Open **Custom Maps & Mods > Search / Download Community Maps**. Search the map name, move between pages, and select a map to download. The catalog uses HaloNet's live CE listing, caches it locally and shows installed maps. Download and validation failures appear in the status line. The catalog contains thousands of CE campaign and multiplayer entries; listing a map does not establish that every engine extension it uses is supported.
+Open **Custom Maps & Mods > Custom Maps > Browse**. Search the map name, move between pages, and select a map to download. The catalog uses HaloNet's live CE listing, caches it locally and shows installed maps. Download and validation failures appear in the status line. The catalog contains thousands of CE campaign and multiplayer entries; listing a map does not establish that every engine extension it uses is supported.
 
 Supply your own compatible CE bitmaps.map, sounds.map and loc.map through the local importer. Resource files and downloaded game maps are not included in releases.
 
