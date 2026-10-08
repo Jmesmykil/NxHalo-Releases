@@ -207,6 +207,15 @@ typedef char verify_widget_instance_number_of_items_offset[
 typedef char verify_widget_instance_animation_offset[
 	offsetof(struct widget_instance, animation) == 0x50 ? 1 : -1];
 
+static boolean content_widget_named(struct widget_instance const *widget, char const *name)
+{
+	return widget && widget->name && name && !strcmp(widget->name, name);
+}
+
+static boolean content_widget_name_starts_with(struct widget_instance const *widget, char const *prefix)
+{
+	return widget && widget->name && prefix && !strncmp(widget->name, prefix, strlen(prefix));
+}
 /* menu_tags.c's */
 struct pc_menu_setting
 {
@@ -2191,6 +2200,8 @@ static void text_field_begin_masked(struct widget_instance *row, char const *tex
 	text_field.masked = TRUE;
 }
 
+static void content_catalog_search_done(char const *text) { extern void content_setup_catalog_set_query(const char *); content_setup_catalog_set_query(text); }
+
 static void text_field_end(boolean keep)
 {
 	void (*done)(char const *text) = text_field.done;
@@ -2269,6 +2280,8 @@ enum { SERVER_VIEW_ALL, SERVER_VIEW_CAMPAIGN, SERVER_VIEW_MULTIPLAYER, SERVER_VI
 static char map_ready_invite[96];
 static char map_download_invite[96];
 static short map_download_controller;
+static char map_download_map[256];
+static boolean map_download_retry_pending;
 static short server_view = SERVER_VIEW_CAMPAIGN;
 static boolean campaign_host_selected;
 
@@ -2277,6 +2290,11 @@ static void multiplayer_mode_set(struct widget_instance *widget)
 	char const *name = widget->name;
 	campaign_host_selected = strstr(name,"create_campaign") != NULL;
 	network_profile_clear_room();
+	/* Campaign setup opts into a co-op-capable profile for this host only. */
+	if (campaign_host_selected)
+		network_profile_set_host_override(21);
+	else
+		network_profile_clear_host_override();
 	server_view = strstr(name, "join_classic_ce") ? SERVER_VIEW_CLASSIC_CE :
 		strstr(name, "join_classic_pc") ? SERVER_VIEW_CLASSIC_PC :
 		strstr(name, "join_legacy") ? SERVER_VIEW_LEGACY :
@@ -3202,6 +3220,38 @@ static struct
 	boolean password_joined;
 } lobby_browser;
 
+/* Download the authoritative rotated map and retain the same room invite.
+ * The browser only retries after that room advertises this exact map. */
+boolean pc_menu_queue_rotated_map_download(char const *map_name)
+{
+	extern char const *cache_files_map_directory(void);
+	char file[64], target[512];
+	short family = map_family_parse(map_name, file, sizeof(file));
+	int index;
+	if (family != _map_family_custom_edition || !file[0] || map_download_retry_pending)
+		return FALSE;
+	for (index = 0; index < lobby_browser.count; index++)
+	{
+		if (!memcmp(lobby_browser.games[index].identifier, lobby_browser.identifier, sizeof(lobby_browser.identifier)) &&
+			lobby_browser.games[index].invite[0])
+		{
+			char const *directory = cache_files_map_directory();
+			int length = snprintf(target, sizeof(target), "%sce\\%s.map", directory, file);
+			if (length < 0 || (size_t)length >= sizeof(target) ||
+				!community_map_download_start(file, target))
+				return FALSE;
+			csstrncpy(map_download_invite, lobby_browser.games[index].invite, sizeof(map_download_invite));
+			map_download_invite[sizeof(map_download_invite) - 1] = 0;
+			csstrncpy(map_download_map, map_name, sizeof(map_download_map));
+			map_download_map[sizeof(map_download_map) - 1] = 0;
+			map_download_controller = lobby_browser.controller;
+			map_download_retry_pending = TRUE;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 static void lobby_browser_begin(void)
 {
 	lobby_browser.count = 0;
@@ -3219,7 +3269,8 @@ static void lobby_browser_begin(void)
 /* "gamespy screen dispose" */
 static void lobby_browser_end(void)
 {
-	map_download_invite[0]=0;
+	if (!map_download_retry_pending)
+		map_download_invite[0] = 0;
 	lobby_browser.joining = lobby_browser.ready = FALSE;
 	p2p_lobby_browse(FALSE);
 }
@@ -3357,14 +3408,43 @@ static void lobby_browser_update(struct widget_instance *list)
 	lobby_browser.count = lobby_browser_collect();
 	{
 		char progress[256]; int state=community_map_download_status(progress,sizeof(progress));
-		if (map_download_invite[0] && state==COMMUNITY_MAP_DOWNLOAD_READY) {
-			short chosen=lobby_browser.chosen; boolean same=chosen>=0 && chosen<lobby_browser.count && !strcmp(lobby_browser.games[chosen].invite,map_download_invite);
-			csstrncpy(map_ready_invite,map_download_invite,sizeof(map_ready_invite)-1);
-			community_map_download_clear(); map_download_invite[0]=0; ui_widget_port_multiplayer_maps_refresh();
-			if (same && ui_map_list_preflight(lobby_browser.games[chosen].map)) ui_widget_port_post_button(map_download_controller,BUTTON_A);
-            else { map_ready_invite[0]=0; network_profile_clear_room(); }
+		if (map_download_retry_pending && state==COMMUNITY_MAP_DOWNLOAD_READY) {
+			short room = NONE, index;
+			for (index = 0; index < lobby_browser.count; index++)
+				if (!strcmp(lobby_browser.games[index].invite, map_download_invite)) { room = index; break; }
+			if (room != NONE && _stricmp(lobby_browser.games[room].map, map_download_map)) {
+				char file[64];
+				short family=map_family_parse(lobby_browser.games[room].map,file,sizeof(file));
+				if (ui_map_list_family_present(family,file)) {
+					csstrncpy(map_download_map,lobby_browser.games[room].map,sizeof(map_download_map));
+					map_download_map[sizeof(map_download_map)-1]=0;
+				} else {
+					community_map_download_clear();
+					map_download_retry_pending=FALSE;
+					if (!pc_menu_queue_rotated_map_download(lobby_browser.games[room].map)) {
+						map_download_invite[0]=map_download_map[0]=0;
+						network_profile_clear_room();
+					}
+					state=COMMUNITY_MAP_DOWNLOAD_IDLE;
+				}
+			}
+			if (state==COMMUNITY_MAP_DOWNLOAD_READY && room != NONE && !_stricmp(lobby_browser.games[room].map, map_download_map)) {
+				csstrncpy(map_ready_invite, map_download_invite, sizeof(map_ready_invite)-1);
+				community_map_download_clear();
+				map_download_invite[0] = map_download_map[0] = 0;
+				map_download_retry_pending = FALSE;
+				ui_widget_port_multiplayer_maps_refresh();
+				lobby_browser.chosen = room;
+				if (ui_map_list_preflight(lobby_browser.games[room].map))
+					ui_widget_port_post_button(map_download_controller, BUTTON_A);
+				else { map_ready_invite[0] = 0; network_profile_clear_room(); }
+			}
 		}
-		else if (state==COMMUNITY_MAP_DOWNLOAD_FAILED) { map_download_invite[0]=0; network_profile_clear_room(); }
+		else if (state==COMMUNITY_MAP_DOWNLOAD_FAILED && map_download_retry_pending) {
+			map_download_invite[0] = map_download_map[0] = 0;
+			map_download_retry_pending = FALSE;
+			network_profile_clear_room();
+		}
 	}
 
 	if (focused == BROWSER_ROWS - 1 && lobby_browser.first + BROWSER_ROWS < lobby_browser.count)
@@ -3623,6 +3703,9 @@ static boolean lobby_browser_select(struct widget_instance *widget, short contro
 			if (community_map_download_start(file,target)) {
 				csstrncpy(map_download_invite,game->invite,sizeof(map_download_invite)-1); map_download_invite[sizeof(map_download_invite)-1]=0;
 				map_download_controller=controller;
+				csstrncpy(map_download_map,game->map,sizeof(map_download_map));
+				map_download_map[sizeof(map_download_map)-1]=0;
+				map_download_retry_pending=TRUE;
 			}
 			return TRUE;
 		}
@@ -4073,7 +4156,7 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
     if(!selected_player) for(index=0;index<lobby_player_count;index++)
         if(lobby_players[index]->machine_index==lobby_selected_machine) { selected_player=lobby_players[index]; break; }
 
-	/* Session information, with the full map name and status kept readable. */
+	/* Show the received game variant, never the joining client's own preset. */
 	ui_overlay_rect(right, 88, right_width, 332, 7, 0x0B1B31F4);
 	ui_overlay_outline(right, 88, right_width, 332, 7, 1, 0x2E5F9FFF);
 	ui_overlay_text(UI_FONT_BOLD, 10, right + 14, 101, UI_ALIGN_LEFT, 0x85B8FFFF, "MATCH DETAILS");
@@ -4084,38 +4167,60 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
 	lobby_utf8(engine_names[PIN(game->variant.game_engine_index, 0, 5)], engine, sizeof(engine));
 	if (!title[0])
 		csstrncpy(title, engine, sizeof(title) - 1);
-	ui_overlay_text(UI_FONT_BOLD, 13, right + 14, 136, UI_ALIGN_LEFT, 0xF0F4FAFF, title);
-	snprintf(text, sizeof(text), "MODE  %s", engine);
-	ui_overlay_text(UI_FONT_REGULAR, 10, right + 14, 164, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
-	snprintf(text, sizeof(text), "MAP  %s", game->map.name);
-	ui_overlay_text(UI_FONT_REGULAR, 10, right + 14, 186, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
-	snprintf(text, sizeof(text), "CAPACITY  %d PLAYERS", game->maximum_players);
-	ui_overlay_text(UI_FONT_REGULAR, 10, right + 14, 208, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+	ui_overlay_text(UI_FONT_BOLD, 13, right + 14, 134, UI_ALIGN_LEFT, 0xF0F4FAFF, title);
+	snprintf(text, sizeof(text), "%s  |  %d PLAYERS", engine, game->maximum_players);
+	ui_overlay_text(UI_FONT_REGULAR, 9, right + 14, 159, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+	snprintf(text, sizeof(text), "MAP  %s", tag_name_strip_path(game->map.name));
+	ui_overlay_text(UI_FONT_REGULAR, 9, right + 14, 178, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+	if (game->variant.game_engine_index)
+	{
+		static char const *weapon_sets[] = { "Map weapons", "Pistols", "Assault rifles", "Plasma",
+			"Snipers", "No snipers", "Rockets", "Shotguns", "Short range", "Human",
+			"No grenades", "Covenant", "Classic", "Heavy" };
+		snprintf(text, sizeof(text), "%s  |  %.0f%% HEALTH  |  SCORE %ld",
+			game->variant.universal_variant.flags & FLAG(_game_variant_no_shields_bit) ? "NO SHIELDS" : "SHIELDS",
+			game->variant.universal_variant.health * 100.0f, game->variant.universal_variant.score_to_win);
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 200, UI_ALIGN_LEFT, 0xD9E8FFFF, text);
+		static char const *loadout_weapons[] = { "None", "Random", "AR", "Pistol", "Shotgun",
+			"Sniper", "Rockets", "Plasma pistol", "Plasma rifle", "Needler" };
+		static char const *friendly_fire[] = { "ON", "OFF", "SHIELDS ONLY", "EXPLOSIVES ONLY" };
+		if (!ustrncmp(game->variant.human_readable_game_description, L"Zombies", 7) ||
+			!ustrncmp(game->variant.human_readable_game_description, L"Infection", 9))
+			snprintf(text, sizeof(text), "INFECTED: MELEE  |  %s", weapon_sets[PIN(game->variant.universal_variant.weapon_set, 0, 13)]);
+		else if (game->variant_options.loadout == _loadout_custom)
+			snprintf(text, sizeof(text), "WEAPONS  %s / %s",
+				loadout_weapons[PIN(game->variant_options.primary_weapon, 0, 9)],
+				loadout_weapons[PIN(game->variant_options.secondary_weapon, 0, 9)]);
+		else
+			snprintf(text, sizeof(text), "WEAPONS  %s", weapon_sets[PIN(game->variant.universal_variant.weapon_set, 0, 13)]);
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 218, UI_ALIGN_LEFT, 0xD9E8FFFF, text);
+		if (game->variant_options.time_limit > 0)
+			snprintf(text, sizeof(text), "%d MIN  |  FRIENDLY FIRE %s", game->variant_options.time_limit,
+				friendly_fire[PIN(game->variant_options.friendly_fire, 0, NUMBER_OF_FRIENDLY_FIRE_MODES - 1)]);
+		else
+			snprintf(text, sizeof(text), "NO TIME LIMIT  |  FRIENDLY FIRE %s",
+				friendly_fire[PIN(game->variant_options.friendly_fire, 0, NUMBER_OF_FRIENDLY_FIRE_MODES - 1)]);
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 236, UI_ALIGN_LEFT, 0xD9E8FFFF, text);
+	}
 	if (seconds > 0)
 		snprintf(text, sizeof(text), "STARTING IN  %d SECONDS", seconds);
-	else if (game->machine_count < 2)
-		snprintf(text, sizeof(text), "WAITING FOR ANOTHER CONSOLE OR PLAYER");
 	else
-		snprintf(text, sizeof(text), "LOBBY OPEN  |  READY WHEN YOU ARE");
-	ui_overlay_rect(right + 12, 242, right_width - 24, 48, 5, 0x123266FF);
-	ui_overlay_text(UI_FONT_BOLD, 10, right + right_width / 2, 258, UI_ALIGN_CENTER, 0x87C6FFFF, text);
-	ui_overlay_text(UI_FONT_BOLD, 9, right + 14, 310, UI_ALIGN_LEFT, 0x85B8FFFF, "SELECTED PLAYER");
+		snprintf(text, sizeof(text), "LOBBY OPEN  |  WAITING FOR PLAYERS");
+	ui_overlay_rect(right + 12, 260, right_width - 24, 34, 5, 0x123266FF);
+	ui_overlay_text(UI_FONT_BOLD, 9, right + right_width / 2, 270, UI_ALIGN_CENTER, 0x87C6FFFF, text);
+	ui_overlay_text(UI_FONT_BOLD, 9, right + 14, 308, UI_ALIGN_LEFT, 0x85B8FFFF, "SELECTED PLAYER");
 	if (selected_player)
 	{
 		ustrncpy(wide, selected_player->name, NUMBEROF(wide) - 1);
 		wide[NUMBEROF(wide) - 1] = 0;
 		lobby_utf8(wide, title, sizeof(title));
 		ui_overlay_text(UI_FONT_BOLD, 11, right + 14, 328, UI_ALIGN_LEFT, 0xF0F4FAFF, title);
-		snprintf(text, sizeof(text), "PLAYER SLOT  %d", (int)selected_player->player_list_index + 1);
-		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 350, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
-		if (game->variant.universal_variant.teams)
-			snprintf(text, sizeof(text), "TEAM  %s", selected_player->team_index ? "BLUE" : "RED");
-		else
-			snprintf(text, sizeof(text), "TEAM  FREE-FOR-ALL");
-		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 368, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+		snprintf(text, sizeof(text), "PLAYER SLOT  %d  |  %s", (int)selected_player->player_list_index + 1,
+			game->variant.universal_variant.teams ? (selected_player->team_index ? "BLUE" : "RED") : "FREE-FOR-ALL");
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 351, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
 		snprintf(text, sizeof(text), "CONSOLE  %d  |  %s", (int)selected_player->machine_index + 1,
 			selected_player->machine_index == network_game_client_get_local_machine_index() ? "LOCAL" : "REMOTE");
-		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 386, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
+		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 373, UI_ALIGN_LEFT, 0xB8C9DFFF, text);
 	}
 	else
 		ui_overlay_text(UI_FONT_REGULAR, 8, right + 14, 333, UI_ALIGN_LEFT, 0xAFC4E0FF,
@@ -5101,6 +5206,18 @@ static boolean gametype_setup_apply(void)
 	return applied;
 }
 
+/* A mode choice made while Server Setup is already open must update its
+ * cached host copy now; earlier choices are applied when that copy begins. */
+static boolean gametype_setup_select_preset(short preset)
+{
+	if (!match_rules_preset_set(preset))
+		return FALSE;
+	if (gametype_edit.setup)
+		return match_rules_apply_variant_preset(
+			preset, &gametype_edit.setup_variant, &gametype_edit.setup_options);
+	return TRUE;
+}
+
 /* the game type row's: the gametype's name and type */
 static void gametype_setup_type(wchar_t *text)
 {
@@ -5404,7 +5521,7 @@ boolean pc_menu_event_function_invoke(
 			multiplayer_mode_set(widget);
 			if (campaign_host_selected && !network_profile_supports_coop()) {
 				extern void platform_show_message(const char *, const char *);
-				platform_show_message("Campaign needs a current profile", "Select V21 or V20 under Custom Maps & Mods before hosting online campaign. V11 is multiplayer only.");
+				platform_show_message("Campaign unavailable", "Online campaign hosting could not be started. Please return to the menu and try again.");
 				return FALSE;
 			}
 			/* (Create's: the map list only for a game made, "join controller
@@ -5583,13 +5700,14 @@ boolean pc_menu_event_function_invoke(
 			return profile_choose(controller);
 		}
 		else if (!strcmp(name, "port match preset")) {
-			char const *last=strrchr(widget->name,'_'); return last && match_rules_preset_set((short)atoi(last+1));
+			char const *last=strrchr(widget->name,'_');
+			return last && gametype_setup_select_preset((short)atoi(last+1));
 		}
 		else if (!strcmp(name, "port faction matchup")) {
 			char const *last=strrchr(widget->name,'_');
 			return last &&
 				match_rules_matchup_set((short)atoi(last+1)) &&
-				match_rules_preset_set(MATCH_RULES_PRESET_FACTION);
+				gametype_setup_select_preset(MATCH_RULES_PRESET_FACTION);
 		}
 		else if (!strcmp(name, "port character select")) {
 			extern boolean nxhalo_character_choice_set(boolean,long); char const *last=strrchr(widget->name,'_');
@@ -5597,9 +5715,41 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "port campaign character")) { extern void ui_widget_port_character_open_context(boolean); ui_widget_port_character_open_context(FALSE); return TRUE; }
 		else if (!strcmp(name, "port host character")) { extern void ui_widget_port_character_open_context(boolean); ui_widget_port_character_open_context(TRUE); return TRUE; }
-		else if (!strcmp(name, "port content import")) { extern void content_setup_import_local(void); content_setup_import_local(); return TRUE; }
-		else if (!strcmp(name, "port content folder")) { extern void content_setup_open_folder(void); content_setup_open_folder(); return TRUE; }
-		else if (!strcmp(name, "port content download")) { extern void content_setup_download_clipboard(void); content_setup_download_clipboard(); return TRUE; }
+		else if (!strcmp(name, "port content import")) {
+            extern void content_setup_import_local(void), content_setup_catalog_page_move(int); extern const char *content_setup_catalog_query(void);
+            if (content_widget_named(widget, "mods_import")) {
+                extern void content_setup_texture_pack_import(void); content_setup_texture_pack_import();
+            } else if (content_widget_named(widget, "browser_search")) {
+                if (text_field_editing(widget)) text_field_end(TRUE);
+                else text_field_begin(widget, content_setup_catalog_query(), 47, content_catalog_search_done);
+            } else if (content_widget_named(widget, "browser_prev")) content_setup_catalog_page_move(-1);
+            else if (content_widget_named(widget, "browser_next")) content_setup_catalog_page_move(1);
+            else content_setup_import_local();
+            return TRUE;
+        }
+		else if (!strcmp(name, "port content folder")) {
+            extern void content_setup_open_folder(void); extern int content_setup_texture_pack_toggle(void);
+			if (content_widget_named(widget, "mods_toggle")) content_setup_texture_pack_toggle();
+			else if (content_widget_named(widget, "mods_upscale")) {
+#ifdef HALO_SWITCH_GUEST
+				config_write("display.deck_upscaling", "off");
+#else
+				const char *value=config_string("display.deck_upscaling");
+				config_write("display.deck_upscaling",!strcmp(value,"off")?"quality":!strcmp(value,"quality")?"performance":"off");
+#endif
+			} else content_setup_open_folder();
+            return TRUE;
+        }
+		else if (!strcmp(name, "port content download")) {
+            extern void content_setup_download_clipboard(void), content_setup_catalog_download_row(int);
+            if (content_widget_name_starts_with(widget, "browser_map_")) { const char *last=strrchr(widget->name,'_'); if(last)content_setup_catalog_download_row(atoi(last+1)); }
+            else if (content_widget_name_starts_with(widget, "mods_pack_")) {
+                extern int content_setup_texture_pack_select_row(int);
+                const char *last=strrchr(widget->name,'_');
+                return last && content_setup_texture_pack_select_row(atoi(last+1));
+            } else content_setup_download_clipboard();
+            return TRUE;
+        }
 		else if (!strcmp(name, "port host profile")) {
 			int profile=network_profile_host_version();
 			return config_write("network.compatibility_version",profile==21?"20":profile==20?"11":"21");
@@ -5747,6 +5897,17 @@ void pc_menu_game_data_function_invoke(
 		gametype_edit_list_update(widget);
 	else if (!strcmp(name, "get edit game settings name"))
 		gametype_edit_name(widget);
+    else if (!strcmp(name, "playlist settings menu update desc")) {
+        struct widget_instance *description = widget->parameters.list.extended_description;
+        struct widget_instance *help = named(description, "playlist_edit_ext_desc_text", 0);
+        struct widget_instance *picture = named(description, "playlist_edit_ext_desc_pic", 0);
+        struct game_variant *variant = edit_variant();
+        short row = focused_row(widget);
+        if (help && row >= 0 && row < 7) help->parameters.text_box.string_list_index = row;
+        if (picture && variant)
+            picture->animation.current_frame_index = (short)PIN(variant->game_engine_index, 0, 5);
+    }
+
 	else if (!strcmp(name, "game settings lists text update"))
 		gametype_option_help(widget);
 	else if (!strcmp(name, "mp edit profile set rule text"))
@@ -5757,9 +5918,18 @@ void pc_menu_game_data_function_invoke(
 		preview_update(widget);
 	else if (!strcmp(name, "port match status")) {
 			char line[512]; wchar_t text[512];
-			snprintf(line,sizeof(line),"Preset: %s\r\nFactions: %s\r\n%s",match_rules_preset_name(match_rules_preset_get()),match_rules_matchup_name(match_rules_matchup_get()),match_rules_status());
+			char const *selected = match_rules_preset_get() == MATCH_RULES_PRESET_FACTION ?
+				match_rules_matchup_name(match_rules_matchup_get()) :
+				match_rules_preset_name(match_rules_preset_get());
+			if (gametype_edit.setup)
+				snprintf(line, sizeof(line), "Selected: %s\r\nApplied to current Server Setup.\r\n%.120s",
+					selected, match_rules_status());
+			else
+				snprintf(line, sizeof(line), "Selected: %s\r\nApplies in Server Setup after map and gametype selection.\r\n%.90s",
+					selected, match_rules_status());
 			text_to_wide(line,text,NUMBEROF(text));text_set_length(widget,text,NUMBEROF(text));return;
 		}
+
 		else if (!strcmp(name, "port character status")) {
 			extern long nxhalo_character_choice(boolean); extern char const *nxhalo_character_name(short);
 			boolean host=strstr(widget->name,"host_")!=NULL; char line[256]; wchar_t text[256];
@@ -5767,10 +5937,58 @@ void pc_menu_game_data_function_invoke(
 			text_to_wide(line,text,NUMBEROF(text));text_set_length(widget,text,NUMBEROF(text));return;
 		}
 		else if (!strcmp(name, "port content status")) {
-			extern const char *content_setup_status(void); wchar_t message[512]; char line[512];
-			snprintf(line,sizeof(line),"Host network profile: V%d\r\n%s",network_profile_host_version(),content_setup_status());
-			text_to_wide(line,message,NUMBEROF(message)); text_set_length(widget,message,NUMBEROF(message)); return;
-		}
+            extern const char *content_setup_status(void), *content_setup_catalog_status(void), *content_setup_catalog_query(void);
+            extern void content_setup_catalog_poll(void);
+            extern int content_setup_catalog_result(int,char *,size_t,char *,size_t), content_setup_catalog_installed(const char *);
+            wchar_t message[512]; char line[512],map[64],type[16]; int row;
+            if (content_widget_name_starts_with(widget, "mods_")) {
+                extern int content_setup_deck_upscaling_available(void), content_setup_texture_pack_count(void), content_setup_texture_pack_name(int,char *,size_t);
+                extern const char *content_setup_texture_pack_status(void);
+                extern int texture_pack_enabled(void); extern const char *texture_pack_selected(void);
+                if (content_widget_named(widget, "mods_upscale")) {
+                    widget->visible=content_setup_deck_upscaling_available(); widget->disabled=!widget->visible;
+                    snprintf(line,sizeof(line),"Deck upscaling: %s (A: next mode)",config_string("display.deck_upscaling"));
+                    text_to_wide(line,message,NUMBEROF(message));text_set(widget,message);return;
+                }
+                if (content_widget_named(widget, "mods_toggle")) {
+                    snprintf(line,sizeof(line),"Texture pack overrides: %s",texture_pack_enabled()?"ON":"OFF");
+                    text_to_wide(line,message,NUMBEROF(message));text_set(widget,message);return;
+                }
+                if (content_widget_name_starts_with(widget, "mods_pack_")) {
+                    const char *last=strrchr(widget->name,'_');int index=last?atoi(last+1):-1;
+                    if(content_setup_texture_pack_name(index,map,sizeof(map))) {
+                        const char *selected=texture_pack_selected(); const char *selected_leaf=strrchr(selected,'/'); if(!strcmp(selected_leaf?selected_leaf+1:selected,map))snprintf(line,sizeof(line),"%.46s  [SELECTED]",map);
+                        else snprintf(line,sizeof(line),"%.56s",map);
+                        text_to_wide(line,message,NUMBEROF(message));text_set(widget,message);widget->disabled=FALSE;
+                    } else { text_set(widget,L"");widget->disabled=TRUE; }
+                    return;
+                }
+                content_setup_texture_pack_count();
+                { const char *selected=texture_pack_selected(); const char *leaf=strrchr(selected,'/');
+                snprintf(line,sizeof(line),"Textures: %s | Pack: %.28s | Upscaling: %.12s\r\nImport native PNG / TGA / DDS pack folders.",texture_pack_enabled()?"ON":"OFF",selected[0]?(leaf?leaf+1:selected):"none",config_string("display.deck_upscaling")); }
+                text_to_wide(line,message,NUMBEROF(message));text_set_length(widget,message,NUMBEROF(message));return;
+            }
+            if (content_widget_name_starts_with(widget, "browser_")) {
+                content_setup_catalog_poll();
+                if (content_widget_named(widget, "browser_search")) {
+                    snprintf(line,sizeof(line),"SEARCH MAPS: %s",content_setup_catalog_query());
+                    text_field_show(widget,line,text_field_editing(widget)); return;
+                }
+                if (content_widget_name_starts_with(widget, "browser_map_")) {
+                    const char *last=strrchr(widget->name,'_'); row=last?atoi(last+1):-1;
+                    if (content_setup_catalog_result(row,map,sizeof(map),type,sizeof(type))) {
+                        if(content_setup_catalog_installed(map))snprintf(line,sizeof(line),"%-38.38s  %s  [INSTALLED]",map,type);
+                        else snprintf(line,sizeof(line),"%-38.38s  %s",map,type);
+                        text_to_wide(line,message,NUMBEROF(message));text_set(widget,message);widget->disabled=FALSE;
+                    } else { text_set(widget,L"");widget->disabled=TRUE; }
+                    return;
+                }
+                snprintf(line,sizeof(line),"%.105s\r\nSelect a map to download. CE resources are imported separately.",content_setup_catalog_status());
+                text_to_wide(line,message,NUMBEROF(message));text_set_length(widget,message,NUMBEROF(message));return;
+            }
+            snprintf(line,sizeof(line),"Host network profile: V%d\r\n%s",network_profile_host_version(),content_setup_status());
+            text_to_wide(line,message,NUMBEROF(message)); text_set_length(widget,message,NUMBEROF(message)); return;
+        }
 		else if (!strcmp(name, "port lobby update"))
 		lobby_update(widget);
 	else if (!strcmp(name, "port settings help"))

@@ -90,6 +90,7 @@ extern void host_log(int priority, const char *text);
 struct posix_file_information;
 extern int posix_stat(const char *path, struct posix_file_information *information);
 extern int posix_fstat(int descriptor, struct posix_file_information *information);
+extern int posix_file_is_regular(int descriptor);
 extern int posix_set_file_times(const char *path, uint32_t a_sec, uint32_t a_nsec, uint32_t m_sec, uint32_t m_nsec);
 extern int posix_seek(int descriptor, int32_t off_lo, int32_t off_hi, int whence, uint32_t *pos_lo, uint32_t *pos_hi);
 extern int posix_truncate(int descriptor, uint32_t size_lo, uint32_t size_hi);
@@ -227,6 +228,7 @@ static const struct import_entry imports[] =
 	/* POSIX File helpers (posix_files) */
 	{ "hostposix_stat",                  posix_stat },
 	{ "hostposix_fstat",                 posix_fstat },
+	{ "hostposix_file_is_regular",       posix_file_is_regular },
 	{ "hostposix_set_file_times",        posix_set_file_times },
 	{ "hostposix_seek",                  posix_seek },
 	{ "hostposix_truncate",              posix_truncate },

@@ -24,6 +24,8 @@ Runtime selection of the native OpenCE-compatible network wire profile.
  X(20, 11, 20, 0, 1) \
  X(21, 21, 21, 1, 1)
 
+int network_profile_set_host_override(unsigned int version);
+void network_profile_clear_host_override(void);
 int network_profile_host_version(void);
 int network_profile_active_version(void);
 int network_profile_select_room(unsigned int advertised_version);

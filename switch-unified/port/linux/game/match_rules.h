@@ -3,6 +3,7 @@
 #include "cseries.h"
 struct game_variant;
 struct game_variant_options;
+struct unit_control_data;
 enum match_rules_preset {
  MATCH_RULES_PRESET_STANDARD=0, MATCH_RULES_PRESET_FACTION, MATCH_RULES_PRESET_SWAT,
  MATCH_RULES_PRESET_TOWER_OF_POWER, MATCH_RULES_PRESET_DODGEBALL,
@@ -30,5 +31,7 @@ long match_rules_host_spawn_definition(long player_index, long fallback_definiti
 void match_rules_host_prespawn_player(long player_index);
 void match_rules_host_player_killed(long player_index);
 void match_rules_host_postspawn_player(long player_index);
+boolean match_rules_player_melee_only(long player_index);
+void match_rules_filter_player_control(long player_index, struct unit_control_data *control);
 boolean match_rules_should_end_game(void);
 #endif

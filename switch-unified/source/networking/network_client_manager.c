@@ -392,6 +392,10 @@ symbols in this file:
 #include "halo_network_profile.h"
 #include "networking/network_server_manager.h"
 #include "text/unicode.h"
+#ifdef HALO_GAME_BROWSER
+#include "halo_map_families.h"
+#include "halo_ui_map_list.h"
+#endif
 
 /* ---------- constants */
 
@@ -841,9 +845,41 @@ int network_profile_known_version(unsigned int version)
 	return FALSE;
 }
 
+static unsigned int network_profile_host_override;
+
+int network_profile_set_host_override(unsigned int version)
+{
+	if (version == 0)
+	{
+		network_profile_host_override = 0;
+		return TRUE;
+	}
+	if (!network_profile_known_version(version))
+		return FALSE;
+	/* An automatic campaign route may only select a wire that supports co-op. */
+	{
+		long index;
+		for (index = 0; index < (long)(sizeof(network_profile_ranges) / sizeof(network_profile_ranges[0])); index++)
+			if (network_profile_ranges[index].version == version && network_profile_ranges[index].coop)
+			{
+				network_profile_host_override = version;
+				return TRUE;
+			}
+	}
+	return FALSE;
+}
+
+void network_profile_clear_host_override(void)
+{
+	network_profile_host_override = 0;
+}
+
 int network_profile_host_version(void)
 {
-	long configured = config_integer("network.compatibility_version");
+	long configured;
+	if (network_profile_host_override)
+		return (int)network_profile_host_override;
+	configured = config_integer("network.compatibility_version");
 	/* Only stable profile choices are hostable. Invalid config falls back to
 	 * current OpenCE 21; it never silently advertises another wire. */
 	return configured == 11 || configured == 20 || configured == 21 ? (int)configured : 21;
@@ -1377,6 +1413,22 @@ boolean network_game_client_game_settings_updated(
 		if (csstrcmp(message_packet->map.name, client->game.map.name))
 		{
 			char build[0x20];
+#ifdef HALO_GAME_BROWSER
+			char map_file[64];
+			short map_family = map_family_parse(message_packet->map.name, map_file, sizeof(map_file));
+			if (map_family == _map_family_custom_edition &&
+				!ui_map_list_family_present(map_family, map_file))
+			{
+				extern boolean pc_menu_queue_rotated_map_download(char const *map_name);
+				boolean queued = pc_menu_queue_rotated_map_download(message_packet->map.name);
+				network_event("host rotated to missing map '%s'; download queued=%d",
+					message_packet->map.name, queued);
+				display_error_when_main_menu_loaded(_error_network_failed_to_join_game);
+				/* Client disposal occurs in network_game_start_frame after this message unwinds. */
+				network_game_abort();
+				return TRUE;
+			}
+#endif
 
 			/* port: a map of a build this version does not play with others
 			(its objects would not be the host's): said, and the game left */
@@ -1417,6 +1469,7 @@ boolean network_game_client_game_settings_updated(
 		message_packet->player_count,
 		message_packet->machine_count,
 		message_packet->difficulty);
+	network_event("rejected settings detail: maximum=%d map=%.*s valid_name=%d", message_packet->maximum_players, (int)sizeof(message_packet->map.name), message_packet->map.name, network_game_client_map_name_is_valid(message_packet->map.name,sizeof(message_packet->map.name)));
 
 	return FALSE;
 }

@@ -15,8 +15,10 @@
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "units/units.h"
+#include "units/unit_control_data.h"
 #include "../src/port_config.h"
 #include "match_rules.h"
+#include "match_rules_melee.h"
 #include "nxhalo_custom_content.h"
 
 #include <stdio.h>
@@ -74,6 +76,11 @@ boolean match_rules_preset_set(short preset)
     if (!match_rules_preset_supported(preset))
     {
         set_message("Unknown preset.");
+        return FALSE;
+    }
+    if (game_connection() == _game_connection_network_client)
+    {
+        set_message("Only the host can change the match preset.");
         return FALSE;
     }
     csprintf(value, "%d", preset);
@@ -204,9 +211,11 @@ boolean match_rules_preset_available(short preset, char *reason, int reason_size
         break;
     case MATCH_RULES_PRESET_ZOMBIES:
         if (players_in_game() < 2)
-            message = "Zombies waits for two connected players. Flood biped tags are optional; without them, infected retain the standard appearance.";
+            message = "Zombies waits for two connected players. Flood models are optional.";
         else if (!faction_bipeds(NXHALO_FACTION_FLOOD, definitions, 8))
-            message = "Zombies is playable with standard infected appearance; Flood biped tags are optional and are not auto-delivered.";
+            message = "This map has no Flood models; infected use the normal character and cannot fire.";
+        else
+            message = "Infected carry a melee weapon and cannot fire or throw grenades.";
         break;
     default:
         break;
@@ -325,7 +334,7 @@ boolean match_rules_apply_variant_preset(short preset, struct game_variant *vari
                 options->vehicle_counts[team][vehicle] = 0;
         }
     }
-    set_message("Preset template applied; map requirements will be checked after the selected map loads.");
+    set_message("Rules applied. Map compatibility is checked when loading.");
     return TRUE;
 }
 
@@ -427,7 +436,7 @@ static boolean zombies_initialize(void)
             zombies_infected[absolute] = TRUE;
     }
     zombies_ready = TRUE;
-    set_message("Zombies: one initial infected chosen; infected players return as Flood and use melee only.");
+    set_message("Zombies: one infected chosen; infected use melee and cannot fire or throw grenades.");
     return TRUE;
 }
 
@@ -450,7 +459,6 @@ void match_rules_host_prespawn_player(long player_index)
 
 void match_rules_host_player_killed(long dead_player_index)
 {
-    struct player_datum *player;
     short absolute;
     if (match_rules_preset_get() != MATCH_RULES_PRESET_ZOMBIES ||
         game_connection() == _game_connection_network_client ||
@@ -460,9 +468,10 @@ void match_rules_host_player_killed(long dead_player_index)
     if (absolute < 0 || absolute >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
         return;
     zombies_infected[absolute] = TRUE;
-    player = player_get(dead_player_index);
-    update_host_team(player, dead_player_index, 1);
-    set_message("Zombies: the host converted the player on death; infected players spawn with melee only.");
+    /* Keep the eliminated player on the team replicated with their current
+       unit through postgame. The infected team is assigned at the next
+       prespawn, where the stock object-create delta delivers it to peers. */
+    set_message("Zombies: this player is infected and will respawn with melee only.");
 }
 
 long match_rules_host_spawn_definition(long player_index, long fallback_definition)
@@ -501,7 +510,7 @@ long match_rules_host_spawn_definition(long player_index, long fallback_definiti
     if (count <= 0)
     {
         set_message(preset == MATCH_RULES_PRESET_ZOMBIES ?
-            "Zombies is active; Flood biped tags are unavailable on this map, so infected retain the standard appearance." :
+            "This map has no Flood models; infected use the normal character." :
             "Faction matches require faction biped assets loaded by the selected map; assets are not auto-delivered, so the standard biped is retained.");
         return fallback_definition;
     }
@@ -542,6 +551,51 @@ boolean match_rules_should_end_game(void)
     return FALSE;
 }
 
+static boolean match_rules_variant_is_zombies(void)
+{
+	struct game_variant *variant = game_engine_get_variant();
+	wchar_t const *description;
+	if (!variant)
+		return FALSE;
+	description = variant->human_readable_game_description;
+	return (description[0] == L'Z' && description[1] == L'o' && description[2] == L'm' &&
+		description[3] == L'b' && description[4] == L'i' && description[5] == L'e' &&
+		description[6] == L's') ||
+		(description[0] == L'I' && description[1] == L'n' && description[2] == L'f' &&
+		description[3] == L'e' && description[4] == L'c' && description[5] == L't' &&
+		description[6] == L'i' && description[7] == L'o' && description[8] == L'n');
+}
+
+boolean match_rules_player_melee_only(long player_index)
+{
+	struct player_datum *player;
+	short absolute;
+	if (player_index == NONE || !game_engine_running() || !game_engine_has_teams() ||
+		!match_rules_variant_is_zombies())
+		return FALSE;
+	player = player_try_and_get(player_index);
+	if (!player || player->team_index != 1)
+		return FALSE;
+	if (game_connection() == _game_connection_network_client || network_game_distributed_client())
+		return TRUE;
+	absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+	return absolute >= 0 && absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS &&
+		zombies_ready && zombies_player_is_infected(player_index);
+}
+
+void match_rules_filter_player_control(long player_index, struct unit_control_data *control)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+	if (!control || !match_rules_player_melee_only(player_index))
+		return;
+	player = player_get(player_index);
+	unit = unit_try_and_get(player->unit_index);
+	if (!unit)
+		return;
+	match_rules_filter_infected_control(TRUE, unit->unit.current_weapon_index, control);
+}
+
 /* Called after standard loadout and grenades have been assigned. */
 void match_rules_host_postspawn_player(long player_index)
 {
@@ -569,10 +623,11 @@ void match_rules_host_postspawn_player(long player_index)
         absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
         if (absolute >= 0 && absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS && zombies_player_is_infected(player_index))
         {
-            unit_delete_all_weapons(unit_index);
             unit->unit.grenade_counts[_unit_grenade_human_fragmentation] = 0;
             unit->unit.grenade_counts[_unit_grenade_covenant_plasma] = 0;
             unit->unit.desired_grenade_index = NONE;
+            if (!nxhalo_give_zombie_melee_weapon(unit_index))
+                set_message("Melee weapon could not be equipped; existing weapons were kept, and infected still cannot fire.");
         }
     }
 }

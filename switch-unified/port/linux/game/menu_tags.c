@@ -404,6 +404,7 @@ static char const *const port_game_data_input_names[] =
 	"port character status",
 
 	"port match status",
+	"playlist settings menu update desc",
 
 };
 

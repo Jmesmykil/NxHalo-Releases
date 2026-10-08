@@ -1054,20 +1054,15 @@ def _lobby() -> list:
 
 
 def _coop() -> list:
-    """Co-op, the campaign for two players on this machine in split screen
-    (the Xbox's Cooperative Play): Multiplayer's CO-OP CAMPAIGN, then player
-    2's profile, chosen with player 2's controller (its rows take any
-    controller's presses, as the shared rows do only controller 1's), then
-    New Game's levels and difficulty, which either player's controller uses
-    (ui_widget.c's widget_takes_events_of_controller; menu_functions.c's
-    coop_begin)"""
+    """Multiplayer's CO-OP CAMPAIGN opens online campaign choices. The
+    dedicated LOCAL SPLIT-SCREEN choice routes to the player 2 profile flow."""
     base = f"{MT}/coop"
     lines = _widget(f"{MT}/multiplayer_type_coop_item",
                     [("type", "text"), ("left", 51), ("width", 232), ("height", 32), ("bitmap", "bitmaps/list_item_bkd"),
                      ("string_list", f"{MT}/multiplayer_options"), ("string_index", 7), ("font", "ui\\large_ui"),
                      ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 5)],
-                    [f'<on event="a" run="port coop begin" open="{base}/player_2_profile_screen" branch="true"/>',
-                     f'<on event="start" run="port coop begin" open="{base}/player_2_profile_screen" branch="true"/>',
+                    ['<on event="a" open="main_menu/online_campaign/root"/>',
+                     '<on event="start" open="main_menu/online_campaign/root"/>',
                      '<on event="left_mouse" run="mouse emit accept event"/>'])
     lines += _widget(f"{base}/player_2_profile_screen", [("width", 640), ("height", 480),
                                                          ("flags", "pass_unhandled_to_focused_child"),

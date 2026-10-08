@@ -175,6 +175,14 @@ int posix_fstat(int descriptor, struct posix_file_information *information)
 	return 0;
 }
 
+/* The guest asks the host to classify the descriptor. Do not pass the
+ * host's 64-bit struct stat across the ILP32 boundary. */
+int posix_file_is_regular(int descriptor)
+{
+	struct stat st;
+	return host_file_fstat(descriptor, &st) == 0 && S_ISREG(st.st_mode);
+}
+
 int posix_set_file_times(const char *path,
 	posix_ulong access_seconds, posix_ulong access_nanoseconds,
 	posix_ulong modification_seconds, posix_ulong modification_nanoseconds)

@@ -5,15 +5,12 @@
   <child widget="main_menu/online_campaign/list" />
   <child widget="main_menu/online_campaign/help" />
  </widget>
- <widget name="main_menu/online_campaign/title" type="text" controller="1" left="40" top="40" width="560" height="60" text="ONLINE GAMES" font="ui\large_ui" color="#FF2896FF" />
+ <widget name="main_menu/online_campaign/title" type="text" controller="1" left="40" top="40" width="560" height="60" text="MULTIPLAYER" font="ui\large_ui" color="#FF2896FF" />
  <widget name="main_menu/online_campaign/list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
-  <child widget="main_menu/online_campaign/mp_join_campaign" y="105" />
-  <child widget="main_menu/online_campaign/mp_create_campaign" y="141" />
-  <child widget="main_menu/online_campaign/mp_join_multiplayer" y="177" />
-  <child widget="main_menu/online_campaign/mp_create_multiplayer" y="213" /><child widget="main_menu/online_campaign/multiplayer_type_join_all_item" y="249" />
-  <child widget="main_menu/online_campaign/multiplayer_type_coop_item" y="285" />
-  <child widget="main_menu/online_campaign/filter_button" y="321" />
-  <child widget="main_menu/online_campaign/quit" y="357" />
+  <child widget="main_menu/online_campaign/join_menu" y="110" />
+  <child widget="main_menu/online_campaign/host_menu" y="158" />
+  <child widget="main_menu/online_campaign/multiplayer_type_coop_item" y="206" />
+  <child widget="main_menu/online_campaign/custom_gametypes" y="254" />
  </widget>
  <widget name="main_menu/online_campaign/mp_join_campaign" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="JOIN CAMPAIGN LOBBIES" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
   <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
@@ -27,7 +24,7 @@
   <on event="start" run="mp type set mode" open="main_menu/multiplayer_type_select/connected/connected_map_select_wrapper" />
   <on event="left_mouse" run="mouse emit accept event" />
  </widget>
- <widget name="main_menu/online_campaign/multiplayer_type_coop_item" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="LOCAL SPLIT-SCREEN (2 CONTROLLERS)" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
+ <widget name="main_menu/online_campaign/multiplayer_type_coop_item" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="LOCAL SPLIT-SCREEN" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
   <on event="a" run="port coop begin" open="main_menu/multiplayer_type_select/coop/player_2_profile_screen" branch="true" />
   <on event="left_mouse" run="mouse emit accept event" />
  </widget>
@@ -35,7 +32,7 @@
   <on event="a" back="true" />
   <on event="left_mouse" run="mouse emit accept event" />
  </widget>
- <widget name="main_menu/online_campaign/help" type="text" controller="1" left="50" top="414" width="540" height="50" text="Online play uses remote players. No second local controller is required." font="ui\small_ui" color="#FFFFFFFF" />
+ <widget name="main_menu/online_campaign/help" type="text" controller="1" left="50" top="414" width="540" height="50" text="Join a game, create a match, or build your own rules." font="ui\small_ui" color="#FFFFFFFF" />
  <widget name="main_menu/online_campaign/mp_join_multiplayer" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="MULTIPLAYER SERVERS" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
   <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
   <on event="start" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
@@ -88,4 +85,64 @@
   <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
   <on event="left_mouse" run="mouse emit accept event" />
  </widget>
-<widget name="main_menu/online_campaign/mp_create_multiplayer" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="HOST MULTIPLAYER" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3"><on event="a" run="join controller to mp game" /><on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/connected/connected_map_select_wrapper" /><on event="start" run="join controller to mp game" /><on event="start" run="mp type set mode" open="main_menu/multiplayer_type_select/connected/connected_map_select_wrapper" /><on event="left_mouse" run="mouse emit accept event" /></widget></menus>
+ <widget name="main_menu/online_campaign/mp_create_multiplayer" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="HOST MULTIPLAYER" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="3">
+  <on event="a" run="join controller to mp game" />
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/connected/connected_map_select_wrapper" />
+  <on event="start" run="join controller to mp game" />
+  <on event="start" run="mp type set mode" open="main_menu/multiplayer_type_select/connected/connected_map_select_wrapper" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/custom_gametypes" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="EDIT GAMETYPES" font="ui\large_ui" color="#FF2896FF" text_x="12" text_y="3">
+  <on event="a" open="main_menu/settings_select/multiplayer_setup/playlist_select/gametype_select_screen" />
+  <on event="start" open="main_menu/settings_select/multiplayer_setup/playlist_select/gametype_select_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/join_menu" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="JOIN GAME" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+  <on event="a" open="main_menu/online_campaign/join" />
+  <on event="start" open="main_menu/online_campaign/join" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/host_menu" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="CREATE GAME" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+  <on event="a" open="main_menu/online_campaign/host" />
+  <on event="start" open="main_menu/online_campaign/host" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/join" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+  <on event="b" back="true" />
+  <child widget="main_menu/online_campaign/join_title" />
+  <child widget="main_menu/online_campaign/join_list" />
+  <child widget="main_menu/online_campaign/join_help" />
+ </widget>
+ <widget name="main_menu/online_campaign/join_title" type="text" controller="1" left="40" top="30" width="560" height="50" text="JOIN GAME" font="ui\large_ui" color="#FF2896FF" />
+ <widget name="main_menu/online_campaign/join_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+  <child widget="main_menu/online_campaign/mp_join_multiplayer" y="105" />
+  <child widget="main_menu/online_campaign/mp_join_campaign" y="149" />
+  <child widget="main_menu/online_campaign/multiplayer_type_join_all_item" y="193" />
+  <child widget="main_menu/online_campaign/filter_button" y="237" />
+ </widget>
+ <widget name="main_menu/online_campaign/join_help" type="text" controller="1" left="50" top="400" width="540" height="65" text="Multiplayer and campaign rooms have separate lists." font="ui\small_ui" color="#FFFFFFFF" />
+ <widget name="main_menu/online_campaign/host" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+  <on event="b" back="true" />
+  <child widget="main_menu/online_campaign/host_title" />
+  <child widget="main_menu/online_campaign/host_list" />
+  <child widget="main_menu/online_campaign/host_help" />
+ </widget>
+ <widget name="main_menu/online_campaign/host_title" type="text" controller="1" left="40" top="30" width="560" height="50" text="CREATE GAME" font="ui\large_ui" color="#FF2896FF" />
+ <widget name="main_menu/online_campaign/host_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+  <child widget="main_menu/online_campaign/mp_create_multiplayer" y="105" />
+  <child widget="main_menu/online_campaign/mp_create_campaign" y="149" />
+  <child widget="main_menu/online_campaign/modes_menu" y="193" />
+  <child widget="main_menu/online_campaign/network_menu" y="237" />
+ </widget>
+ <widget name="main_menu/online_campaign/host_help" type="text" controller="1" left="50" top="400" width="540" height="65" text="Choose a map and gametype, then adjust the match in Server Setup." font="ui\small_ui" color="#FFFFFFFF" />
+ <widget name="main_menu/online_campaign/modes_menu" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="GAME MODES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+  <on event="a" open="main_menu/match_rules/presets" />
+  <on event="start" open="main_menu/match_rules/presets" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/network_menu" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="NETWORK OPTIONS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+  <on event="a" open="main_menu/content/network" />
+  <on event="start" open="main_menu/content/network" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+</menus>

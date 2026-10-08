@@ -37,9 +37,9 @@ ROMFS_FILES	:=	$(wildcard $(TOPDIR)/$(ROMFS)/*)
 APP_JSON	:=	$(CURDIR)/halo.json
 
 # NRO metadata
-APP_TITLE	:=	HALO: Combat Evolved
+APP_TITLE	:=	HALO: CE Content Preview 2.9.4
 APP_AUTHOR	:=	NxHalo contributors
-APP_VERSION	:=	0.1.11-p33
+APP_VERSION	:=	2.9.4-preview
 APP_TITLEID	:=	010048414C210000
 export NACPFLAGS += --titleid=$(APP_TITLEID)
 

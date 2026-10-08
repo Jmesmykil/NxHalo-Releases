@@ -3,7 +3,7 @@
 #include "cseries.h"
 #include "cseries/cseries_windows.h"
 #include "SDL3/SDL.h"
-#include "zlib.h"
+#include "../../third_party/zlib/zlib_prefixed.h"
 #include "../src/update.h"
 #include "community_map_download.h"
 
@@ -655,9 +655,20 @@ static int SDLCALL map_download_worker(void *context)
 	}
 	snprintf(job->archive, sizeof(job->archive), "%s%s.zip", directory, job->name);
 	SDL_free(directory);
-	snprintf(url, sizeof(url), "https://maps.halonet.net/halonet/locator.php?map=%s&type=ce&format=zip", job->name);
+	/* Fetch the catalog archive by its exact name. Locator aliases can point
+	   at a different cache (for example 1bloodgulch -> bloodgulch). */
+	snprintf(url, sizeof(url), "https://maps.halonet.net/maps/%s.zip", job->name);
 	if (!update_download_limited(url, job->archive, MAP_DOWNLOAD_MAX_ARCHIVE, map_download_progress, job, error, sizeof(error)))
-		goto failed;
+	{
+		/* Older advertised rooms may use a locator alias. Only retry a
+		   not-found response on the same trusted HTTPS host; both paths retain
+		   transfer limits and normal ZIP/header/CRC validation. */
+		if (!strstr(error, "HTTP 404"))
+			goto failed;
+		snprintf(url, sizeof(url), "https://maps.halonet.net/halonet/locator.php?map=%s&type=ce&format=zip", job->name);
+		if (!update_download_limited(url, job->archive, MAP_DOWNLOAD_MAX_ARCHIVE, map_download_progress, job, error, sizeof(error)))
+			goto failed;
+	}
 	zip = fopen(job->archive, "rb");
 	if (!zip)
 	{

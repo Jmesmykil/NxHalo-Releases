@@ -42,6 +42,7 @@ void texture_cache_flush(
 	void);
 void *texture_cache_steal_memory(
 	long size);
+boolean texture_cache_bitmap_identity(unsigned long address, const char **tag, long *bitmap_index);
 void texture_cache_debug_render(
 	void);
 

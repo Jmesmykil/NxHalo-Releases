@@ -1,6 +1,6 @@
 # Nintendo Switch community preview build recipe
 
-This tree documents the source used for the Switch 2.9.4 content preview NRO. The NRO embeds the matching Android-ABI guest ELF, a Mozilla CA bundle, and its MPL-2.0 license and source notice. It contains no Halo map assets, console keys, or `instructions.inc`.
+This tree is the source used for the private Switch candidate NRO. The NRO embeds the matching Android-ABI guest ELF, a Mozilla CA bundle, and its MPL-2.0 license and source notice. It contains no Halo map assets, console keys, or `instructions.inc`.
 
 ## Prerequisites
 
