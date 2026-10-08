@@ -4,7 +4,7 @@ This additive 2.9.4 prerelease updates the native Linux runtime with synchronize
 
 ## Downloads
 
-- `NxHalo-SteamDeck-unified-runtime-2.9.4-editfix1.tar.gz` — native runtime and required shared libraries; SHA-256 `92f5be6441ac91f5331b37ef4d10e23e81c5b9fef1af4a21d24c0992aaa0194a`.
+- `NxHalo-SteamDeck-unified-runtime-2.9.4-editfix1.tar.gz` — native runtime and required shared libraries; SHA-256 `2c75e1911e7225774746e3d65df76744e5bfcc040a9f1dff9696a9a72d1b535e`.
 - `NxHalo-Unified-source-2.9.4.zip` — filtered matching source snapshot; SHA-256 `9b318a3037cb41a986d78323867f1aff05306d171a03c92d239fbce10b096ead`.
 
 The package excludes Halo game data, maps, resource files, saves, keys, and user profiles. Import your own compatible game data.

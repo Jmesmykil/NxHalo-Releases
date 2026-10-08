@@ -2,7 +2,7 @@
   "release": "v0.2.9.4-steamdeck-runtime-editfix1",
   "title": "2.9.4 editor stability update",
   "runtime_sha256": "64761e21783c861123469b8827716690843d878b98e674252edfbe24043f080d",
-  "runtime_archive_sha256": "92f5be6441ac91f5331b37ef4d10e23e81c5b9fef1af4a21d24c0992aaa0194a",
+  "runtime_archive_sha256": "2c75e1911e7225774746e3d65df76744e5bfcc040a9f1dff9696a9a72d1b535e",
   "source_archive_sha256": "9b318a3037cb41a986d78323867f1aff05306d171a03c92d239fbce10b096ead",
   "source_archive_bytes": 17905613,
   "source_archive_entries": 2261,
