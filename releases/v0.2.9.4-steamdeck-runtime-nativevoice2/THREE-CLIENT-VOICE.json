@@ -1,0 +1,58 @@
+{
+  "host": {
+    "baseline": {
+      "mean": 0.00319096177187775,
+      "max": 0.008435172795419884
+    },
+    "voice": {
+      "mean": 0.03703345826183636,
+      "max": 0.11264070227368263
+    },
+    "after": {
+      "mean": 0.00396063304398167,
+      "max": 0.015330688908420122
+    },
+    "last_voice_counter": "halo-linux: native voice: enabled=1 ptt=0 menus=0 host=1 roster=3 capture=0 sent=579 received=579 spatial=579 mapping_drop=0 mixed=480512"
+  },
+  "client": {
+    "baseline": {
+      "mean": 0.0025533204578758475,
+      "max": 0.00689804423151234
+    },
+    "voice": {
+      "mean": 0.003259608408365542,
+      "max": 0.008895032537091554
+    },
+    "after": {
+      "mean": 0.0026479317989119683,
+      "max": 0.006228633453201924
+    },
+    "last_voice_counter": "halo-linux: native voice: enabled=1 ptt=0 menus=0 host=1 roster=0 capture=605 sent=605 received=0 spatial=0 mapping_drop=0 mixed=0"
+  },
+  "third": {
+    "baseline": {
+      "mean": 0.003847286601813745,
+      "max": 0.00957725882477263
+    },
+    "voice": {
+      "mean": 0.037991921474617024,
+      "max": 0.08517871635844793
+    },
+    "after": {
+      "mean": 0.005143251367072584,
+      "max": 0.04651592542800618
+    },
+    "last_voice_counter": "halo-linux: native voice: enabled=1 ptt=0 menus=0 host=1 roster=0 capture=0 sent=0 received=521 spatial=521 mapping_drop=0 mixed=441728"
+  },
+  "receiver_signal_pass": true,
+  "sender_no_loopback_pass": true,
+  "post_ptt_expiry_pass": true,
+  "exit": {
+    "x-host": 0,
+    "x-client": 0,
+    "x-third": 0,
+    "host": 0,
+    "client": 0,
+    "third": 0
+  }
+}
