@@ -2290,6 +2290,11 @@ static void multiplayer_mode_set(struct widget_instance *widget)
 	char const *name = widget->name;
 	campaign_host_selected = strstr(name,"create_campaign") != NULL;
 	network_profile_clear_room();
+	/* Campaign setup opts into a co-op-capable profile for this host only. */
+	if (campaign_host_selected)
+		network_profile_set_host_override(21);
+	else
+		network_profile_clear_host_override();
 	server_view = strstr(name, "join_classic_ce") ? SERVER_VIEW_CLASSIC_CE :
 		strstr(name, "join_classic_pc") ? SERVER_VIEW_CLASSIC_PC :
 		strstr(name, "join_legacy") ? SERVER_VIEW_LEGACY :
@@ -5516,7 +5521,7 @@ boolean pc_menu_event_function_invoke(
 			multiplayer_mode_set(widget);
 			if (campaign_host_selected && !network_profile_supports_coop()) {
 				extern void platform_show_message(const char *, const char *);
-				platform_show_message("Campaign needs a current profile", "Select V21 or V20 under Custom Maps & Mods before hosting online campaign. V11 is multiplayer only.");
+				platform_show_message("Campaign unavailable", "Online campaign hosting could not be started. Please return to the menu and try again.");
 				return FALSE;
 			}
 			/* (Create's: the map list only for a game made, "join controller

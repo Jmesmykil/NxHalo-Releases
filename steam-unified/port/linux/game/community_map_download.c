@@ -3,7 +3,8 @@
 #include "cseries.h"
 #include "cseries/cseries_windows.h"
 #include "SDL3/SDL.h"
-#include "zlib.h"
+/* Use the port inflater for external archives, not the game legacy zlib. */
+#include "../../third_party/zlib/zlib_prefixed.h"
 #include "../src/update.h"
 #include "community_map_download.h"
 
@@ -309,6 +310,13 @@ static int map_zip_single_map(FILE *zip, char *expected, size_t expected_size)
 	return maps == 1;
 }
 
+/* Keep rejected archive diagnostics in the runtime log without writing entries. */
+static int map_zip_reject(FILE *zip, char const *expected, int line)
+{
+	fprintf(stderr, "halo-linux: CE map archive rejected: expected=%s source_line=%d archive_offset=%ld\n", expected, line, ftell(zip));
+	return 0;
+}
+
 /* Extract only the exact requested map. Other archive entries are never written. */
 static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 {
@@ -322,10 +330,10 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 	char partial[560];
 
 	if (fseek(zip, 0, SEEK_END) || (end = ftell(zip)) < 22)
-		return 0;
+		return map_zip_reject(zip, expected, __LINE__);
 	tail_size = end < (long)sizeof(tail) ? end : (long)sizeof(tail);
 	if (fseek(zip, end - tail_size, SEEK_SET) || fread(tail, 1, (size_t)tail_size, zip) != (size_t)tail_size)
-		return 0;
+		return map_zip_reject(zip, expected, __LINE__);
 	for (index = (unsigned long)(tail_size - 22 + 1); index-- > 0;)
 	{
 		if (map_zip_long(tail + index) == 0x06054b50 && index + 22 <= (unsigned long)tail_size &&
@@ -336,17 +344,17 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 		}
 	}
 	if (!found)
-		return 0;
+		return map_zip_reject(zip, expected, __LINE__);
 	if (map_zip_word(tail + index + 4) || map_zip_word(tail + index + 6) ||
 		map_zip_word(tail + index + 8) != map_zip_word(tail + index + 10))
-		return 0;
+		return map_zip_reject(zip, expected, __LINE__);
 	entries = map_zip_word(tail + index + 10);
 	directory_size = map_zip_long(tail + index + 12);
 	directory = (long)map_zip_long(tail + index + 16);
 	end_record = end - tail_size + (long)index;
 	if (directory < 0 || directory > end_record || directory_size > (unsigned long)(end_record - directory) ||
 		fseek(zip, directory, SEEK_SET))
-		return 0;
+		return map_zip_reject(zip, expected, __LINE__);
 	found = 0;
 	for (index = 0; index < entries; index++)
 	{
@@ -355,7 +363,7 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 		char const *basename;
 		int unsafe_path;
 		if (fread(central, 1, sizeof(central), zip) != sizeof(central) || map_zip_long(central) != 0x02014b50)
-			return 0;
+			return map_zip_reject(zip, expected, __LINE__);
 		name_size = map_zip_word(central + 28);
 		extra_size = map_zip_word(central + 30);
 		comment_size = map_zip_word(central + 32);
@@ -363,7 +371,7 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 		compressed_size = map_zip_long(central + 20);
 		uncompressed_size = map_zip_long(central + 24);
 		if (!name_size || name_size >= sizeof(name) || fread(name, 1, name_size, zip) != name_size)
-			return 0;
+			return map_zip_reject(zip, expected, __LINE__);
 		name[name_size] = 0;
 		basename = map_zip_basename(name, name_size, &unsafe_path);
 		if (basename && !SDL_strcasecmp(basename, expected))
@@ -373,16 +381,16 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 			if (unsafe_path || found || (flags & 1) || compressed_size == 0xffffffffUL ||
 				uncompressed_size == 0xffffffffUL || map_zip_long(central + 42) == 0xffffffffUL ||
 				extra_size > sizeof(extra) || fread(extra, 1, extra_size, zip) != extra_size)
-				return 0;
+				return map_zip_reject(zip, expected, __LINE__);
 			while (cursor + 4 <= extra_size)
 			{
 				unsigned long id = map_zip_word(extra + cursor);
 				unsigned long length = map_zip_word(extra + cursor + 2);
-				if (cursor + 4 + length > extra_size) return 0;
-				if (id == 0x0001) return 0;
+				if (cursor + 4 + length > extra_size) return map_zip_reject(zip, expected, __LINE__);
+				if (id == 0x0001) return map_zip_reject(zip, expected, __LINE__);
 				cursor += 4 + length;
 			}
-			if (cursor != extra_size) return 0;
+			if (cursor != extra_size) return map_zip_reject(zip, expected, __LINE__);
 			method = (int)map_zip_word(central + 10);
 			packed = compressed_size;
 			unpacked = uncompressed_size;
@@ -392,17 +400,17 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 			found = 1;
 		}
 		else if (fseek(zip, (long)(extra_size + comment_size), SEEK_CUR))
-			return 0;
+			return map_zip_reject(zip, expected, __LINE__);
 		if (found && basename && !SDL_strcasecmp(basename, expected) &&
 			fseek(zip, (long)comment_size, SEEK_CUR))
-			return 0;
+			return map_zip_reject(zip, expected, __LINE__);
 	}
 	if (!found || (method != 0 && method != 8) || !unpacked || unpacked > MAP_DOWNLOAD_MAX_MAP ||
 		(method == 0 && packed != unpacked) ||
 		packed > MAP_DOWNLOAD_MAX_ARCHIVE || fseek(zip, (long)offset, SEEK_SET) ||
 		fread(local, 1, sizeof(local), zip) != sizeof(local) || map_zip_long(local) != 0x04034b50 ||
 		map_zip_word(local + 6) != selected_flags || map_zip_word(local + 8) != (unsigned long)method)
-		return 0;
+		return map_zip_reject(zip, expected, __LINE__);
 	{
 		unsigned long local_name_size = map_zip_word(local + 26);
 		unsigned long local_extra_size = map_zip_word(local + 28);
@@ -411,15 +419,15 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 		if (!local_name_size || local_extra_size > sizeof(local_extra) ||
 			fseek(zip, (long)local_name_size, SEEK_CUR) ||
 			fread(local_extra, 1, local_extra_size, zip) != local_extra_size)
-			return 0;
+			return map_zip_reject(zip, expected, __LINE__);
 		while (cursor + 4 <= local_extra_size)
 		{
 			unsigned long id = map_zip_word(local_extra + cursor);
 			unsigned long length = map_zip_word(local_extra + cursor + 2);
-			if (cursor + 4 + length > local_extra_size || id == 0x0001) return 0;
+			if (cursor + 4 + length > local_extra_size || id == 0x0001) return map_zip_reject(zip, expected, __LINE__);
 			cursor += 4 + length;
 		}
-		if (cursor != local_extra_size) return 0;
+		if (cursor != local_extra_size) return map_zip_reject(zip, expected, __LINE__);
 	}
 	snprintf(partial, sizeof(partial), "%s.partial", target);
 	{
@@ -427,12 +435,12 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 		if (existing != INVALID_HANDLE_VALUE)
 		{
 			CloseHandle(existing);
-			return 0;
+			return map_zip_reject(zip, expected, __LINE__);
 		}
 	}
 	file = CreateFileA(partial, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE)
-		return 0;
+		return map_zip_reject(zip, expected, __LINE__);
 	{
 		z_stream stream;
 		unsigned long remaining = packed;
@@ -475,6 +483,7 @@ static int map_zip_extract(FILE *zip, char const *expected, char const *target)
 				if (ended) break;
 				continue;
 inflate_done:
+				fprintf(stderr, "halo-linux: CE map inflate failed: result=%d remaining=%lu available=%u total_in=%lu total_out=%lu\n", result, remaining, stream.avail_in, stream.total_in, stream.total_out);
 				inflateEnd(&stream);
 				goto done;
 			}
@@ -482,9 +491,12 @@ inflate_done:
 		if (written == unpacked && checksum == crc &&
 			(method != 8 || (ended && remaining == 0 && stream.avail_in == 0)))
 			success = 1;
+		if (method == 8 && !success) fprintf(stderr, "halo-linux: CE map inflate incomplete: ended=%d remaining=%lu available=%u total_in=%lu packed=%lu\n", ended, remaining, stream.avail_in, stream.total_in, packed);
 		if (method == 8) inflateEnd(&stream);
 	}
 done:
+	if (!success)
+		fprintf(stderr, "halo-linux: CE map archive decode failed: expected=%s method=%d written=%lu unpacked=%lu crc=%08lx expected_crc=%08lx\n", expected, method, written, unpacked, checksum, crc);
 	if (success)
 	{
 		unsigned long long file_size = GetFileSize(file, NULL);
@@ -509,7 +521,7 @@ done:
 		if (MoveFileA(partial, target)) return 1;
 	}
 	DeleteFileA(partial);
-	return 0;
+	return map_zip_reject(zip, expected, __LINE__);
 }
 
 static int map_target_exists(char const *target)
@@ -655,9 +667,20 @@ static int SDLCALL map_download_worker(void *context)
 	}
 	snprintf(job->archive, sizeof(job->archive), "%s%s.zip", directory, job->name);
 	SDL_free(directory);
-	snprintf(url, sizeof(url), "https://maps.halonet.net/halonet/locator.php?map=%s&type=ce&format=zip", job->name);
+	/* Fetch the catalog archive by its exact name. Locator aliases can point
+	   at a different cache (for example 1bloodgulch -> bloodgulch). */
+	snprintf(url, sizeof(url), "https://maps.halonet.net/maps/%s.zip", job->name);
 	if (!update_download_limited(url, job->archive, MAP_DOWNLOAD_MAX_ARCHIVE, map_download_progress, job, error, sizeof(error)))
-		goto failed;
+	{
+		/* Older advertised rooms may use a locator alias. Only retry a
+		   not-found response on the same trusted HTTPS host; both paths retain
+		   transfer limits and normal ZIP/header/CRC validation. */
+		if (!strstr(error, "HTTP 404"))
+			goto failed;
+		snprintf(url, sizeof(url), "https://maps.halonet.net/halonet/locator.php?map=%s&type=ce&format=zip", job->name);
+		if (!update_download_limited(url, job->archive, MAP_DOWNLOAD_MAX_ARCHIVE, map_download_progress, job, error, sizeof(error)))
+			goto failed;
+	}
 	zip = fopen(job->archive, "rb");
 	if (!zip)
 	{

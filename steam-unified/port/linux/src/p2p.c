@@ -2340,7 +2340,9 @@ int p2p_join_invite(const char *text)
 	pthread_mutex_lock(&p2p_lock);
 	result = join_invite(text);
 	pthread_mutex_unlock(&p2p_lock);
-	if (result > 0 && !p2p.running)
+	/* Clipboard focus events can queue an invite before networking starts.
+	   In that case initialize will service it; it has not been ignored. */
+	if (result > 0 && !p2p.running && !config_boolean("network.online"))
 		platform_log("Internet play is off (network.online in config.toml): the invite is ignored");
 	return result > 0;
 }

@@ -425,6 +425,8 @@ static const struct config_setting config_settings[] =
 	{ "debug.gpu_flush_draws", _config_integer, "-1", "HALO_GPU_FLUSH_DRAWS", _environment_value, _platform_desktop,
 		"Flush the GPU's pipeline every this many draws: -1 for every 3 on Intel\n"
 		"graphics with Mesa's driver (which can hang without), 0 never." },
+	{ "debug.performance", _config_boolean, "false", "HALO_PERFORMANCE", _environment_value, _platform_all,
+		"Record bounded frame percentiles, process resources, network counters and multiplayer scores every 5-10 seconds." },
 	{ "debug.gpu_stats", _config_boolean, "false", "HALO_GPU_STATS", _environment_set_is_true, _platform_all,
 		"Log the renderer's draw counts once a second." },
 	{ "debug.gpu_trace_frame", _config_integer, "-1", "HALO_GPU_TRACE", _environment_value, _platform_all,

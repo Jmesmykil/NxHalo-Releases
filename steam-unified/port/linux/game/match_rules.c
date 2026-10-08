@@ -459,7 +459,6 @@ void match_rules_host_prespawn_player(long player_index)
 
 void match_rules_host_player_killed(long dead_player_index)
 {
-    struct player_datum *player;
     short absolute;
     if (match_rules_preset_get() != MATCH_RULES_PRESET_ZOMBIES ||
         game_connection() == _game_connection_network_client ||
@@ -469,8 +468,9 @@ void match_rules_host_player_killed(long dead_player_index)
     if (absolute < 0 || absolute >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
         return;
     zombies_infected[absolute] = TRUE;
-    player = player_get(dead_player_index);
-    update_host_team(player, dead_player_index, 1);
+    /* Keep the eliminated player on the team replicated with their current
+       unit through postgame. The infected team is assigned at the next
+       prespawn, where the stock object-create delta delivers it to peers. */
     set_message("Zombies: this player is infected and will respawn with melee only.");
 }
 

@@ -933,6 +933,7 @@ symbols in this file:
 
 #ifdef HALO_CUSTOM_EDITION
 #include "halo_ui_map_list.h"
+#include "halo_network_profile.h"
 #endif
 
 /* ---------- constants */
@@ -2369,6 +2370,7 @@ static boolean main_menu_initialize(
 	player_ui_clear_multiplayer_variant();
 	dispose_global_network_game_client();
 	dispose_global_network_game_server();
+	network_profile_clear_host_override();
 	network_game_accept_remote_connections(FALSE);
 	player_spawn_count = 1;
 	/* port: as multiplayer_type_menu_initialize */

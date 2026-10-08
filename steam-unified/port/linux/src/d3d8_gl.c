@@ -1,4 +1,5 @@
 #include "ui_overlay.h"
+#include "runtime_telemetry.h"
 /*
 D3D8_GL.C
 
@@ -83,6 +84,10 @@ is presented (halo_screen_commit). */
 render target the size of the screen has per unit of it */
 static long screen_width;
 static float screen_scale[2] = { 1.0f, 1.0f };
+/* Configured scene scale; screen_scale can temporarily use full resolution
+   for the HUD after the Deck upscale pass. Only configuration changes resize
+   the logical surfaces or produce a resolution-change log. */
+static float screen_committed_scale[2] = { 1.0f, 1.0f };
 #ifndef HALO_ANDROID
 /* The game's logical scene is rendered at screen_scale. A Deck upscale frame
    first uses a reduced scale, then switches to this output scale at the 3D/HUD
@@ -259,6 +264,8 @@ long halo_screen_width(void)
 	if (!screen_width)
 	{
 		screen_mode_choose(&screen_width, screen_scale);
+		screen_committed_scale[0] = screen_scale[0];
+		screen_committed_scale[1] = screen_scale[1];
 		platform_log("screen: %ldx%d drawn at %.0fx%.0f", screen_width, SCREEN_HEIGHT,
 			screen_width * screen_scale[0], SCREEN_HEIGHT * screen_scale[1]);
 	}
@@ -2101,13 +2108,14 @@ long halo_screen_commit(void)
 	if (!screen_width)
 		return halo_screen_width();
 	screen_mode_choose(&width, scale);
-	if (width != screen_width || scale[0] != screen_scale[0] || scale[1] != screen_scale[1])
+	if (width != screen_width || scale[0] != screen_committed_scale[0] ||
+		scale[1] != screen_committed_scale[1])
 	{
 		platform_log("screen: %ldx%d drawn at %.0fx%.0f", width, SCREEN_HEIGHT,
 			width * scale[0], SCREEN_HEIGHT * scale[1]);
 		screen_width = width;
-		screen_scale[0] = scale[0];
-		screen_scale[1] = scale[1];
+		screen_committed_scale[0] = scale[0];
+		screen_committed_scale[1] = scale[1];
 #ifndef HALO_ANDROID
 		if (device.created)
 		{
@@ -2117,6 +2125,10 @@ long halo_screen_commit(void)
 		}
 #endif
 	}
+	/* Start the next 3D frame at scene resolution after the full-resolution
+	   HUD phase, even when the configured display mode has not changed. */
+	screen_scale[0] = scale[0];
+	screen_scale[1] = scale[1];
 	return screen_width;
 }
 
@@ -4914,6 +4926,8 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	void *unused, void *unused2)
 {
 	static long screenshot_every = -1;
+	double telemetry_entered = halo_telemetry_time_ms();
+	double telemetry_completed;
 
 	(void)source_rectangle;
 	(void)destination_rectangle;
@@ -4973,6 +4987,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		device.index_offset = INDEX_BUFFER_SIZE;
 #endif
 	}
+	telemetry_completed = halo_telemetry_time_ms();
 	device.frame++;
 	stats.presents++;
 	if (debug_settings.statistics && device.frame % 60 == 0)
@@ -5001,6 +5016,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		pending_flips++;
 	}
 	pthread_mutex_unlock(&vertical_blank_lock);
+	halo_telemetry_present(telemetry_entered, telemetry_completed, device.frame);
 }
 
 HRESULT WINAPI D3DDevice_PersistDisplay(void)

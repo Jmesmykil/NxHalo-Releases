@@ -1,0 +1,173 @@
+{
+  "name": "NxHalo Unified Runtime Preview 2.9.4",
+  "tag": "v0.2.9.4-steamdeck-runtime",
+  "prerelease": true,
+  "platform": "Steam Deck/Linux",
+  "single_executable": true,
+  "binary_sha256": "8335b4f246b592854a91916bb36141c884883eb197eff1f5e59e4fe78aae64fc",
+  "source_sha256": "cc42606df9ee224b0fd246b8effe80f5c6276328e1521c01e3e0364a0dc9ec5b",
+  "launcher_sha256": "9ea947ee4e95d1f3084497366716526321f8edf88b724da0adb145e6faaa8f57",
+  "source_archive_entries": 2255,
+  "deck_install_verified": true,
+  "network_host_profiles": [
+    11,
+    20,
+    21
+  ],
+  "game_data_included": false,
+  "previous_releases": [
+    "v0.2.9.3-steamdeck-rules",
+    "v0.2.9.2-steamdeck-menus",
+    "v0.2.9.1-steamdeck-content",
+    "v0.2.9-steamdeck-content"
+  ],
+  "acceptance": {
+    "online_campaign_menu_route_profile_runtime_override": "route/profile behavior verified; natural campaign browser joined a private 2-player V21 lobby and loaded a50; client W for 3s moved from (31.630,-32.980,87.205) to (27.607,-29.640,88.111), throttle 1; host reported matching final position; ticks ~31/s and traffic increased; profile11 unchanged; no full campaign completion claim",
+    "online_campaign_end_to_end_verified": false,
+    "roster_ui_test_binary_sha256": "5ecb2c2bca91792e9b901e8a4f427b5b94d75633e641e4a6cd60aeea51942a11",
+    "roster_host_count": 1,
+    "roster_synthetic_peer_count": 127,
+    "roster_displayed_count": 128,
+    "roster_tail_selection": "rows 118-128; selected slot 128 and details visible",
+    "roster_real_128_users_verified": false,
+    "roster_retested_on_candidate": false,
+    "visible_texture_test_binary_sha256": "4dd54a46c8554f25386d2ee7619dc904d1a9df60315dcca85071cfdec68b7d3f",
+    "visible_texture_identity": "scenery\\halo\\bitmaps\\halo inner ring bitmap 0",
+    "visible_texture_fixture": "synthetic TGA; visible baseline/enabled comparison; software llvmpipe",
+    "visible_texture_deck_gpu_performance_verified": false,
+    "visible_texture_retested_on_candidate": false,
+    "map_download_test_binary_sha256": "0f6e0df06a59c5ac189ce75f2c4f68a31f621d735de36049400d500840ae9d1b",
+    "map_download_test_cases": {
+      "3Tiers": {
+        "bytes": 22590613,
+        "cache_header": "daeh",
+        "sha256": "71d53da30f2c4719bb912c07e38c39015b409be9bf2a0cf672bc75828a294dad"
+      },
+      "1bloodgulch": {
+        "bytes": 16610796,
+        "sha256": "a676c21c4ad75cdf5dc88ed4f76335ec018948efa84d92107ea5370e86635c9d"
+      }
+    },
+    "map_download_input": "private native XTest keyboard search/filter/select; two maps tested, not physical Deck input or universal catalog coverage",
+    "zombies_endround_test_binary_sha256": "0f6e0df06a59c5ac189ce75f2c4f68a31f621d735de36049400d500840ae9d1b",
+    "zombies_endround_two_client_protocol11": "passed; host tick255 and peer tick264; identical final player arrays: slot1 team0 loss (0 kills/1 death), slot2 team1 win (1 kill/0 deaths)",
+    "telemetry_test_binary_sha256": "0f6e0df06a59c5ac189ce75f2c4f68a31f621d735de36049400d500840ae9d1b",
+    "telemetry_records": "ELF identity, timing percentiles, RSS/resources, replication/damage counters, match snapshots and engine final outcome",
+    "telemetry_renderer": "Mesa 26.2.2 llvmpipe on local Omarchy; not Deck performance",
+    "deck_install_verified": true,
+    "deck_performance_capture_verified": true,
+    "switch_hardware_included": false,
+    "deck_measurement_scope": "one Bloodgulch 2-player session in Quality mode; no universal performance claim",
+    "switch_candidate": {
+      "tag": "v0.2.9.4-switch-content-preview",
+      "nro_sha256": "95146cf80828d3c7da2b450a7c677b2ce79caab03acfe72b456d35945aa5404b",
+      "guest_sha256": "4c0211097f63ddcb1041bf7169e349f3a0b2def93c914107fd11fab2d8af31ab",
+      "source_zip_sha256": "14857ed2ed9de2a4d8f2838d73d6f4e98c38885cb31292ff361ee46f6140112b",
+      "sd_staged_readback_verified": true,
+      "physical_launch_verified": false,
+      "source_entries": 2305,
+      "source_commit": "9322691ba8060e613b393231e7a946cb40582cfe"
+    },
+    "deck_gameplay_performance": "8335; four post-load intervals 59.70 fps; wall p95 16.825-16.864 ms; p99 16.909-16.949 ms; latest CPU 26.22%; RSS 210136 KiB, peak 238484 KiB; scene 852x480 and draw 1280x720",
+    "deck_gpu_sensor_limit": "No per-game GPU timing claim; capture used native AMD/vangogh OpenGL 4.6 / Mesa 26.1.2",
+    "deck_predecessor_measurement": "6582bd88 predecessor: one Bloodgulch two-player Quality session, 1280x720 scene to 1920x1080, 59.6-59.7 fps, wall p95 16.81-16.83 ms, p99 16.89-16.91 ms, CPU31%, RSS 212992 KiB (208 MiB)",
+    "deck_performance_capture_scope": "one 65-second two-player Protocol 11 Bloodgulch LAN session in Quality mode; not universal",
+    "deck_predecessor_gameplay_capture_verified": true,
+    "campaign_trace_test_binary_sha256": "8335b4f246b592854a91916bb36141c884883eb197eff1f5e59e4fe78aae64fc",
+    "campaign_trace_test_status": "passed bounded W movement/state agreement on a50; trace read-only and off by default; not full campaign completion",
+    "online_coop_movement_verified": true,
+    "deck_install_binary_sha256": "8335b4f246b592854a91916bb36141c884883eb197eff1f5e59e4fe78aae64fc",
+    "deck_process_verified": true,
+    "deck_process_binary_sha256": "8335b4f246b592854a91916bb36141c884883eb197eff1f5e59e4fe78aae64fc",
+    "deck_performance_capture_binary_sha256": "8335b4f246b592854a91916bb36141c884883eb197eff1f5e59e4fe78aae64fc",
+    "deck_capture_composition": "1920x1080 screenshot is composed capture size, not logical render target",
+    "deck_timed_match_final_winner_recorded": false,
+    "deck_gameplay_fixture_exit_status": "host and peer exited 0; config and launcher restored; original shortcut relaunched PID 600229",
+    "deck_gameplay_capture_pid": 600095,
+    "deck_post_restore_original_shortcut_pid": 600229
+  },
+  "excluded_content": [
+    "game maps",
+    "owner resource companions",
+    "shader instruction tokens",
+    "console keys",
+    "personal saves"
+  ],
+  "assets": {
+    "NxHalo-SteamDeck-unified-runtime-preview2.9.4.tar.gz": {
+      "bytes": 22125698,
+      "sha256": "069c50ada94de069a06a0b9778bed5f366f2ddf718823d97b96e2f1637cc2015"
+    },
+    "NxHalo-Unified-source-2.9.4.zip": {
+      "bytes": 17897214,
+      "sha256": "cc42606df9ee224b0fd246b8effe80f5c6276328e1521c01e3e0364a0dc9ec5b"
+    },
+    "NATIVE-CONTENT.md": {
+      "bytes": 3005,
+      "sha256": "60bd39a1f2aacba0a8a79482121c328d0e204844127d933b8fafd15d94b032c2"
+    },
+    "SUPPORTED-MODS.md": {
+      "bytes": 2872,
+      "sha256": "acc9c304b86e5fceccf453adcac7bd851ebf5ba44f9d319b7979dbf6f64b1c19"
+    },
+    "RUNTIME-TELEMETRY.md": {
+      "bytes": 3146,
+      "sha256": "4ce909de90d69c56c4b656211eaeb78bfd126aa099e37c969c8fa75d4ebd0292"
+    },
+    "VERIFICATION-EVIDENCE.md": {
+      "bytes": 7438,
+      "sha256": "593e1adfa68790a98335376e0e8cc1a055c0cc8018d02a54e4b164892bec9d78"
+    },
+    "release-notes.md": {
+      "bytes": 5827,
+      "sha256": "88288e7bcc8d1b5eea19ad86295276052e65656de3d93aa97878ba08b7f4a4a0"
+    }
+  },
+  "candidate_install_verified": true,
+  "candidate_install_status": "8335 atomically installed, destination exact hash read back, PID 600229 verified running from original Steam shortcut",
+  "previous_candidate_binary_sha256": "0f6e0df06a59c5ac189ce75f2c4f68a31f621d735de36049400d500840ae9d1b",
+  "deck_runtime_scope": "8335 post-load menu startup and one 65-second two-player Bloodgulch Quality-mode gameplay capture; no universal performance claim",
+  "previous_candidate_deck_runtime": {
+    "pid": 599413,
+    "elf_build_id": "516b352de9781be01ad32f2b5bad11c47cdc8001",
+    "device": "Steam Deck Jupiter / AMD vangogh",
+    "renderer": "native AMD GPU / OpenGL",
+    "postload_menu_fps": 60,
+    "postload_wall_p95_ms": 16.81,
+    "postload_wall_p99_ms": 16.865,
+    "rss_kib": 207468,
+    "original_steam_shortcut": true,
+    "launcher_sha256": "9ea947ee4e95d1f3084497366716526321f8edf88b724da0adb145e6faaa8f57",
+    "configuration_restored": true,
+    "predecessor_gameplay_capture_binary_sha256": "6582bd882fbb79de03bca73ba98c2f5cc640b2d6afcc96425c2c00af6a47834b",
+    "wall_p95_ms": 16.81,
+    "wall_p99_ms": 16.865,
+    "predecessor_gameplay_rss_kib": 212992
+  },
+  "elf_build_id": "ecebfaa1f3985674f649d2e73dab077f505dab20",
+  "previous_candidate_last_verified_process_binary_sha256": "0f6e0df06a59c5ac189ce75f2c4f68a31f621d735de36049400d500840ae9d1b",
+  "running_process_binary_sha256": "8335b4f246b592854a91916bb36141c884883eb197eff1f5e59e4fe78aae64fc",
+  "deck_runtime": {
+    "pid": 600229,
+    "elf_build_id": "ecebfaa1f3985674f649d2e73dab077f505dab20",
+    "device": "Steam Deck Jupiter / AMD vangogh",
+    "renderer": "AMD OpenGL 4.6 / Mesa 26.1.2",
+    "postload_menu_fps": 60,
+    "original_steam_shortcut": true,
+    "launcher_sha256": "9ea947ee4e95d1f3084497366716526321f8edf88b724da0adb145e6faaa8f57",
+    "configuration_restored": true,
+    "configuration_matches_preinstall_backup": true
+  },
+  "source_snapshot_sha256": "cc42606df9ee224b0fd246b8effe80f5c6276328e1521c01e3e0364a0dc9ec5b",
+  "source_snapshot_entries": 2255,
+  "post_snapshot_doc_only_commit": "1890097",
+  "source_snapshot_doc_note": "The pinned source ZIP bytes remain unchanged. NxHalo main commit 1890097 adds documentation-only corrections to the Linux roster description and 2.9.3 native-content menu path; include these docs when syncing the 2.9.4 source mirror.",
+  "candidate_menu_startup": {
+    "pid": 599911,
+    "binary_sha256": "8335b4f246b592854a91916bb36141c884883eb197eff1f5e59e4fe78aae64fc",
+    "postload_fps": 60,
+    "wall_p95_ms": "16.815-16.818",
+    "wall_p99_ms": "16.871-16.873",
+    "rss_kib": 201504
+  }
+}

@@ -845,9 +845,41 @@ int network_profile_known_version(unsigned int version)
 	return FALSE;
 }
 
+static unsigned int network_profile_host_override;
+
+int network_profile_set_host_override(unsigned int version)
+{
+	if (version == 0)
+	{
+		network_profile_host_override = 0;
+		return TRUE;
+	}
+	if (!network_profile_known_version(version))
+		return FALSE;
+	/* An automatic campaign route may only select a wire that supports co-op. */
+	{
+		long index;
+		for (index = 0; index < (long)(sizeof(network_profile_ranges) / sizeof(network_profile_ranges[0])); index++)
+			if (network_profile_ranges[index].version == version && network_profile_ranges[index].coop)
+			{
+				network_profile_host_override = version;
+				return TRUE;
+			}
+	}
+	return FALSE;
+}
+
+void network_profile_clear_host_override(void)
+{
+	network_profile_host_override = 0;
+}
+
 int network_profile_host_version(void)
 {
-	long configured = config_integer("network.compatibility_version");
+	long configured;
+	if (network_profile_host_override)
+		return (int)network_profile_host_override;
+	configured = config_integer("network.compatibility_version");
 	/* Only stable profile choices are hostable. Invalid config falls back to
 	 * current OpenCE 21; it never silently advertises another wire. */
 	return configured == 11 || configured == 20 || configured == 21 ? (int)configured : 21;
