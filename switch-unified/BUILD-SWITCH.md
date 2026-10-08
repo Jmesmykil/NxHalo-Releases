@@ -1,6 +1,6 @@
-# Private Switch candidate build recipe
+# Nintendo Switch community preview build recipe
 
-This tree is the source used for the private Switch candidate NRO. The NRO embeds the matching Android-ABI guest ELF, a Mozilla CA bundle, and its MPL-2.0 license and source notice. It contains no Halo map assets, console keys, or `instructions.inc`.
+This tree documents the source used for the Switch 2.9.4 content preview NRO. The NRO embeds the matching Android-ABI guest ELF, a Mozilla CA bundle, and its MPL-2.0 license and source notice. It contains no Halo map assets, console keys, or `instructions.inc`.
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ python3 configure.py \
 ninja -f build.ninja build/android/halo_guest.elf
 ```
 
-The verified candidate used LLVM 22 clang/llvm-ar and Rust LLD on macOS. Keep all object output and temporary files on a volume with sufficient free space.
+The 2.9.4 preview was built with the available Clang 21/llvm-ar and Rust LLD on macOS. Profile-guided optimization requiring Clang 22 was therefore omitted. Keep all object output and temporary files on a volume with sufficient free space.
 
 ## Host NRO
 
@@ -35,6 +35,10 @@ cp build/android/halo_guest.elf port/switch/romfs/halo_guest.elf
 ```
 
 `make host` builds the native Switch host and packages the RomFS files, including the guest ELF and CA bundle, into `halo.nro`. It does not install or deploy the package. Do not add private map assets or console keys to this source bundle.
+
+## Preview status
+
+The 2.9.4 NRO was staged at `switch/NxHalo-Content29/halo.nro` on the identified SD volume, with the replaced file retained for rollback. The NRO has not been launched on Switch hardware, and gameplay has not been verified. No HOME-menu NSP forwarder was inspected or verified; this source package includes no NSP.
 
 ## Trust roots
 

@@ -62,6 +62,19 @@ Each platform has its own instructions:
 | Windows (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/windows/README.md](port/windows/README.md) |
 | Android (arm64 app, OpenGL ES 3, SDL3) | [port/android/README.md](port/android/README.md) |
 
+### Nintendo Switch preview
+
+A separate NxHalo community preview is available as a standalone homebrew NRO.
+It is not part of the OpenCE release downloads or its standard Linux, Windows,
+and Android CI builds. The NRO does not include Halo game maps, resource maps,
+console keys, or an NSP installer. See [BUILD-SWITCH.md](BUILD-SWITCH.md) for
+the Switch host/guest build recipe and the preview's acceptance limits.
+
+The 2.9.4 preview is staged on SD at
+`switch/NxHalo-Content29/halo.nro`. That is the standalone NRO path; a HOME-menu
+NSP forwarder target has not been established, and no Switch runtime launch or
+gameplay acceptance is claimed for this preview.
+
 The Linux README also gives the controls, the settings and the multiplayer
 functions. These are almost the same on all platforms.
 
