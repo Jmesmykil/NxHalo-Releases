@@ -1,3 +1,9 @@
+## NxHalo Steam Deck/Linux update: 2.9.5
+
+[Runtime and source](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.9.5-steamdeck-lobby-modes). Read the [feature guide and validation limits](docs/LOBBIES-MODES-CONTENT-2.9.5.md). Supply your own game data.
+
+Upstream project documentation follows.
+
 # Halo: Combat Evolved for Linux, Windows and Android
 
 [![Join our Discord](https://invidget.switchblade.xyz/9gqcHyr5km)](https://discord.gg/9gqcHyr5km)

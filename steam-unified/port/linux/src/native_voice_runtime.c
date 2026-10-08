@@ -18,6 +18,7 @@
 #define VOICE_PLAYBACK_FRAMES_PER_STREAM 3
 #define VOICE_PLAYER_LIMIT 128
 #define VOICE_SAMPLE_GAIN 0.45f
+#define VOICE_CAPTURE_RETRY_MS 1000
 
 struct playback_frame {
     int16_t samples[NATIVE_VOICE_SAMPLES];
@@ -34,10 +35,13 @@ struct playback_stream {
 static pthread_mutex_t voice_lock = PTHREAD_MUTEX_INITIALIZER;
 static SDL_AudioStream *capture_stream;
 static struct playback_stream playback[VOICE_PLAYBACK_STREAMS];
-static int voice_enabled, ptt_active, menus_active_previous, session_map_initialized;
+/* ptt_active: the microphone is being read, by the key or by open mic. */
+static int voice_enabled, voice_open, voice_menus, voice_lobby_mix, ptt_active, session_map_initialized;
+static int session_connected_previous, local_allowed_previous;
 static unsigned long session_map_token;
 static int16_t capture_pending[NATIVE_VOICE_SAMPLES];
 static unsigned int capture_pending_count;
+static Uint64 capture_retry_time;
 static uint32_t capture_sequence;
 static unsigned char receive_sender[6], receive_speaker[6];
 static unsigned char session_host[6];
@@ -78,10 +82,15 @@ static void playback_push(const struct native_voice_frame *frame, int speaker_sl
     float left, output_right;
     struct playback_stream *stream = NULL;
     int i, tail;
-    if (speaker_slot < 0 || speaker_slot >= VOICE_PLAYER_LIMIT ||
-        !network_game_port_voice_spatial(speaker_slot, listener, right, speaker)) { trace_mapping_drops++; return; }
-    trace_spatial++;
-    native_voice_spatial_gains(listener, right, speaker, 1.0f, 30.0f, &left_gain, &right_gain);
+    if (speaker_slot < 0 || speaker_slot >= VOICE_PLAYER_LIMIT) { trace_mapping_drops++; return; }
+    if (voice_lobby_mix) {
+        /* A joined lobby has an authenticated roster, but no world positions. */
+        left_gain = right_gain = 0.70710678f;
+    } else {
+        if (!network_game_port_voice_spatial(speaker_slot, listener, right, speaker)) { trace_mapping_drops++; return; }
+        trace_spatial++;
+        native_voice_spatial_gains(listener, right, speaker, 1.0f, 30.0f, &left_gain, &right_gain);
+    }
     left = left_gain * VOICE_SAMPLE_GAIN;
     output_right = right_gain * VOICE_SAMPLE_GAIN;
     pthread_mutex_lock(&voice_lock);
@@ -112,11 +121,16 @@ static int capture_open(void)
     SDL_AudioSpec spec;
     if (capture_stream) return 1;
     if (!config_boolean("audio.voice_enabled")) return 0;
+    /* Open mic asks on every update: do not hammer a missing or refused device. */
+    if (SDL_GetTicks() < capture_retry_time) return 0;
     spec.format = SDL_AUDIO_S16;
     spec.channels = 1;
     spec.freq = NATIVE_VOICE_RATE;
     capture_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &spec, NULL, NULL);
-    if (!capture_stream) return 0;
+    if (!capture_stream) {
+        capture_retry_time = SDL_GetTicks() + VOICE_CAPTURE_RETRY_MS;
+        return 0;
+    }
     SDL_ResumeAudioStreamDevice(capture_stream);
     return 1;
 }
@@ -200,7 +214,7 @@ static void capture_drain(void)
     }
 }
 
-static void receive_drain(void)
+static void receive_drain(int allow_playback)
 {
     unsigned long addresses[VOICE_PLAYER_LIMIT];
     int slots[VOICE_PLAYER_LIMIT], roster_count, limit = 64;
@@ -228,19 +242,32 @@ static void receive_drain(void)
                     !p2p_voice_peer_for_address(voice_socket_address(addresses[i]), destination)) continue;
                 trace_sent += p2p_voice_send_relay(destination, receive_sender, verified_slot, voice_wire, sizeof(voice_wire));
             }
-            playback_push(&frame, verified_slot);
+            if (allow_playback) playback_push(&frame, verified_slot);
         } else {
             static const unsigned char zero_identity[6] = { 0 };
             if (!receive_relayed || receive_slot < 0 || receive_slot >= VOICE_PLAYER_LIMIT ||
                 memcmp(receive_speaker, zero_identity, sizeof(zero_identity)) == 0) continue;
-            playback_push(&frame, receive_slot);
+            if (allow_playback) playback_push(&frame, receive_slot);
         }
     }
+}
+
+/* Only an explicit "open" is open mic; anything else stays push-to-talk. */
+static int voice_open_mode(void)
+{
+    return strcmp(config_string("audio.voice_mode"), "open") == 0;
 }
 
 void native_voice_runtime_update(int ptt_pressed, int menus_active)
 {
     int enabled = config_boolean("audio.voice_enabled");
+    int open_mode = enabled && voice_open_mode();
+    int in_menus = config_boolean("audio.voice_in_menus");
+    int connected = network_game_port_voice_session_connected();
+    int gameplay = network_game_port_voice_session_active();
+    int local_allowed = enabled && connected &&
+        ((gameplay && !menus_active) || in_menus);
+    int lobby_mix = connected && !gameplay;
     unsigned char current_host[6] = { 0 };
     int has_host = p2p_voice_session_host(current_host);
     unsigned long current_map = network_game_port_voice_map_token();
@@ -252,34 +279,37 @@ void native_voice_runtime_update(int ptt_pressed, int menus_active)
     if (trace_enabled && enabled && SDL_GetTicks() - trace_time >= 2000) {
         unsigned long addresses[VOICE_PLAYER_LIMIT]; int slots[VOICE_PLAYER_LIMIT];
         trace_time = SDL_GetTicks();
-        platform_log("native voice: enabled=%d ptt=%d menus=%d host=%d roster=%d capture=%lu sent=%lu received=%lu spatial=%lu mapping_drop=%lu mixed=%lu",
+        platform_log("native voice: enabled=%d ptt=%d menus=%d host=%d roster=%d capture=%lu sent=%lu received=%lu spatial=%lu mapping_drop=%lu mixed=%lu open=%d lobby_voice=%d connected=%d allowed=%d",
             enabled, ptt_pressed, menus_active, has_host,
             network_game_server_port_voice_roster(addresses, slots, VOICE_PLAYER_LIMIT),
-            trace_capture, trace_sent, trace_received, trace_spatial, trace_mapping_drops, atomic_load(&trace_mixed));
+            trace_capture, trace_sent, trace_received, trace_spatial, trace_mapping_drops, atomic_load(&trace_mixed),
+            open_mode, in_menus, connected, local_allowed);
     }
     if (!has_host) memset(current_host, 0, sizeof(current_host));
-    if (voice_enabled != enabled || !session_host_initialized || map_changed || memcmp(session_host, current_host, sizeof(session_host))) {
+    if (voice_enabled != enabled || !session_host_initialized || map_changed ||
+        session_connected_previous != connected ||
+        memcmp(session_host, current_host, sizeof(session_host))) {
         voice_enabled = enabled;
+        session_connected_previous = connected;
         session_host_initialized = 1;
         memcpy(session_host, current_host, sizeof(session_host));
         session_map_initialized = 1;
         session_map_token = current_map;
         capture_pause();
         ptt_active = 0;
-        p2p_voice_enable(enabled);
+        p2p_voice_enable(enabled && connected);
         playback_clear();
     }
-    if (menus_active) {
-        if (!menus_active_previous) {
-            capture_pause();
-            playback_clear();
-            p2p_voice_enable(enabled);
-        }
-        menus_active_previous = 1;
+    if (voice_open != open_mode || voice_menus != in_menus ||
+        local_allowed_previous != local_allowed || voice_lobby_mix != lobby_mix) {
+        voice_open = open_mode;
+        voice_menus = in_menus;
+        voice_lobby_mix = lobby_mix;
+        local_allowed_previous = local_allowed;
+        capture_pause();
+        playback_clear();
         ptt_active = 0;
-        return;
     }
-    menus_active_previous = 0;
     if (!enabled) {
         if (capture_stream) {
             SDL_DestroyAudioStream(capture_stream);
@@ -289,7 +319,7 @@ void native_voice_runtime_update(int ptt_pressed, int menus_active)
         playback_clear();
         return;
     }
-    if (!menus_active && ptt_pressed && capture_open()) {
+    if (local_allowed && (open_mode || ptt_pressed) && capture_open()) {
         if (!ptt_active) {
             SDL_ClearAudioStream(capture_stream);
             SDL_ResumeAudioStreamDevice(capture_stream);
@@ -300,7 +330,9 @@ void native_voice_runtime_update(int ptt_pressed, int menus_active)
         capture_pause();
         ptt_active = 0;
     }
-    receive_drain();
+    /* A host's local menu preference must not interrupt consenting peers'
+     * relay. Admission and identity checks remain in receive_drain. */
+    if (connected) receive_drain(local_allowed);
 }
 
 void native_voice_runtime_mix(float *stereo, size_t frames)
@@ -360,7 +392,9 @@ void native_voice_runtime_reset(void)
         SDL_DestroyAudioStream(capture_stream);
         capture_stream = NULL;
     }
-    ptt_active = voice_enabled = session_host_initialized = menus_active_previous = session_map_initialized = 0;
+    ptt_active = voice_enabled = voice_open = voice_menus = voice_lobby_mix = 0;
+    session_host_initialized = session_map_initialized = session_connected_previous = local_allowed_previous = 0;
+    capture_retry_time = 0;
     session_map_token = 0;
     memset(session_host, 0, sizeof(session_host));
     playback_clear();

@@ -161,7 +161,16 @@ static const struct config_setting config_settings[] =
 		"as the Xbox does." },
 
 	{ "audio.voice_enabled", _config_boolean, "false", "HALO_VOICE_ENABLED", _environment_value, _platform_desktop,
-		"Enable compatible-client push-to-talk voice. Mic starts only while the PTT key is held." },
+		"Enable optional voice, which requires compatible clients. The microphone\n"
+		"is used only as audio.voice_mode says, and never while this is false." },
+	{ "audio.voice_mode", _config_string, "\"ptt\"", "HALO_VOICE_MODE", _environment_value, _platform_desktop,
+		"How voice transmits once audio.voice_enabled is true: \"ptt\" only while\n"
+		"the push-to-talk key (controls.voice_ptt) is held; \"open\" continuously\n"
+		"transmits the microphone during gameplay, with no key. Anything else is\n"
+		"\"ptt\"." },
+	{ "audio.voice_in_menus", _config_boolean, "false", "HALO_VOICE_IN_MENUS", _environment_value, _platform_desktop,
+		"Allow voice in connected lobbies and menus. Uses audio.voice_mode;\n"
+		"never captures outside a joined session or when voice is disabled." },
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
 	{ "audio.volume", _config_real, "1.0", "HALO_VOLUME", _environment_value, _platform_all,
@@ -191,6 +200,8 @@ static const struct config_setting config_settings[] =
 		"same as input.mouse_sensitivity." },
 
 	/* the keyboard and mouse's own controls (port/linux/src/xinput_sdl.c) */
+	{ "controls.vehicle_boost", _config_string, "\"L\"", "HALO_KEY_VEHICLE_BOOST", _environment_value, _platform_all,
+		"Hold to boost while driving a Ghost. Controller L/LB/L1 also boosts." },
 	{ "controls.voice_ptt", _config_string, "\"V\"", "HALO_KEY_VOICE_PTT", _environment_value, _platform_desktop,
 		"Keyboard push-to-talk key for optional compatible-client voice." },
 	{ "controls.move_forward", _config_string, "\"W\"", "HALO_KEY_MOVE_FORWARD", _environment_value, _platform_all,
@@ -887,6 +898,21 @@ static void config_report_unknown_keys(toml_datum_t table)
 	}
 }
 
+/* audio.voice_mode is "ptt" or "open": anything else (misspelt, or of some
+other build) is push-to-talk, so that the microphone is never open by
+mistake */
+static void config_check_voice_mode(size_t index)
+{
+	const char *mode = config_values[index].string;
+
+	if (strcmp(config_settings[index].name, "audio.voice_mode") != 0 || !mode || !strcmp(mode, "ptt") ||
+		!strcmp(mode, "open"))
+		return;
+	platform_log("settings: audio.voice_mode \"%s\" is neither \"ptt\" nor \"open\"; using \"ptt\"", mode);
+	/* (the old string is kept, as config_set_from_text keeps it) */
+	config_values[index].string = strdup("ptt");
+}
+
 static void config_load(void)
 {
 	char path[1024];
@@ -968,6 +994,8 @@ static void config_load(void)
 			break;
 		}
 	}
+	for (index = 0; index < NUMBER_OF_CONFIG_SETTINGS; index++)
+		config_check_voice_mode(index);
 }
 
 static const struct config_value *config_value(const char *name, enum config_type type)
@@ -1045,6 +1073,7 @@ int config_write(const char *name, const char *value)
 	config_value(name, config_settings[index].type);
 	pthread_mutex_lock(&config_lock);
 	config_set_from_text(&config_values[index], config_settings[index].type, value);
+	config_check_voice_mode((size_t)index);
 	snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
 	snprintf(key, sizeof(key), "%s", dot + 1);
 	switch (config_settings[index].type)

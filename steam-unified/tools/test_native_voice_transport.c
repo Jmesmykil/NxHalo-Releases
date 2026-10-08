@@ -6,28 +6,49 @@
 
 static unsigned long test_clock = 1000;
 static unsigned long test_map_token;
+static int test_voice_session_active;
+static int test_voice_session_connected = 1;
+static int test_voice_in_menus;
+static int test_spatial_available = 1;
 static int test_voice_enabled;
+static const char *test_voice_mode = "ptt";
+static int test_capture_device, test_capture_samples;
 static unsigned char captured[MAXIMUM_PACKET_SIZE];
 static int captured_size;
 void platform_log(const char *format, ...) { (void)format; }
 
-int config_boolean(const char *name) { (void)name; return test_voice_enabled; }
+int config_boolean(const char *name) { return !strcmp(name, "audio.voice_in_menus") ? test_voice_in_menus : test_voice_enabled; }
+const char *config_string(const char *name) { (void)name; return test_voice_mode; }
 int network_game_server_port_voice_roster(unsigned long *addresses, int *slots, int capacity)
 { (void)addresses; (void)slots; (void)capacity; return 0; }
 int network_game_server_port_voice_sender_slot(unsigned long address, int controller, int *slot)
 { (void)address; (void)controller; (void)slot; return 0; }
 int network_game_port_voice_spatial(int speaker_slot, float listener[3], float right[3], float speaker[3])
-{ (void)speaker_slot; listener[0]=listener[1]=listener[2]=0; right[0]=1; right[1]=right[2]=0; speaker[0]=speaker[1]=speaker[2]=0; return 1; }
+{ (void)speaker_slot; listener[0]=listener[1]=listener[2]=0; right[0]=1; right[1]=right[2]=0; speaker[0]=speaker[1]=speaker[2]=0; return test_spatial_available; }
 unsigned long network_game_port_voice_map_token(void) { return test_map_token; }
+int network_game_port_voice_session_active(void) { return test_voice_session_active; }
+int network_game_port_voice_session_connected(void) { return test_voice_session_connected; }
 SDL_AudioStream *SDL_OpenAudioDeviceStream(SDL_AudioDeviceID device, const SDL_AudioSpec *spec, SDL_AudioStreamCallback callback, void *userdata)
-{ (void)device; (void)spec; (void)callback; (void)userdata; return NULL; }
+{
+    /* A fake microphone, only while a test asks for one: no audio device opens. */
+    static char fake_stream;
+    (void)device; (void)spec; (void)callback; (void)userdata;
+    return test_capture_device ? (SDL_AudioStream *)(void *)&fake_stream : NULL;
+}
 bool SDL_ResumeAudioStreamDevice(SDL_AudioStream *stream) { (void)stream; return false; }
 bool SDL_PauseAudioStreamDevice(SDL_AudioStream *stream) { (void)stream; return true; }
-bool SDL_ClearAudioStream(SDL_AudioStream *stream) { (void)stream; return true; }
+bool SDL_ClearAudioStream(SDL_AudioStream *stream) { (void)stream; test_capture_samples = 0; return true; }
 void SDL_DestroyAudioStream(SDL_AudioStream *stream) { (void)stream; }
-int SDL_GetAudioStreamAvailable(SDL_AudioStream *stream) { (void)stream; return 0; }
+int SDL_GetAudioStreamAvailable(SDL_AudioStream *stream) { (void)stream; return test_capture_samples * (int)sizeof(int16_t); }
 int SDL_GetAudioStreamData(SDL_AudioStream *stream, void *buffer, int length)
-{ (void)stream; (void)buffer; (void)length; return 0; }
+{
+    int count = length / (int)sizeof(int16_t), i;
+    (void)stream;
+    if (count > test_capture_samples) count = test_capture_samples;
+    for (i = 0; i < count; i++) ((int16_t *)buffer)[i] = 4321;
+    test_capture_samples -= count;
+    return count * (int)sizeof(int16_t);
+}
 Uint64 SDL_GetTicks(void) { return test_clock; }
 unsigned long __stdcall GetTickCount(void) { return test_clock; }
 void posix_random_bytes(void *buffer, posix_ulong size) { memset(buffer, 0x42, (size_t)size); }
@@ -303,6 +324,122 @@ int main(void)
         for (sample = 0; sample < 2 * NATIVE_VOICE_SAMPLES * 3; sample++) assert(mixed[sample] == 0.0f);
         test_voice_enabled = 0;
         native_voice_runtime_update(0, 0);
+    }
+    { /* Open mic: the fake microphone's PCM reaches the host without the key
+       * only when voice is enabled, the mode is "open" and play is live. */
+        const int half = NATIVE_VOICE_SAMPLES / 2;
+        test_capture_device = 1;
+        test_voice_enabled = 1;
+        test_voice_session_active = 0;
+        peer->is_host = 1; /* A connected P2P host alone is still pregame. */
+        assert(p2p_voice_session_host(sender));
+        native_voice_runtime_update(0, 0);
+        test_capture_samples = NATIVE_VOICE_SAMPLES; captured_size = 0;
+        native_voice_runtime_update(0, 0);
+        assert(!captured_size && test_capture_samples == NATIVE_VOICE_SAMPLES); /* Push-to-talk, key up. */
+        test_voice_mode = "OPEN MIC"; /* An unknown mode is push-to-talk. */
+        native_voice_runtime_update(0, 0);
+        assert(!captured_size && test_capture_samples == NATIVE_VOICE_SAMPLES);
+        test_voice_mode = "open";
+        test_capture_samples = NATIVE_VOICE_SAMPLES;
+        native_voice_runtime_update(0, 0);
+        assert(!captured_size && test_capture_samples == NATIVE_VOICE_SAMPLES); /* P2P host exists, but no in-game local unit: don't read. */
+        native_voice_runtime_update(1, 0);
+        assert(!captured_size && test_capture_samples == NATIVE_VOICE_SAMPLES); /* Open mode cannot bypass the live-game gate with its PTT key. */
+        test_voice_session_active = 1;
+        native_voice_runtime_update(0, 0);
+        assert(!captured_size && !test_capture_samples); /* Entering open mic discards queued pregame samples. */
+        test_capture_samples = NATIVE_VOICE_SAMPLES;
+        native_voice_runtime_update(0, 0);
+        assert(captured_size > 0 && !capture_pending_count); /* Live play: one frame sent, no key. */
+        captured_size = 0; test_capture_samples = half;
+        native_voice_runtime_update(0, 0);
+        assert(!captured_size && capture_pending_count == (unsigned int)half);
+        test_voice_session_active = 0; /* Game stops while a partial frame is buffered. */
+        native_voice_runtime_update(1, 0);
+        assert(!captured_size && !capture_pending_count && test_capture_samples == 0);
+        test_voice_session_active = 1;
+        native_voice_runtime_update(0, 1); /* A menu opens over a partial frame. */
+        assert(!capture_pending_count);
+        test_capture_samples = NATIVE_VOICE_SAMPLES;
+        native_voice_runtime_update(0, 1);
+        assert(!captured_size && test_capture_samples == NATIVE_VOICE_SAMPLES); /* Menus: nothing read or sent. */
+        native_voice_runtime_update(0, 0);
+        assert(!captured_size && !test_capture_samples); /* Menu-time audio never reaches play. */
+        test_capture_samples = half;
+        native_voice_runtime_update(0, 0);
+        assert(capture_pending_count == (unsigned int)half);
+        test_voice_mode = "ptt"; /* Changing mode live clears queued capture. */
+        native_voice_runtime_update(0, 0);
+        assert(!captured_size && !capture_pending_count);
+        native_voice_runtime_update(1, 0); /* The separate push-to-talk key still works. */
+        test_capture_samples = NATIVE_VOICE_SAMPLES;
+        native_voice_runtime_update(1, 0);
+        assert(captured_size > 0);
+        test_voice_mode = "open";
+        native_voice_runtime_update(0, 0);
+        captured_size = 0; test_capture_samples = half;
+        native_voice_runtime_update(0, 0);
+        assert(capture_pending_count == (unsigned int)half);
+        test_map_token = 12; /* A new map never sends the old map's partial frame. */
+        native_voice_runtime_update(0, 0);
+        assert(!captured_size && !capture_pending_count);
+        test_voice_enabled = 0; test_capture_samples = NATIVE_VOICE_SAMPLES;
+        native_voice_runtime_update(0, 0);
+        assert(!captured_size && !capture_stream); /* "open" alone, without voice enabled, opens nothing. */
+        test_voice_mode = "ptt"; test_capture_device = 0; test_capture_samples = 0;
+    }
+    { /* Lobby/menu voice is a separate opt-in, gated by real session admission. */
+        float mixed[NATIVE_VOICE_SAMPLES * 6] = {0};
+        struct native_voice_frame tone = {0};
+        test_capture_device = test_voice_enabled = 1;
+        test_voice_mode = "open";
+        test_voice_session_active = 0;
+        test_voice_session_connected = 1;
+        test_voice_in_menus = 0;
+        captured_size = 0;
+        native_voice_runtime_update(0, 1);
+        test_capture_samples = NATIVE_VOICE_SAMPLES;
+        native_voice_runtime_update(0, 1);
+        assert(!captured_size && !ptt_active);
+        test_voice_in_menus = 1;
+        native_voice_runtime_update(0, 1);
+        assert(!captured_size && !test_capture_samples && ptt_active);
+        test_capture_samples = NATIVE_VOICE_SAMPLES;
+        native_voice_runtime_update(0, 1);
+        assert(captured_size > 0); /* No push-to-talk press. */
+        test_spatial_available = 0;
+        for (i=0; i<NATIVE_VOICE_SAMPLES; i++) tone.samples[i]=8000;
+        playback_push(&tone, 1);
+        native_voice_runtime_mix(mixed, NATIVE_VOICE_SAMPLES * 3);
+        for (i=0; i<NATIVE_VOICE_SAMPLES * 3; i++)
+            assert(mixed[2*i] > 0.07f && mixed[2*i] == mixed[2*i+1]);
+        captured_size = 0; test_capture_samples = NATIVE_VOICE_SAMPLES / 2;
+        native_voice_runtime_update(0, 1);
+        assert(capture_pending_count);
+        test_voice_session_connected = 0;
+        native_voice_runtime_update(1, 1);
+        assert(!captured_size && !capture_pending_count && !ptt_active);
+        test_capture_samples = NATIVE_VOICE_SAMPLES;
+        native_voice_runtime_update(1, 1);
+        assert(!captured_size); /* Setting and key cannot open unjoined main menu. */
+        test_voice_session_connected = 1; test_voice_mode = "ptt";
+        native_voice_runtime_update(0, 1);
+        test_capture_samples = NATIVE_VOICE_SAMPLES;
+        native_voice_runtime_update(0, 1);
+        assert(!captured_size && !ptt_active);
+        native_voice_runtime_update(1, 1);
+        test_capture_samples = NATIVE_VOICE_SAMPLES;
+        native_voice_runtime_update(1, 1);
+        assert(captured_size > 0);
+        test_voice_in_menus = 0; captured_size = 0;
+        native_voice_runtime_update(1, 1);
+        assert(!ptt_active && !capture_pending_count);
+        test_voice_in_menus = 1; test_voice_enabled = 0;
+        native_voice_runtime_update(1, 1);
+        assert(!capture_stream && !captured_size);
+        test_voice_in_menus = 0; test_capture_device = 0;
+        test_capture_samples = 0; test_spatial_available = 1;
     }
     { /* A 30 Hz game update drains a genuine sustained 50 Hz PCM stream. */
         unsigned long second = 0, refill = 0;

@@ -1,0 +1,18 @@
+{
+  "version": "2.9.5",
+  "tag": "v0.2.9.5-steamdeck-lobby-modes",
+  "runtime": "b3d735a6f78fa495464c6589043245fcf8330580931b949e4f099299e3e1c1db",
+  "assets": {
+    "NxHalo-SteamDeck-unified-runtime-2.9.5-lobby-modes.tar.gz": {
+      "sha256": "448c75ad0a52c546c2da55bfd5fd4e1cd8d855b548c8fab48d893b6a3ff13e16",
+      "bytes": 22228252
+    },
+    "NxHalo-Unified-source-2.9.5-lobby-modes.zip": {
+      "sha256": "97aff53e8195d15ea506d00ccb98e74b48eeaaac61f115dcb9c8d991a1160d3c",
+      "bytes": 17838608
+    }
+  },
+  "source_entries": 2265,
+  "platform": "Steam Deck/Linux",
+  "switch_runtime_changed": false
+}

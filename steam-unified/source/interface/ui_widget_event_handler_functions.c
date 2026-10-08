@@ -923,6 +923,7 @@ symbols in this file:
 #include "networking/network_game_manager.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
+#include "match_rules.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "saved games/game_state.h"
 #include "saved games/player_profile.h"
@@ -6109,6 +6110,8 @@ boolean ui_widget_port_gametype_choose(
 	if (!playlist_profile_get(profile_index, &profile))
 		return FALSE;
 	server = global_network_game_server_get();
+	if (!match_rules_preset_set(MATCH_RULES_PRESET_STANDARD))
+		return FALSE;
 	if (saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
 		saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
 	player_ui_set_game_variant(&profile);

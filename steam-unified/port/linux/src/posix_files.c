@@ -6,6 +6,7 @@ the host ABI and _FILE_OFFSET_BITS=64.
 */
 
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <string.h>
 #include <strings.h>
@@ -63,6 +64,51 @@ int posix_file_is_regular(int descriptor)
 {
 	struct stat st;
 	return fstat(descriptor, &st) == 0 && S_ISREG(st.st_mode);
+}
+
+static int directory_identity_from_stat(const struct stat *st, struct posix_directory_identity *identity)
+{
+	if (!S_ISDIR(st->st_mode)) { errno = ENOTDIR; return -1; }
+	split64((unsigned long long)st->st_dev, &identity->device_low, &identity->device_high);
+	split64((unsigned long long)st->st_ino, &identity->inode_low, &identity->inode_high);
+	return 0;
+}
+
+static int directory_component(const char *name)
+{
+	if (!name || !*name || !strcmp(name, ".") || !strcmp(name, "..") || strchr(name, '/'))
+	{ errno = EINVAL; return 0; }
+	return 1;
+}
+
+int posix_directory_identity_fd(int descriptor, struct posix_directory_identity *identity)
+{
+	struct stat st;
+	if (!identity) { errno = EINVAL; return -1; }
+	if (fstat(descriptor, &st)) return -1;
+	return directory_identity_from_stat(&st, identity);
+}
+
+int posix_directory_identity_at(int directory, const char *name, struct posix_directory_identity *identity)
+{
+	struct stat st;
+	if (!identity || !directory_component(name)) { errno = EINVAL; return -1; }
+	if (fstatat(directory, name, &st, AT_SYMLINK_NOFOLLOW)) return -1;
+	return directory_identity_from_stat(&st, identity);
+}
+
+int posix_directory_identity_path(const char *path, struct posix_directory_identity *identity)
+{
+	struct stat st;
+	if (!path || !identity) { errno = EINVAL; return -1; }
+	if (stat(path, &st)) return -1;
+	return directory_identity_from_stat(&st, identity);
+}
+
+int posix_make_private_directory_at(int directory, const char *name)
+{
+	if (!directory_component(name)) return -1;
+	return mkdirat(directory, name, 0700);
 }
 
 int posix_set_file_times(const char *path,

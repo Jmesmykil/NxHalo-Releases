@@ -17,9 +17,27 @@ int main(void)
         control.primary_trigger != 0.0f || control.grenade_index != NONE ||
         control.weapon_index != 3)
         return 1;
+    if (!match_rules_restricted_weapon_allowed(FALSE, TRUE, TRUE, FALSE, FALSE, FALSE) ||
+        !match_rules_restricted_weapon_allowed(FALSE, TRUE, FALSE, FALSE, FALSE, TRUE) ||
+        match_rules_restricted_weapon_allowed(FALSE, TRUE, FALSE, FALSE, FALSE, FALSE) ||
+        !match_rules_restricted_weapon_allowed(TRUE, FALSE, FALSE, FALSE, FALSE, TRUE) ||
+        !match_rules_restricted_weapon_allowed(TRUE, FALSE, FALSE, TRUE, TRUE, FALSE) ||
+        match_rules_restricted_weapon_allowed(TRUE, FALSE, FALSE, TRUE, FALSE, TRUE))
+        return 4;
     if (!match_rules_infected_damage_allowed(FALSE, FALSE) ||
         !match_rules_infected_damage_allowed(TRUE, TRUE) ||
         match_rules_infected_damage_allowed(TRUE, FALSE))
         return 2;
+    if (!match_rules_infected_lunge_candidate_allowed(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 1.5f, 0.9f) ||
+        match_rules_infected_lunge_candidate_allowed(FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 1.5f, 0.9f) ||
+        match_rules_infected_lunge_candidate_allowed(TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, 1.5f, 0.9f) ||
+        match_rules_infected_lunge_candidate_allowed(TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, 1.5f, 0.9f) ||
+        match_rules_infected_lunge_candidate_allowed(TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, 1.5f, 0.9f) ||
+        match_rules_infected_lunge_candidate_allowed(TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, 1.5f, 0.9f) ||
+        match_rules_infected_lunge_candidate_allowed(TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, 1.5f, 0.9f) ||
+        match_rules_infected_lunge_candidate_allowed(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, 1.5f, 0.9f) ||
+        match_rules_infected_lunge_candidate_allowed(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 2.9f, 0.9f) ||
+        match_rules_infected_lunge_candidate_allowed(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 1.5f, 0.6f))
+        return 3;
     return 0;
 }

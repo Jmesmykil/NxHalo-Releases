@@ -18,7 +18,13 @@
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "units/units.h"
+#include "units/vehicles.h"
+#include "units/bipeds.h"
+#include "units/unit_definitions.h"
 #include "units/unit_control_data.h"
+#include "physics/collisions.h"
+#include "physics/physics_definitions.h"
+#include "objects/objects.h"
 #include "../src/port_config.h"
 #include "match_rules.h"
 #include "match_rules_melee.h"
@@ -41,6 +47,11 @@ static boolean zombies_ready;
 static boolean zombies_infected[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 static boolean zombies_initial_roster[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 static long zombies_tracked_player[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+static long lunge_tracked_player[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+static boolean lunge_button_held[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+static long lunge_last_tick[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+static long lunge_started_tick[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+static real_vector3d lunge_direction[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 
 static char const * const match_preset_names[MATCH_RULES_PRESET_COUNT] = {
     "Standard", "Faction match", "SWAT", "Tower of Power",
@@ -127,7 +138,14 @@ void match_rules_reset(void)
     csmemset(zombies_infected, 0, sizeof(zombies_infected));
     csmemset(zombies_initial_roster, 0, sizeof(zombies_initial_roster));
     for (index = 0; index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; index++)
+    {
         zombies_tracked_player[index] = NONE;
+        lunge_tracked_player[index] = NONE;
+        lunge_button_held[index] = FALSE;
+        lunge_last_tick[index] = NONE;
+        lunge_started_tick[index] = NONE;
+        lunge_direction[index] = *global_zero_vector3d;
+    }
 }
 
 static short faction_for_team(short matchup, long team)
@@ -211,7 +229,13 @@ boolean match_rules_preset_available(short preset, char *reason, int reason_size
         }
         break;
     case MATCH_RULES_PRESET_TOWER_OF_POWER:
-        message = "The selected map must supply Tower of Power geometry and placements.";
+        if (list_index_to_weapon_definition_index(8) == NONE)
+        {
+            available = FALSE;
+            message = "Tower of Power requires a shotgun tag loaded by the map and a map-authored mounted turret; nothing is generated.";
+        }
+        else
+            message = "Tower of Power requires a loaded shotgun and map-authored mounted turret; turret placement is not generated.";
         break;
     case MATCH_RULES_PRESET_RACING:
         if (count_race_track_markers() < 2)
@@ -221,12 +245,17 @@ boolean match_rules_preset_available(short preset, char *reason, int reason_size
         }
         break;
     case MATCH_RULES_PRESET_ZOMBIES:
-        if (players_in_game() < 2)
-            message = "Zombies waits for two connected players. Flood models are optional.";
+        if (list_index_to_weapon_definition_index(8) == NONE)
+        {
+            available = FALSE;
+            message = "Zombies requires a shotgun tag loaded by the map for survivors; infected use melee only.";
+        }
+        else if (players_in_game() < 2)
+            message = "Zombies waits for two connected players. Survivors use shotguns; infected use melee only.";
         else if (!faction_bipeds(NXHALO_FACTION_FLOOD, definitions, 8))
-            message = "This map has no Flood models; infected use the normal character and cannot fire.";
+            message = "No Flood models loaded: infected keep the normal body and melee weapon; survivors use shotguns.";
         else
-            message = "Infected carry a melee weapon and cannot fire or throw grenades.";
+            message = "Survivors use shotguns; infected use melee only and cannot throw grenades.";
         break;
     default:
         break;
@@ -390,12 +419,18 @@ boolean match_rules_apply_variant_preset(short preset, struct game_variant *vari
         break;
     case MATCH_RULES_PRESET_TOWER_OF_POWER:
         variant_template(variant, "team_slayer", "Tower Power");
+        variant->universal_variant.vehicle_set = 1;
         variant->universal_variant.teams = TRUE;
+        SET_FLAG(variant->universal_variant.flags, _game_variant_no_shields_bit, TRUE);
+        variant->universal_variant.goal_radar = 2; /* _radar_none */
+        variant->universal_variant.weapon_set = 10; /* _game_engine_weapons_no_grenades */
+        options->radar_players = 2; /* _radar_players_none */
         options->loadout = _loadout_custom;
         options->primary_weapon = _loadout_weapon_shotgun;
         options->secondary_weapon = _loadout_weapon_none;
-        set_message("Tower of Power template applied; map-owned tower geometry and placements are checked after map load.");
-        return TRUE;
+        options->no_map_weapons = TRUE;
+        set_message("Tower of Power: shotgun only, no shields or radar. Map must provide the mounted turret; turret placement is not generated.");
+        break;
     case MATCH_RULES_PRESET_DODGEBALL:
         variant_template(variant, "team_slayer", "Dodgeball");
         variant->universal_variant.teams = TRUE;
@@ -409,7 +444,13 @@ boolean match_rules_apply_variant_preset(short preset, struct game_variant *vari
         break;
     case MATCH_RULES_PRESET_ZOMBIES:
         variant_template(variant, "team_slayer", "Zombies");
+        variant->universal_variant.vehicle_set = 1;
         variant->universal_variant.teams = TRUE;
+        variant->universal_variant.weapon_set = 10; /* _game_engine_weapons_no_grenades */
+        options->loadout = _loadout_custom;
+        options->primary_weapon = _loadout_weapon_shotgun;
+        options->secondary_weapon = _loadout_weapon_none;
+        options->no_map_weapons = TRUE;
         options->auto_team_balance = FALSE;
         break;
     case MATCH_RULES_PRESET_RACING:
@@ -420,7 +461,8 @@ boolean match_rules_apply_variant_preset(short preset, struct game_variant *vari
         return FALSE;
     }
 
-    if (preset == MATCH_RULES_PRESET_SWAT || preset == MATCH_RULES_PRESET_DODGEBALL)
+    if (preset == MATCH_RULES_PRESET_SWAT || preset == MATCH_RULES_PRESET_DODGEBALL ||
+        preset == MATCH_RULES_PRESET_TOWER_OF_POWER || preset == MATCH_RULES_PRESET_ZOMBIES)
     {
         for (team = 0; team < 2; team++)
         {
@@ -429,7 +471,9 @@ boolean match_rules_apply_variant_preset(short preset, struct game_variant *vari
                 options->vehicle_counts[team][vehicle] = 0;
         }
     }
-    set_message("Rules applied. Map compatibility is checked when loading.");
+    set_message(preset == MATCH_RULES_PRESET_TOWER_OF_POWER ?
+        "Tower of Power: shotguns and mounted turret only; no shields, radar or grenades. Choose a map with a tower turret." :
+        "Rules applied. Map compatibility is checked when loading.");
     return TRUE;
 }
 
@@ -548,6 +592,11 @@ void match_rules_host_prespawn_player(long player_index)
     absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
     if (absolute < 0 || absolute >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
         return;
+    lunge_tracked_player[absolute] = player_index;
+    lunge_button_held[absolute] = FALSE;
+    lunge_last_tick[absolute] = NONE;
+    lunge_started_tick[absolute] = NONE;
+    lunge_direction[absolute] = *global_zero_vector3d;
     player = player_get(player_index);
     update_host_team(player, player_index, zombies_player_is_infected(player_index) ? 1 : 0);
 }
@@ -661,6 +710,57 @@ static boolean match_rules_variant_is_zombies(void)
 		description[6] == L'i' && description[7] == L'o' && description[8] == L'n');
 }
 
+static boolean match_rules_variant_is_tower_of_power(void)
+{
+    struct game_variant *variant = game_engine_get_variant();
+    wchar_t const *description;
+    if (!variant)
+        return FALSE;
+    description = variant->human_readable_game_description;
+    return description[0] == L'T' && description[1] == L'o' && description[2] == L'w' &&
+        description[3] == L'e' && description[4] == L'r' && description[5] == L' ' &&
+        description[6] == L'P' && description[7] == L'o' && description[8] == L'w' &&
+        description[9] == L'e' && description[10] == L'r';
+}
+
+short match_rules_vehicle_policy(long definition_index)
+{
+    if (match_rules_variant_is_zombies())
+        return 0;
+    if (match_rules_variant_is_tower_of_power())
+        return vehicle_definition_is_turret(definition_index) ? 1 : 0;
+    return -1;
+}
+
+boolean match_rules_weapon_allowed_for_unit(long unit_index, long weapon_definition_index)
+{
+    boolean zombies = match_rules_variant_is_zombies();
+    boolean tower = match_rules_variant_is_tower_of_power();
+    struct unit_datum *vehicle_unit = tower && unit_index != NONE ? vehicle_try_and_get(unit_index) : NULL;
+    boolean vehicle = vehicle_unit && vehicle_definition_is_turret(vehicle_unit->definition_index);
+    long player_index;
+    long shotgun_definition;
+    boolean infected;
+    boolean melee_weapon;
+
+    if (weapon_definition_index == NONE)
+        return !zombies && !tower;
+    player_index = unit_index != NONE ? player_index_from_unit_index(unit_index) : NONE;
+    infected = zombies && player_index != NONE && match_rules_player_melee_only(player_index);
+    melee_weapon = infected && nxhalo_zombie_melee_weapon_allowed(weapon_definition_index);
+    /* Global weapon-list index 8 is the stock shotgun entry. Missing tags
+       resolve to NONE and therefore do not silently allow a player weapon. */
+    shotgun_definition = list_index_to_weapon_definition_index(8);
+    return match_rules_restricted_weapon_allowed(zombies, tower, vehicle, infected,
+        melee_weapon, shotgun_definition != NONE && weapon_definition_index == shotgun_definition);
+}
+
+boolean match_rules_grenade_pickup_allowed(long unit_index)
+{
+    (void)unit_index;
+    return !match_rules_variant_is_zombies() && !match_rules_variant_is_tower_of_power();
+}
+
 boolean match_rules_player_melee_only(long player_index)
 {
 	struct player_datum *player;
@@ -676,6 +776,151 @@ boolean match_rules_player_melee_only(long player_index)
 	absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
 	return absolute >= 0 && absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS &&
 		zombies_ready && zombies_player_is_infected(player_index);
+}
+
+void match_rules_host_apply_infected_lunge(long player_index, struct unit_control_data *control,
+    boolean equipment_action_consumed)
+{
+    struct player_datum *player;
+    struct biped_datum *attacker;
+    struct object_iterator iterator;
+    struct biped_datum *target;
+    long target_index = NONE;
+    short absolute;
+    boolean pressed;
+    real best_distance = 2.8f;
+    real_vector3d best_direction = { 0.f, 0.f, 0.f };
+    long now;
+    unsigned long lunge_ticks = (unsigned long)((TICKS_PER_SECOND + 9) / 10);
+    real lunge_speed_per_tick = 9.f / (real)TICKS_PER_SECOND;
+
+    if (!control || player_index == NONE || TICKS_PER_SECOND <= 0)
+        return;
+    absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+    if (absolute < 0 || absolute >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+        return;
+    player = player_try_and_get(player_index);
+    if (lunge_tracked_player[absolute] != player_index)
+    {
+        lunge_tracked_player[absolute] = player_index;
+        lunge_button_held[absolute] = FALSE;
+        lunge_last_tick[absolute] = NONE;
+        lunge_started_tick[absolute] = NONE;
+        lunge_direction[absolute] = *global_zero_vector3d;
+    }
+    if (!match_rules_player_melee_only(player_index) ||
+        game_connection() == _game_connection_network_client || network_game_distributed_client() ||
+        !player || player->unit_index == NONE)
+    {
+        lunge_button_held[absolute] = FALSE;
+        lunge_started_tick[absolute] = NONE;
+        return;
+    }
+
+    now = game_time_get();
+    attacker = biped_try_and_get(player->unit_index);
+    if (!attacker || attacker->object.parent_object_index != NONE ||
+        attacker->object.body_vitality <= 0.f || TEST_FLAG(attacker->object.damage_flags, _object_dead_bit) ||
+        TEST_FLAG(attacker->biped.flags, _biped_airborne_bit))
+    {
+        lunge_started_tick[absolute] = NONE;
+        lunge_button_held[absolute] =
+            TEST_FLAG(control->control_flags, _unit_control_use_equipment_bit);
+        return;
+    }
+
+    /* Biped velocity is world units per tick. Native biped physics consumes
+       it and runs its ordinary swept collision/slide resolution. */
+    if (lunge_started_tick[absolute] != NONE &&
+        (unsigned long)(now - lunge_started_tick[absolute]) < lunge_ticks)
+    {
+        attacker->object.translational_velocity.i =
+            lunge_direction[absolute].i * lunge_speed_per_tick;
+        attacker->object.translational_velocity.j =
+            lunge_direction[absolute].j * lunge_speed_per_tick;
+        return;
+    }
+    lunge_started_tick[absolute] = NONE;
+
+    pressed = TEST_FLAG(control->control_flags, _unit_control_use_equipment_bit);
+    if (!pressed)
+    {
+        lunge_button_held[absolute] = FALSE;
+        return;
+    }
+    if (lunge_button_held[absolute])
+        return;
+    lunge_button_held[absolute] = TRUE;
+    if (equipment_action_consumed)
+        return;
+    if (lunge_last_tick[absolute] != NONE &&
+        (unsigned long)(now - lunge_last_tick[absolute]) < (unsigned long)((TICKS_PER_SECOND * 3 + 3) / 4))
+        return;
+
+    object_iterator_new(&iterator, _object_mask_biped, 0);
+    while ((target = object_iterator_next(&iterator)) != NULL)
+    {
+        struct player_datum *target_player;
+        struct collision_result collision;
+        real_point3d start, end;
+        real_vector3d toward;
+        real distance, forward_dot;
+        long candidate_index = iterator.index;
+        if (candidate_index == player->unit_index || target->unit.player_index == NONE ||
+            target->object.parent_object_index != NONE || target->object.body_vitality <= 0.f ||
+            TEST_FLAG(target->object.damage_flags, _object_dead_bit) ||
+            TEST_FLAG(target->biped.flags, _biped_airborne_bit))
+            continue;
+        target_player = player_try_and_get(target->unit.player_index);
+        if (!target_player || target_player->quit_out_of_game || target_player->team_index != 0)
+            continue;
+
+        toward.i = target->object.position.x - attacker->object.position.x;
+        toward.j = target->object.position.y - attacker->object.position.y;
+        toward.k = target->object.position.z - attacker->object.position.z;
+        distance = magnitude3d(&toward);
+        if (distance < 0.65f || distance > best_distance)
+            continue;
+        forward_dot = dot_product3d(&toward, &control->facing_vector) / distance;
+        if (forward_dot < 0.70f)
+            continue;
+
+        start = attacker->object.position;
+        end = target->object.position;
+        start.z += 0.35f;
+        end.z += 0.35f;
+        toward.i = end.x - start.x;
+        toward.j = end.y - start.y;
+        toward.k = end.z - start.z;
+        if (collision_test_vector(_collision_test_for_line_of_sight_flags | FLAG(_collision_test_objects_bipeds_bit), &start, &toward,
+                player->unit_index, &collision) &&
+            (collision.type != _collision_result_object || collision.object_index != candidate_index))
+            continue;
+
+        toward.i = target->object.position.x - attacker->object.position.x;
+        toward.j = target->object.position.y - attacker->object.position.y;
+        toward.k = 0.f;
+        if (normalize3d(&toward) == 0.f)
+            continue;
+        if (!match_rules_infected_lunge_candidate_allowed(TRUE,
+                attacker->object.body_vitality > 0.f && !TEST_FLAG(attacker->object.damage_flags, _object_dead_bit),
+                attacker->object.parent_object_index == NONE && !TEST_FLAG(attacker->biped.flags, _biped_airborne_bit),
+                target->object.body_vitality > 0.f && !TEST_FLAG(target->object.damage_flags, _object_dead_bit),
+                target->object.parent_object_index == NONE && !TEST_FLAG(target->biped.flags, _biped_airborne_bit),
+                TRUE, TRUE, distance, forward_dot))
+            continue;
+        best_distance = distance;
+        best_direction = toward;
+        target_index = candidate_index;
+    }
+    if (target_index == NONE)
+        return;
+
+    lunge_last_tick[absolute] = now;
+    lunge_started_tick[absolute] = now;
+    lunge_direction[absolute] = best_direction;
+    attacker->object.translational_velocity.i = best_direction.i * lunge_speed_per_tick;
+    attacker->object.translational_velocity.j = best_direction.j * lunge_speed_per_tick;
 }
 
 void match_rules_filter_player_control(long player_index, struct unit_control_data *control)
@@ -716,13 +961,19 @@ void match_rules_host_postspawn_player(long player_index)
     else if (preset == MATCH_RULES_PRESET_ZOMBIES)
     {
         absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+        unit->unit.grenade_counts[_unit_grenade_human_fragmentation] = 0;
+        unit->unit.grenade_counts[_unit_grenade_covenant_plasma] = 0;
+        unit->unit.desired_grenade_index = NONE;
         if (absolute >= 0 && absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS && zombies_player_is_infected(player_index))
         {
-            unit->unit.grenade_counts[_unit_grenade_human_fragmentation] = 0;
-            unit->unit.grenade_counts[_unit_grenade_covenant_plasma] = 0;
-            unit->unit.desired_grenade_index = NONE;
             if (!nxhalo_give_zombie_melee_weapon(unit_index))
-                set_message("Melee weapon could not be equipped; existing weapons were kept, and infected still cannot fire.");
+                set_message("Melee weapon could not be equipped; infected still cannot fire or throw grenades.");
         }
+    }
+    else if (preset == MATCH_RULES_PRESET_TOWER_OF_POWER)
+    {
+        unit->unit.grenade_counts[_unit_grenade_human_fragmentation] = 0;
+        unit->unit.grenade_counts[_unit_grenade_covenant_plasma] = 0;
+        unit->unit.desired_grenade_index = NONE;
     }
 }

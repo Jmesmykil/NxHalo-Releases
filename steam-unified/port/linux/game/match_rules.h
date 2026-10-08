@@ -32,7 +32,12 @@ long match_rules_host_spawn_definition(long player_index, long fallback_definiti
 void match_rules_host_prespawn_player(long player_index);
 void match_rules_host_player_killed(long player_index);
 void match_rules_host_postspawn_player(long player_index);
+void match_rules_host_apply_infected_lunge(long player_index, struct unit_control_data *control, boolean equipment_action_consumed);
 boolean match_rules_player_melee_only(long player_index);
+boolean match_rules_weapon_allowed_for_unit(long unit_index, long weapon_definition_index);
+boolean match_rules_grenade_pickup_allowed(long unit_index);
+/* -1: use ordinary variant settings; 0: excluded; 1: authored turret. */
+short match_rules_vehicle_policy(long definition_index);
 void match_rules_filter_player_control(long player_index, struct unit_control_data *control);
 boolean match_rules_should_end_game(void);
 #endif

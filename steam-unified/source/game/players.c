@@ -4455,6 +4455,7 @@ void players_update_before_game(
 	struct unit_control_data control_data;
 	long weapon_index;
 	short action_index;
+	boolean equipment_action_consumed;
 
 	profile_enter(PLAYERS_UPDATE_BEFORE_GAME_PROFILE);
 	players_coop_note_on_foot();
@@ -4554,6 +4555,7 @@ void players_update_before_game(
 
 			if (player->unit_index != NONE && unit_controllable(player->unit_index))
 			{
+				equipment_action_consumed = FALSE;
 				unit = unit_get(player->unit_index);
 				if (!players_globals->input_disabled)
 				{
@@ -4582,6 +4584,7 @@ void players_update_before_game(
 					if (TEST_FLAG(action->control_flags, _unit_control_use_equipment_bit) &&
 						unit->unit.equipment_object_index != NONE)
 					{
+						equipment_action_consumed = TRUE;
 						player_handle_powerup_equipment(
 							iterator.datum_index,
 							unit->unit.equipment_object_index);
@@ -4620,6 +4623,7 @@ void players_update_before_game(
 					control_data.aiming_speed = 0;
 
 					match_rules_filter_player_control(iterator.datum_index, &control_data);
+					match_rules_host_apply_infected_lunge(iterator.datum_index, &control_data, equipment_action_consumed);
 					match_assert(
 						"c:\\halo\\SOURCE\\game\\players.c",
 						0x2E3,

@@ -1785,6 +1785,7 @@ static struct
 	{ "controls.flashlight", L"FLASHLIGHT", 2 },
 	{ "controls.scoreboard", L"SHOW SCORES", 2 },
 	{ "controls.pause", L"PAUSE MENU", 2 },
+	{ "controls.vehicle_boost", L"VEHICLE BOOST", 2 },
 };
 
 static struct
@@ -2201,6 +2202,7 @@ static void text_field_begin_masked(struct widget_instance *row, char const *tex
 }
 
 static void content_catalog_search_done(char const *text) { extern void content_setup_catalog_set_query(const char *); content_setup_catalog_set_query(text); }
+static void content_texture_pack_search_done(char const *text) { extern void content_setup_texture_pack_set_query(const char *); content_setup_texture_pack_set_query(text); }
 
 static void text_field_end(boolean keep)
 {
@@ -2491,6 +2493,9 @@ static void gametype_setup_begin(void);
 static void gametype_setup_end(void);
 static boolean gametype_setup_apply(void);
 static void gametype_setup_type(wchar_t *text);
+static boolean lobby_editing;
+static boolean lobby_can_edit_match(void);
+static void focus_off_hidden(struct widget_instance *bar);
 
 /* ---- the gametype list: its spinner's bank (STANDARD: the built-in ones,
 CUSTOM: those saved) in its first row, then the bank's gametypes */
@@ -2745,6 +2750,9 @@ again on coming back from an option's screen) */
 static boolean server_settings_initialize(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "max_players_spinner", 0);
+	visible_set(named(list, "button_ok", 0), !lobby_editing);
+	visible_set(named(list, "button_apply_lobby", 0), lobby_editing && lobby_can_edit_match());
+	focus_off_hidden(named(list, "button_bar", 0));
 
 	/* (co-op has no gametype to edit) */
 	if (!hosting_cooperative())
@@ -2782,6 +2790,9 @@ static void server_settings_update(struct widget_instance *list)
 	struct widget_instance *row = named(list, "op_server_name", 0);
 	char text[TEXT_FIELD_LENGTH];
 
+	visible_set(named(list, "button_ok", 0), !lobby_editing);
+	visible_set(named(list, "button_apply_lobby", 0), lobby_editing && lobby_can_edit_match());
+	focus_off_hidden(named(list, "button_bar", 0));
 	if (spinner)
 		*server_settings_maximum_players_index() = (short)PIN(spinner->parameters.list.selected_index, 0,
 			NUMBEROF(maximum_players) - 1);
@@ -2889,6 +2900,18 @@ static void server_settings_update(struct widget_instance *list)
 		if (help && list->focused_child == row)
 			help->parameters.text_box.string_list_index = SERVER_PASSWORD_HELP;
 	}
+	if (lobby_editing)
+	{
+		static char const *const unrelated_rows[] = {
+			"op_server_name", "op_max_players", "op_invite", "op_listing", "op_password",
+			"op_friendly_fire", "op_extra_enemies", "op_enemies_per_player",
+			"op_enemies_multiplier", "op_player_collisions"
+		};
+		short index;
+		for (index = 0; index < NUMBEROF(unrelated_rows); index++)
+			visible_set(named(list, unrelated_rows[index], 0), FALSE);
+	}
+	focus_off_hidden(named(list, "options_menu", 0));
 }
 
 static void server_password_done(char const *text)
@@ -4083,8 +4106,17 @@ The original list and widgets still own focus, scrolling, team changes and
 start/leave actions; this only presents their live state. */
 static int lobby_button_slot(char const *name)
 {
-    static char const *names[]={"lobby_button_team","lobby_button_kick","lobby_button_ban","lobby_button_start","lobby_button_add","lobby_button_leave"};
-    int i; for(i=0;i<6;i++) if(!strcmp(name,names[i])) return i; return -1;
+    static char const *names[]={"lobby_button_team","lobby_button_kick","lobby_button_ban","lobby_button_edit","lobby_button_start","lobby_button_add","lobby_button_leave"};
+    int i; for(i=0;i<7;i++) if(!strcmp(name,names[i])) return i; return -1;
+}
+
+static void lobby_button_geometry(long screen_width, int slot, float *x, float *button_width)
+{
+    float content_width = screen_width < 640 ? (float)screen_width : 640.0f;
+    float gap = 6.0f;
+    float total_width = content_width - 16.0f;
+    *button_width = (total_width - gap * 6.0f) / 7.0f;
+    *x = (content_width - total_width) * 0.5f + slot * (*button_width + gap);
 }
 
 boolean ui_widget_port_lobby_bounds(struct widget_instance *widget, rectangle2d *bounds)
@@ -4101,7 +4133,9 @@ boolean ui_widget_port_lobby_bounds(struct widget_instance *widget, rectangle2d 
         bounds->x0=35; bounds->x1=(short)(35+(width-56)*0.56f-14);
         bounds->y0=(short)(126+row*24); bounds->y1=(short)(bounds->y0+23);
     } else if(slot>=0) {
-        bounds->x0=(short)((width-640)/2+10+104*slot);bounds->x1=(short)(bounds->x0+100);
+        float x, button_width;
+        lobby_button_geometry((long)width, slot, &x, &button_width);
+        bounds->x0=(short)x; bounds->x1=(short)(x+button_width);
         bounds->y0=414;bounds->y1=440;
     } else return FALSE;
     return TRUE;
@@ -4255,21 +4289,22 @@ static void lobby_overlay_render(struct network_game const *game, short seconds,
 	selecting a remote console, then confirming the same action once more. */
 	ui_overlay_rect(-margin, 432, (float)width, 1, 0, 0x3D8BFFFF);
     {
-        static char const *names[]={"lobby_button_team","lobby_button_kick","lobby_button_ban","lobby_button_start","lobby_button_add","lobby_button_leave"};
-        static char const *labels[]={"TEAM","KICK CONSOLE","BAN CONSOLE","START","ADD PLAYER","LEAVE"};
+        static char const *names[]={"lobby_button_team","lobby_button_kick","lobby_button_ban","lobby_button_edit","lobby_button_start","lobby_button_add","lobby_button_leave"};
+        static char const *labels[]={"TEAM","KICK CONSOLE","BAN CONSOLE","EDIT MATCH","START","ADD PLAYER","LEAVE"};
         struct widget_instance *bar=named(list,"lobby_button_bar",0);
         int slot;
-        for(slot=0;bar && slot<6;slot++) {
+        for(slot=0;bar && slot<7;slot++) {
             struct widget_instance *button=named(bar,names[slot],0);
-            unsigned long color=(slot==1 || slot==2 || slot==5) ? 0x612F3AFF : slot==3 ? 0x1B5C42FF : 0x153765FF;
-            char const *label=labels[slot]; float x=(float)(10+104*slot);
+            unsigned long color=(slot==1 || slot==2 || slot==6) ? 0x612F3AFF : slot==4 ? 0x1B5C42FF : 0x153765FF;
+            char const *label=labels[slot]; float x, button_width;
+            lobby_button_geometry(width, slot, &x, &button_width);
             if(!button || !button->visible) continue;
             if(slot==1 && lobby_confirm_action==_lobby_action_kick) label="CONFIRM KICK";
             if(slot==2 && lobby_confirm_action==_lobby_action_ban) label="CONFIRM BAN";
-            ui_overlay_rect(x,414,100,26,4,color);
-            ui_overlay_text(UI_FONT_BOLD,8,x+50,423,UI_ALIGN_CENTER,0xEAF3FFFF,label);
+            ui_overlay_rect(x,414,button_width,26,4,color);
+            ui_overlay_text(UI_FONT_BOLD,8,x+button_width*0.5f,423,UI_ALIGN_CENTER,0xEAF3FFFF,label);
             if(list->focused_child==bar && bar->focused_child==button)
-                ui_overlay_outline(x,414,100,26,4,2,0xEAF3FFFF);
+                ui_overlay_outline(x,414,button_width,26,4,2,0xEAF3FFFF);
         }
     }
 	ui_overlay_text(UI_FONT_REGULAR, 8, 320, 453, UI_ALIGN_CENTER, 0xAFC4E0FF,
@@ -4322,6 +4357,16 @@ add player") gives one gamepad its own controller first (as it shares
 player 1's: pc_menu_split_players). A player's B leaves the game alone ("port
 lobby leave"; the machine's last leaves it). In game, a player's pause menu's
 QUIT is theirs (the Xbox's "mp game player quit") */
+static boolean lobby_can_edit_match(void)
+{
+	void *server = global_network_game_server_get();
+	void *client = global_network_game_client_get();
+	struct network_game *game = server ? network_game_server_get_game(server) : NULL;
+	short state_data;
+	return server && client && game && !game_cooperative(game) &&
+		network_game_client_get_state(client, &state_data) == _client_state_pregame;
+}
+
 static struct
 {
 	/* ADD PLAYER chosen: one gamepad is the new player's */
@@ -4392,6 +4437,8 @@ static struct widget_instance *focused_leaf(struct widget_instance *widget)
 /* "port lobby open" (the lobby made, or come back to): no player being added */
 static boolean lobby_join_reset(void)
 {
+	lobby_editing = FALSE;
+	gametype_setup_end();
 	lobby_join.adding = FALSE;
 	lobby_join.controller = NONE;
 	return TRUE;
@@ -4602,6 +4649,7 @@ static void lobby_update(struct widget_instance *list)
 	lobby_join_help(list);
 	visible_set(named(list, "lobby_button_team", 0), game && game->variant.universal_variant.teams);
 	visible_set(named(list,"lobby_button_start",0), global_network_game_server_get()!=NULL);
+	visible_set(named(list,"lobby_button_edit",0), lobby_can_edit_match());
 	/* (the buttons' focus, off Switch Team when it is hidden) */
 	focus_off_hidden(named(list, "lobby_button_bar", 0));
 	visible_set(named(description, "lobby_right_item", 0), game != NULL && state >= _client_state_pregame);
@@ -5212,7 +5260,10 @@ static void gametype_setup_begin(void)
 	if (!player_ui_game_variant_specified(&gametype_edit.setup_variant))
 		return;
 	gametype_edit.setup_options = *player_ui_get_game_variant_options();
-	match_rules_apply_variant_preset(match_rules_preset_get(), &gametype_edit.setup_variant, &gametype_edit.setup_options);
+	/* Reopening the active lobby editor must preserve its current variant.
+	 * A saved preset is applied only by an explicit selection or new setup. */
+	if (!lobby_editing)
+		match_rules_apply_variant_preset(match_rules_preset_get(), &gametype_edit.setup_variant, &gametype_edit.setup_options);
 	gametype_edit.setup = TRUE;
 	gametype_edit.vehicle_side = 0;
 }
@@ -5460,6 +5511,9 @@ static boolean gametype_engine_set(struct widget_instance *item)
 	{
 		if (!strcmp(item->name, engine_items[index]))
 		{
+			/* An explicit base-type choice supersedes a saved special preset. */
+			if (gametype_edit.setup && !gametype_setup_select_preset(MATCH_RULES_PRESET_STANDARD))
+				return FALSE;
 			if (variant->game_engine_index != engine_of_item[index])
 				csmemset(&variant->game_engine_variant, 0, sizeof(variant->game_engine_variant));
 			variant->game_engine_index = engine_of_item[index];
@@ -5741,21 +5795,45 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port campaign character")) { extern void ui_widget_port_character_open_context(boolean); ui_widget_port_character_open_context(FALSE); return TRUE; }
 		else if (!strcmp(name, "port host character")) { extern void ui_widget_port_character_open_context(boolean); ui_widget_port_character_open_context(TRUE); return TRUE; }
 		else if (!strcmp(name, "port content import")) {
-            extern void content_setup_import_local(void), content_setup_catalog_page_move(int); extern const char *content_setup_catalog_query(void);
+            extern void content_setup_import_local(void);
+            extern int content_setup_catalog_page_move(int);
+            extern const char *content_setup_catalog_query(void), *content_setup_catalog_category(void);
+            extern void content_setup_catalog_category_cycle(int), content_setup_catalog_install_filter_cycle(int);
+            extern void content_setup_catalog_sort_cycle(void);
+            extern const char *content_setup_texture_pack_query(void);
+            extern int content_setup_texture_pack_page_move(int);
             if (content_widget_named(widget, "mods_import")) {
                 extern void content_setup_texture_pack_import(void); content_setup_texture_pack_import();
+            } else if (content_widget_named(widget, "mods_search")) {
+                if (text_field_editing(widget)) text_field_end(TRUE);
+                else text_field_begin(widget, content_setup_texture_pack_query(), 47, content_texture_pack_search_done);
             } else if (content_widget_named(widget, "browser_search")) {
                 if (text_field_editing(widget)) text_field_end(TRUE);
                 else text_field_begin(widget, content_setup_catalog_query(), 47, content_catalog_search_done);
-            } else if (content_widget_named(widget, "browser_prev")) content_setup_catalog_page_move(-1);
+            } else if (content_widget_named(widget, "browser_category")) content_setup_catalog_category_cycle(1);
+            else if (content_widget_named(widget, "browser_installed")) content_setup_catalog_install_filter_cycle(1);
+            else if (content_widget_named(widget, "browser_sort")) content_setup_catalog_sort_cycle();
+            else if (content_widget_named(widget, "browser_prev")) content_setup_catalog_page_move(-1);
             else if (content_widget_named(widget, "browser_next")) content_setup_catalog_page_move(1);
+            else if (content_widget_named(widget, "mods_prev")) content_setup_texture_pack_page_move(-1);
+            else if (content_widget_named(widget, "mods_next")) content_setup_texture_pack_page_move(1);
             else content_setup_import_local();
             return TRUE;
         }
 		else if (!strcmp(name, "port content folder")) {
-            extern void content_setup_open_folder(void); extern int content_setup_texture_pack_toggle(void);
-            if (content_widget_named(widget, "mods_toggle")) content_setup_texture_pack_toggle();
-            else if (content_widget_named(widget, "mods_upscale")) {
+            extern void content_setup_open_folder(void);
+            extern int content_setup_texture_pack_toggle(void), content_setup_texture_pack_disable_selected(void);
+            extern int content_setup_texture_pack_stage_selected_removal(void), content_setup_texture_pack_confirm_removal(void);
+            extern void content_setup_texture_pack_cancel_removal(void);
+            if (content_widget_named(widget, "mods_toggle")) return content_setup_texture_pack_toggle();
+            if (content_widget_named(widget, "mods_disable")) return content_setup_texture_pack_disable_selected();
+            if (content_widget_named(widget, "mods_remove")) return content_setup_texture_pack_stage_selected_removal();
+            if (content_widget_named(widget, "mods_confirm_remove")) return content_setup_texture_pack_confirm_removal();
+            if (content_widget_named(widget, "mods_cancel_remove")) {
+                content_setup_texture_pack_cancel_removal();
+                return TRUE;
+            }
+            if (content_widget_named(widget, "mods_upscale")) {
                 const char *value=config_string("display.deck_upscaling");
                 config_write("display.deck_upscaling",!strcmp(value,"off")?"quality":!strcmp(value,"quality")?"performance":"off");
             } else content_setup_open_folder();
@@ -5774,6 +5852,19 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port host profile")) {
 			int profile=network_profile_host_version();
 			return config_write("network.compatibility_version",profile==21?"20":profile==20?"11":"21");
+		}
+		else if (!strcmp(name, "port lobby edit match"))
+		{
+			if (!lobby_can_edit_match()) return campaign_fail();
+			lobby_editing = TRUE;
+			gametype_setup_end();
+			return TRUE;
+		}
+		else if (!strcmp(name, "port lobby apply settings"))
+		{
+			if (!lobby_editing || !lobby_can_edit_match() || !gametype_setup_apply()) return campaign_fail();
+			lobby_editing = FALSE;
+			return TRUE;
 		}
 		else if (!strcmp(name, "port lobby kick console")) return lobby_machine_action(widget, _lobby_action_kick);
 		else if (!strcmp(name, "port lobby ban console")) return lobby_machine_action(widget, _lobby_action_ban);
@@ -5959,13 +6050,25 @@ void pc_menu_game_data_function_invoke(
 		}
 		else if (!strcmp(name, "port content status")) {
             extern const char *content_setup_status(void), *content_setup_catalog_status(void), *content_setup_catalog_query(void);
+            extern const char *content_setup_catalog_category(void), *content_setup_catalog_install_filter(void);
+            extern const char *content_setup_catalog_sort(void);
             extern void content_setup_catalog_poll(void);
             extern int content_setup_catalog_result(int,char *,size_t,char *,size_t), content_setup_catalog_installed(const char *);
             wchar_t message[512]; char line[512],map[64],type[16]; int row;
             if (content_widget_name_starts_with(widget, "mods_")) {
                 extern int content_setup_deck_upscaling_available(void), content_setup_texture_pack_count(void), content_setup_texture_pack_name(int,char *,size_t);
-                extern const char *content_setup_texture_pack_status(void);
+                extern const char *content_setup_texture_pack_status(void), *content_setup_texture_pack_query(void);
+                extern int content_setup_texture_pack_removal_pending(void);
                 extern int texture_pack_enabled(void); extern const char *texture_pack_selected(void);
+                if (content_widget_named(widget, "mods_confirm_remove") || content_widget_named(widget, "mods_cancel_remove")) {
+                    widget->visible = content_setup_texture_pack_removal_pending();
+                    widget->disabled = !widget->visible;
+                    return;
+                }
+                if (content_widget_named(widget, "mods_search")) {
+                    snprintf(line,sizeof(line),"SEARCH PACKS: %s",content_setup_texture_pack_query());
+                    text_field_show(widget,line,text_field_editing(widget)); return;
+                }
                 if (content_widget_named(widget, "mods_upscale")) {
                     widget->visible=content_setup_deck_upscaling_available(); widget->disabled=!widget->visible;
                     snprintf(line,sizeof(line),"Deck upscaling: %s (A: next mode)",config_string("display.deck_upscaling"));
@@ -5985,8 +6088,7 @@ void pc_menu_game_data_function_invoke(
                     return;
                 }
                 content_setup_texture_pack_count();
-                { const char *selected=texture_pack_selected(); const char *leaf=strrchr(selected,'/');
-                snprintf(line,sizeof(line),"Textures: %s | Pack: %.28s | Upscaling: %.12s\r\nImport native PNG / TGA / DDS pack folders.",texture_pack_enabled()?"ON":"OFF",selected[0]?(leaf?leaf+1:selected):"none",config_string("display.deck_upscaling")); }
+                snprintf(line,sizeof(line),"%.240s",content_setup_texture_pack_status());
                 text_to_wide(line,message,NUMBEROF(message));text_set_length(widget,message,NUMBEROF(message));return;
             }
             if (content_widget_name_starts_with(widget, "browser_")) {
@@ -5994,6 +6096,18 @@ void pc_menu_game_data_function_invoke(
                 if (content_widget_named(widget, "browser_search")) {
                     snprintf(line,sizeof(line),"SEARCH MAPS: %s",content_setup_catalog_query());
                     text_field_show(widget,line,text_field_editing(widget)); return;
+                }
+                if (content_widget_named(widget, "browser_category")) {
+                    snprintf(line,sizeof(line),"CATEGORY: %s (A: cycle)",content_setup_catalog_category());
+                    text_to_wide(line,message,NUMBEROF(message));text_set(widget,message);return;
+                }
+                if (content_widget_named(widget, "browser_installed")) {
+                    snprintf(line,sizeof(line),"INSTALL STATUS: %s (A: cycle)",content_setup_catalog_install_filter());
+                    text_to_wide(line,message,NUMBEROF(message));text_set(widget,message);return;
+                }
+                if (content_widget_named(widget, "browser_sort")) {
+                    snprintf(line,sizeof(line),"SORT: %s (A: cycle)",content_setup_catalog_sort());
+                    text_to_wide(line,message,NUMBEROF(message));text_set(widget,message);return;
                 }
                 if (content_widget_name_starts_with(widget, "browser_map_")) {
                     const char *last=strrchr(widget->name,'_'); row=last?atoi(last+1):-1;
@@ -6004,7 +6118,9 @@ void pc_menu_game_data_function_invoke(
                     } else { text_set(widget,L"");widget->disabled=TRUE; }
                     return;
                 }
-                snprintf(line,sizeof(line),"%.105s\r\nSelect a map to download. CE resources are imported separately.",content_setup_catalog_status());
+                snprintf(line,sizeof(line),"%.70s | %s | %s | %s\r\n%.90s",content_setup_catalog_status(),
+                    content_setup_catalog_category(),content_setup_catalog_install_filter(),content_setup_catalog_sort(),
+                    content_setup_catalog_query());
                 text_to_wide(line,message,NUMBEROF(message));text_set_length(widget,message,NUMBEROF(message));return;
             }
             snprintf(line,sizeof(line),"Host network profile: V%d\r\n%s",network_profile_host_version(),content_setup_status());

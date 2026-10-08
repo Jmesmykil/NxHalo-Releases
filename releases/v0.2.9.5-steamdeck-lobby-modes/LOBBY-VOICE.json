@@ -1,0 +1,165 @@
+{
+  "candidate": "10608fa4d7d093291c35abba34ae40f0d9474b2ef412e8f830a0d45032ed1835",
+  "checks": {
+    "unjoined_menu_no_capture": true,
+    "connected_lobby_capture_without_key": true,
+    "lobby_receives_nonspatial_mix": true,
+    "actual_two_client_gameplay": true,
+    "pause_menu_continues_voice": true,
+    "sender_no_loopback": true,
+    "generated_pcm_in_output": true,
+    "all_owned_exit_zero": true
+  },
+  "phases": {
+    "menu-openmic-gate": {
+      "host": {
+        "enabled": 1,
+        "ptt": 0,
+        "menus": 1,
+        "host": 0,
+        "roster": 0,
+        "capture": 0,
+        "sent": 0,
+        "received": 0,
+        "spatial": 0,
+        "mapping_drop": 0,
+        "mixed": 0,
+        "open": 0,
+        "lobby_voice": 1,
+        "connected": 0,
+        "allowed": 0
+      },
+      "client": {
+        "enabled": 1,
+        "ptt": 0,
+        "menus": 1,
+        "host": 0,
+        "roster": 0,
+        "capture": 0,
+        "sent": 0,
+        "received": 0,
+        "spatial": 0,
+        "mapping_drop": 0,
+        "mixed": 0,
+        "open": 1,
+        "lobby_voice": 1,
+        "connected": 0,
+        "allowed": 0
+      }
+    },
+    "pregame-lobbyvoice": {
+      "host": {
+        "enabled": 1,
+        "ptt": 0,
+        "menus": 1,
+        "host": 1,
+        "roster": 2,
+        "capture": 0,
+        "sent": 0,
+        "received": 827,
+        "spatial": 0,
+        "mapping_drop": 0,
+        "mixed": 779072,
+        "open": 0,
+        "lobby_voice": 1,
+        "connected": 1,
+        "allowed": 1
+      },
+      "client": {
+        "enabled": 1,
+        "ptt": 0,
+        "menus": 1,
+        "host": 1,
+        "roster": 0,
+        "capture": 832,
+        "sent": 832,
+        "received": 0,
+        "spatial": 0,
+        "mapping_drop": 0,
+        "mixed": 0,
+        "open": 1,
+        "lobby_voice": 1,
+        "connected": 1,
+        "allowed": 1
+      }
+    },
+    "openmic-gameplay": {
+      "host": {
+        "enabled": 1,
+        "ptt": 0,
+        "menus": 0,
+        "host": 1,
+        "roster": 2,
+        "capture": 0,
+        "sent": 0,
+        "received": 4859,
+        "spatial": 971,
+        "mapping_drop": 1519,
+        "mixed": 2961600,
+        "open": 0,
+        "lobby_voice": 1,
+        "connected": 1,
+        "allowed": 1
+      },
+      "client": {
+        "enabled": 1,
+        "ptt": 0,
+        "menus": 0,
+        "host": 1,
+        "roster": 0,
+        "capture": 5184,
+        "sent": 5184,
+        "received": 0,
+        "spatial": 0,
+        "mapping_drop": 0,
+        "mixed": 0,
+        "open": 1,
+        "lobby_voice": 1,
+        "connected": 1,
+        "allowed": 1
+      }
+    },
+    "optional-pause-menu-voice": {
+      "host": {
+        "enabled": 1,
+        "ptt": 0,
+        "menus": 0,
+        "host": 1,
+        "roster": 2,
+        "capture": 0,
+        "sent": 0,
+        "received": 5177,
+        "spatial": 1289,
+        "mapping_drop": 1519,
+        "mixed": 3232256,
+        "open": 0,
+        "lobby_voice": 1,
+        "connected": 1,
+        "allowed": 1
+      },
+      "client": {
+        "enabled": 1,
+        "ptt": 0,
+        "menus": 1,
+        "host": 1,
+        "roster": 0,
+        "capture": 5593,
+        "sent": 5593,
+        "received": 0,
+        "spatial": 0,
+        "mapping_drop": 0,
+        "mixed": 0,
+        "open": 1,
+        "lobby_voice": 1,
+        "connected": 1,
+        "allowed": 1
+      }
+    }
+  },
+  "lobby_pcm_bands": {
+    "900": 0.003657024535515756,
+    "983": 0.06645793925563384,
+    "1100": 0.0031281512628920623
+  },
+  "limits": "Generated PCM/dummy audio only. Some transport frames lost under software-rendered load; missing world positions during map load caused mapping drops. No physical microphone, no lossless or capacity claim."
+}

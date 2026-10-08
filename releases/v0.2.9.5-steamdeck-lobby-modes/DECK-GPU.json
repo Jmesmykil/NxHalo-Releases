@@ -1,0 +1,15 @@
+{
+  "sha256": "b3d735a6f78fa495464c6589043245fcf8330580931b949e4f099299e3e1c1db",
+  "installed_baseline": "45a62e4765fed3da8c6c895fb824d2e494bd759d7ec96414d743e790c57afc4d",
+  "checks": {
+    "gameplay": true,
+    "hardware": true,
+    "telemetry": true,
+    "identity": true,
+    "no_resolution_spam": true,
+    "private_online_disabled": true
+  },
+  "frames": 7,
+  "device": "Jupiter",
+  "proof": "/home/deck/Games/HaloCE/runtime-proof/lobby-modes-b3d7-20261008T192235Z"
+}

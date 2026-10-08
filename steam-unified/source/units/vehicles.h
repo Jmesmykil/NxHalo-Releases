@@ -36,6 +36,9 @@ struct vehicle_runtime_datum;
 
 /* ---------- prototypes/VEHICLES.C */
 
+boolean vehicle_supports_boost(long vehicle_index);
+boolean vehicle_definition_is_turret(long definition_index);
+
 void vehicle_hover(
 	long vehicle_index,
 	boolean hover);

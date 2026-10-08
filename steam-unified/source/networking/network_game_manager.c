@@ -90,6 +90,7 @@ symbols in this file:
 #include "network_game_manager.h"
 #include "network_game_ui.h"
 #include "networking/network_server_manager.h"
+#include "networking/network_client_manager.h"
 #include "objects/objects.h"
 #include "units/units.h"
 #include "text/unicode.h"
@@ -331,6 +332,31 @@ int network_game_port_voice_spatial(int speaker_slot, float listener[3], float r
     right[1] = listener_object->object.up.k * listener_object->object.forward.i - listener_object->object.up.i * listener_object->object.forward.k;
     right[2] = listener_object->object.up.i * listener_object->object.forward.j - listener_object->object.up.j * listener_object->object.forward.i;
     return 1;
+}
+
+int network_game_port_voice_session_connected(void)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	unsigned long address; int slot;
+	if (server) return network_game_server_port_voice_roster(&address, &slot, 1) > 0;
+	return network_game_client_is_connected(global_network_game_client_get());
+}
+
+int network_game_port_voice_session_active(void)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	struct network_game_client *client = global_network_game_client_get();
+	struct player_datum *local_player;
+	struct object_datum *local_unit;
+	long local_index;
+	int playing = server ? network_game_server_playing(server) : network_game_client_is_playing(client);
+	if (!playing || !players_globals || players_globals->local_player_count <= 0)
+		return 0;
+	local_index = players_globals->local_players[0];
+	if (local_index == NONE || !(local_player = player_try_and_get(local_index)) || local_player->unit_index == NONE)
+		return 0;
+	local_unit = object_try_and_get(local_player->unit_index);
+	return local_unit != NULL;
 }
 
 unsigned long network_game_port_voice_map_token(void)

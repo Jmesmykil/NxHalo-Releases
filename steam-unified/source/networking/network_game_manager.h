@@ -90,6 +90,9 @@ boolean network_player_is_valid(
 	struct network_player *player);
 int network_game_port_voice_spatial(int speaker_slot, float listener[3], float right[3], float speaker[3]);
 unsigned long network_game_port_voice_map_token(void);
+int network_game_port_voice_session_active(void);
+/* An admitted session, including its pregame and postgame lobby. */
+int network_game_port_voice_session_connected(void);
 boolean network_game_add_machine(
 	struct network_game *game,
 	struct network_machine *machine);

@@ -13,6 +13,7 @@ long nxhalo_campaign_character_definition(long fallback_definition);
 long nxhalo_multiplayer_character_definition(long fallback_definition);
 short nxhalo_character_faction_bipeds(short faction, long *definitions, short capacity);
 boolean nxhalo_zombie_melee_weapon_available(void);
+boolean nxhalo_zombie_melee_weapon_allowed(long definition_index);
 boolean nxhalo_give_zombie_melee_weapon(long unit_index);
 /* Separate campaign and host selectors for the native overlay. */
 short nxhalo_character_count(void);

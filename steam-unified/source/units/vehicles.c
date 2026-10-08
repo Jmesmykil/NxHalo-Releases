@@ -2163,6 +2163,16 @@ static void update_alien_scout_physics(
 
 			maximum_acceleration = definition->unknown300;
 
+            /* Accelerate through the normal collision-aware hover physics. */
+            if (TEST_FLAG(vehicle->vehicle.flags, _vehicle_control_crouch_bit) &&
+                vehicle->unit.driver_object_index != NONE &&
+                vehicle->unit.throttle.i > 0.05f && vehicle->object.up.k > 0.5f &&
+                !TEST_FLAG(vehicle->vehicle.flags, _vehicle_control_jump_bit))
+            {
+                maximum_speed *= 1.75f;
+                maximum_acceleration *= 1.5f;
+            }
+
 			target_velocity.i = maximum_speed*vehicle->unit.throttle.i;
 			target_velocity.j = maximum_speed*vehicle->unit.throttle.j;
 			acceleration.i = target_velocity.i-local_velocity.i;
@@ -2445,6 +2455,19 @@ static boolean vehicle_mass_points_fit(
 body has the same padded size and 98 relocations. The remaining residual is
 instruction scheduling, branch layout, and relocation placement. Keep the
 file-static call topology intact while closing it. */
+
+/* Shared native control uses the existing crouch bit for Ghost boost. */
+boolean vehicle_definition_is_turret(long definition_index)
+{
+    return definition_index != NONE &&
+        vehicle_specific_definition_get(definition_index)->vehicle_type == _vehicle_type_turret;
+}
+
+boolean vehicle_supports_boost(long vehicle_index)
+{
+    struct unit_datum *vehicle = vehicle_try_and_get(vehicle_index);
+    return vehicle && vehicle_specific_definition_get(vehicle->definition_index)->vehicle_type == _vehicle_type_alien_scout;
+}
 
 boolean vehicle_update(
 	long vehicle_index)

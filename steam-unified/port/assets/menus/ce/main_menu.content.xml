@@ -63,17 +63,38 @@
  <widget name="main_menu/content/browser/title" type="text" controller="1" left="38" top="18" width="565" height="42" text="COMMUNITY MAP BROWSER" font="ui\large_ui" color="#FF2896FF" />
  <widget name="main_menu/content/browser/list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
   <child widget="main_menu/content/browser/browser_search" y="70" />
-  <child widget="main_menu/content/browser/browser_prev" y="98" />
-  <child widget="main_menu/content/browser/browser_map_0" y="126" />
-  <child widget="main_menu/content/browser/browser_map_1" y="148" />
-  <child widget="main_menu/content/browser/browser_map_2" y="170" />
-  <child widget="main_menu/content/browser/browser_map_3" y="192" />
-  <child widget="main_menu/content/browser/browser_map_4" y="214" />
-  <child widget="main_menu/content/browser/browser_map_5" y="236" />
-  <child widget="main_menu/content/browser/browser_map_6" y="258" />
-  <child widget="main_menu/content/browser/browser_map_7" y="280" />
-  <child widget="main_menu/content/browser/browser_map_8" y="302" />
-  <child widget="main_menu/content/browser/browser_next" y="326" />
+  <child widget="main_menu/content/browser/browser_category" y="96" />
+  <child widget="main_menu/content/browser/browser_installed" y="122" />
+  <child widget="main_menu/content/browser/browser_sort" y="148" />
+  <child widget="main_menu/content/browser/browser_prev" y="174" />
+  <child widget="main_menu/content/browser/browser_map_0" y="202" />
+  <child widget="main_menu/content/browser/browser_map_1" y="224" />
+  <child widget="main_menu/content/browser/browser_map_2" y="246" />
+  <child widget="main_menu/content/browser/browser_map_3" y="268" />
+  <child widget="main_menu/content/browser/browser_map_4" y="290" />
+  <child widget="main_menu/content/browser/browser_map_5" y="312" />
+  <child widget="main_menu/content/browser/browser_map_6" y="334" />
+  <child widget="main_menu/content/browser/browser_map_7" y="356" />
+  <child widget="main_menu/content/browser/browser_map_8" y="378" />
+  <child widget="main_menu/content/browser/browser_next" y="404" />
+ </widget>
+ <widget name="main_menu/content/browser/browser_category" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
+  <data input="port content status" />
+  <on event="a" run="port content import" />
+  <on event="start" run="port content import" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/content/browser/browser_installed" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
+  <data input="port content status" />
+  <on event="a" run="port content import" />
+  <on event="start" run="port content import" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/content/browser/browser_sort" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
+  <data input="port content status" />
+  <on event="a" run="port content import" />
+  <on event="start" run="port content import" />
+  <on event="left_mouse" run="mouse emit accept event" />
  </widget>
  <widget name="main_menu/content/browser/browser_search" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
   <data input="port content status" />
@@ -145,7 +166,7 @@
   <on event="start" run="port content download" />
   <on event="left_mouse" run="mouse emit accept event" />
  </widget>
- <widget name="main_menu/content/browser/browser_status" type="text" controller="1" left="42" top="362" width="556" height="96" font="ui\small_ui" color="#FFFFFFFF">
+ <widget name="main_menu/content/browser/browser_status" type="text" controller="1" left="42" top="438" width="556" height="38" font="ui\small_ui" color="#FFFFFFFF">
   <data input="port content status" />
  </widget>
  <widget name="main_menu/content/mods_entry" type="text" controller="1" left="40" width="560" height="30" bitmap="bitmaps/list_item_bkd" text="TEXTURE PACKS &amp; DISPLAY" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3">
@@ -164,18 +185,38 @@
   <child widget="main_menu/content/mods/mods_import" y="70" />
   <child widget="main_menu/content/mods/mods_toggle" y="98" />
   <child widget="main_menu/content/mods/mods_upscale" y="126" />
-  <child widget="main_menu/content/mods/mods_pack_0" y="156" />
-  <child widget="main_menu/content/mods/mods_pack_1" y="178" />
-  <child widget="main_menu/content/mods/mods_pack_2" y="200" />
-  <child widget="main_menu/content/mods/mods_pack_3" y="222" />
-  <child widget="main_menu/content/mods/mods_pack_4" y="244" />
-  <child widget="main_menu/content/mods/mods_pack_5" y="266" />
-  <child widget="main_menu/content/mods/mods_pack_6" y="288" />
-  <child widget="main_menu/content/mods/mods_pack_7" y="310" />
-  <child widget="main_menu/content/mods/mods_pack_8" y="332" />
-  <child widget="main_menu/content/mods/mods_pack_9" y="354" />
-  <child widget="main_menu/content/mods/mods_pack_10" y="376" />
-  <child widget="main_menu/content/mods/mods_pack_11" y="398" />
+  <child widget="main_menu/content/mods/mods_library_entry" y="158" />
+  <child widget="main_menu/content/mods/mods_disable" y="202" />
+  <child widget="main_menu/content/mods/mods_remove" y="232" />
+  <child widget="main_menu/content/mods/mods_confirm_remove" y="262" />
+  <child widget="main_menu/content/mods/mods_cancel_remove" y="292" />
+ </widget>
+ <widget name="main_menu/content/mods/mods_disable" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" text="DISABLE SELECTED PACK" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
+  <on event="a" run="port content folder" />
+  <on event="start" run="port content folder" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/content/mods/mods_remove" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" text="REMOVE SELECTED PACK..." font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
+  <on event="a" run="port content folder" />
+  <on event="start" run="port content folder" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/content/mods/mods_confirm_remove" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" text="CONFIRM REMOVAL TO RECOVERY" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
+  <data input="port content status" />
+  <on event="a" run="port content folder" />
+  <on event="start" run="port content folder" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/content/mods/mods_cancel_remove" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" text="CANCEL REMOVAL" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
+  <data input="port content status" />
+  <on event="a" run="port content folder" />
+  <on event="start" run="port content folder" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/content/mods/mods_library_entry" type="text" controller="1" left="42" width="556" height="30" bitmap="bitmaps/list_item_bkd" text="BROWSE / SEARCH INSTALLED TEXTURE PACKS" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="3">
+  <on event="a" open="main_menu/content/mods/library" />
+  <on event="start" open="main_menu/content/mods/library" />
+  <on event="left_mouse" run="mouse emit accept event" />
  </widget>
  <widget name="main_menu/content/mods/mods_import" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" text="IMPORT TEXTURE PACK FOLDER" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
   <on event="a" run="port content import" />
@@ -266,7 +307,7 @@
   <on event="start" run="port content download" />
   <on event="left_mouse" run="mouse emit accept event" />
  </widget>
- <widget name="main_menu/content/mods/mods_status" type="text" controller="1" left="42" top="430" width="556" height="42" font="ui\small_ui" color="#FFFFFFFF">
+ <widget name="main_menu/content/mods/mods_status" type="text" controller="1" left="42" top="352" width="556" height="122" font="ui\small_ui" color="#FFFFFFFF">
   <data input="port content status" />
  </widget>
  <widget name="main_menu/content/maps_menu" type="text" controller="1" left="50" width="540" height="32" bitmap="bitmaps/list_item_bkd" text="CUSTOM MAPS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
@@ -316,4 +357,47 @@
   <child widget="main_menu/content/profile" y="105" />
  </widget>
  <widget name="main_menu/content/network_help" type="text" controller="1" left="50" top="400" width="540" height="65" text="Current native games use V21. Choose another profile for older rooms." font="ui\small_ui" color="#FFFFFFFF" />
+ <widget name="main_menu/content/mods/library" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+  <on event="b" run="gamespy back handler" />
+  <child widget="main_menu/content/mods/library_title" />
+  <child widget="main_menu/content/mods/library_list" />
+  <child widget="main_menu/content/mods/mods_library_status" />
+ </widget>
+ <widget name="main_menu/content/mods/library_title" type="text" controller="1" left="38" top="18" width="565" height="42" text="INSTALLED TEXTURE PACKS" font="ui\large_ui" color="#FF2896FF" />
+ <widget name="main_menu/content/mods/library_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+  <child widget="main_menu/content/mods/mods_search" y="70" />
+  <child widget="main_menu/content/mods/mods_prev" y="98" />
+  <child widget="main_menu/content/mods/mods_pack_0" y="126" />
+  <child widget="main_menu/content/mods/mods_pack_1" y="148" />
+  <child widget="main_menu/content/mods/mods_pack_2" y="170" />
+  <child widget="main_menu/content/mods/mods_pack_3" y="192" />
+  <child widget="main_menu/content/mods/mods_pack_4" y="214" />
+  <child widget="main_menu/content/mods/mods_pack_5" y="236" />
+  <child widget="main_menu/content/mods/mods_pack_6" y="258" />
+  <child widget="main_menu/content/mods/mods_pack_7" y="280" />
+  <child widget="main_menu/content/mods/mods_pack_8" y="302" />
+  <child widget="main_menu/content/mods/mods_pack_9" y="324" />
+  <child widget="main_menu/content/mods/mods_pack_10" y="346" />
+  <child widget="main_menu/content/mods/mods_pack_11" y="368" />
+  <child widget="main_menu/content/mods/mods_next" y="398" />
+ </widget>
+ <widget name="main_menu/content/mods/mods_search" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
+  <data input="port content status" />
+  <on event="a" run="port content import" />
+  <on event="start" run="port content import" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/content/mods/mods_prev" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" text="&lt; PREVIOUS" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
+  <on event="a" run="port content import" />
+  <on event="start" run="port content import" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/content/mods/mods_next" type="text" controller="1" left="42" width="556" height="24" bitmap="bitmaps/list_item_bkd" text="NEXT &gt;" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="2">
+  <on event="a" run="port content import" />
+  <on event="start" run="port content import" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/content/mods/mods_library_status" type="text" controller="1" left="42" top="430" width="556" height="44" font="ui\small_ui" color="#FFFFFFFF">
+  <data input="port content status" />
+ </widget>
 </menus>

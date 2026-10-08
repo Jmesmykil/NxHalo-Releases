@@ -665,6 +665,7 @@ symbols in this file:
 #include "game/game_allegiance.h"
 #include "game/game_globals.h"
 #include "game/game_engine.h"
+#include "match_rules.h"
 #include "game/players.h"
 #include "hs/object_lists.h"
 #include "interface/first_person_weapons.h"
@@ -2159,6 +2160,9 @@ boolean unit_add_grenade_to_inventory(
 		"c:\\halo\\SOURCE\\units\\units.c",
 		7282,
 		equipment_definition->equipment.powerup_type==_equipment_powerup_grenade);
+
+	if (!match_rules_grenade_pickup_allowed(unit_index))
+		return FALSE;
 
 	/* port: only the types a unit carries (a map's type) */
 	if (!VALID_INDEX(equipment_definition->equipment.grenade_type, NUMBER_OF_UNIT_GRENADE_TYPES) &&
@@ -8317,6 +8321,9 @@ boolean unit_add_weapon_to_inventory(
 	which was then used as a weapon. In the released maps they all name
 	weapons (224 initial weapons, 32 item collection entries, every
 	starting profile) */
+	if (!match_rules_weapon_allowed_for_unit(unit_index, weapon->definition_index))
+		return FALSE;
+
 	if (weapon->object.type!=_object_type_weapon)
 	{
 		static boolean reported = FALSE;

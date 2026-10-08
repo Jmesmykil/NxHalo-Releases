@@ -7089,11 +7089,15 @@ boolean game_engine_vehicle_placement_allowed(
 	struct tag_block *palette)
 {
 	struct game_variant_options const *options = game_variant_options_get();
-	short side, type;
+	short side, type, mode_vehicle_policy;
 	byte set;
 
 	if (!game_engine || placement->palette_entry_index == NONE)
 		return TRUE;
+	mode_vehicle_policy = match_rules_vehicle_policy(TAG_BLOCK_GET_ELEMENT(palette, placement->palette_entry_index,
+		struct scenario_object_palette_entry)->reference.index);
+	if (mode_vehicle_policy >= 0)
+		return mode_vehicle_policy != 0;
 	side = global_variant.universal_variant.teams ? game_engine_nearest_team(&placement->position) : 0;
 	set = options->vehicle_set[side];
 	type = game_engine_variant_vehicle_type(TAG_BLOCK_GET_ELEMENT(palette, placement->palette_entry_index,
@@ -7189,6 +7193,9 @@ long game_engine_remap_vehicle(
 	long vehicle_definition_index)
 {
 	long result = vehicle_definition_index;
+	short mode_vehicle_policy = game_engine ? match_rules_vehicle_policy(vehicle_definition_index) : -1;
+	if (mode_vehicle_policy >= 0)
+		return mode_vehicle_policy ? vehicle_definition_index : NONE;
 
 	if (game_engine)
 	{

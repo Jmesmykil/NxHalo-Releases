@@ -112,10 +112,16 @@ SCREENS = {
              "Echo sounds as the place you are in does, and\nmuffle those behind walls, as the Xbox did.", None),
             ("SOUND:", "audio.enabled", ON_OFF,
              "Play sound at all; from the next time the game\nstarts.", None),
+            # (the row's widgets keep the name "voice" the menu has had)
             ("VOICE CHAT:", "audio.voice_enabled", ON_OFF,
-             "Compatible native clients only. Voice is off by default.\nHold the push-to-talk key to transmit nearby.", None),
+             "Talk to nearby players. Off by default; voice\nrequires compatible clients.", None, "voice"),
+            ("VOICE MODE:", "audio.voice_mode", [("PUSH TO TALK", "ptt"), ("OPEN MIC", "open")],
+             "Open mic transmits without holding a key.\nRequires compatible clients and a joined session.",
+             None),
+            ("LOBBY/MENU VOICE:", "audio.voice_in_menus", ON_OFF,
+             "Allow voice in connected lobbies and menus.\nUses your voice mode. Off by default.", None),
             ("PUSH-TO-TALK:", "controls.voice_ptt", [("V", "V"), ("X", "X"), ("C", "C")],
-             "Hold this keyboard key while playing to transmit.\nMicrophone capture stops when the key is released.", None),
+             "Hold this keyboard key while playing to transmit\nin push-to-talk mode. Open mic does not use it.", None),
         ],
     },
     "network_setup": {

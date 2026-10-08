@@ -254,6 +254,11 @@ boolean nxhalo_zombie_melee_weapon_available(void)
 	return nxhalo_zombie_melee_weapon_definition() != NONE;
 }
 
+boolean nxhalo_zombie_melee_weapon_allowed(long definition_index)
+{
+	return definition_index != NONE && definition_index == nxhalo_zombie_melee_weapon_definition();
+}
+
 boolean nxhalo_give_zombie_melee_weapon(long unit_index)
 {
 	long definition_index = nxhalo_zombie_melee_weapon_definition();

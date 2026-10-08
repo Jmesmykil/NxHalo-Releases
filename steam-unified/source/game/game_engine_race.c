@@ -121,8 +121,8 @@ symbols in this file:
 enum
 {
 	MAXIMUM_RACE_FLAGS = 32,
-	MAXIMUM_RACE_VEHICLES = 8,
-	MAXIMUM_RACE_VEHICLES_TO_DELETE = 32,
+	MAXIMUM_RACE_VEHICLES = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
+	MAXIMUM_RACE_VEHICLES_TO_DELETE = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
 	/* port: the native builds' session limit (halo_port_limits.h) */
 	MULTIPLAYER_MAXIMUM_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
 };
@@ -385,26 +385,31 @@ static long race_get_vehicle_to_spawn(
 		struct game_globals_vehicle);
 	long vehicle_definition_index = NONE;
 
+	/* A participant gets one vehicle at a unique map-authored Race spawn.
+	   Do not stop large races at the original four/eight vehicle limit. */
+	if (vehicle_number < 0 || vehicle_number >= MAXIMUM_RACE_VEHICLES)
+		return NONE;
+
 	switch (game_engine_get_variant()->universal_variant.vehicle_set)
 	{
 	case _game_engine_vehicles_default:
-		if (vehicle_number == 0)
+		if (vehicle_number % 6 == 0)
 			vehicle_definition_index = warthog->vehicle.index;
-		else if (vehicle_number == 1)
+		else if (vehicle_number % 6 == 1)
 			vehicle_definition_index = scorpion->vehicle.index;
-		else if (vehicle_number < 6)
+		else
 			vehicle_definition_index = ghost->vehicle.index;
 		break;
 	case _game_engine_vehicles_none:
 		break;
 	case _game_engine_vehicles_warthog:
-		vehicle_definition_index = vehicle_number < 4 ? warthog->vehicle.index : NONE;
+		vehicle_definition_index = warthog->vehicle.index;
 		break;
 	case _game_engine_vehicles_ghost:
-		vehicle_definition_index = vehicle_number < 8 ? ghost->vehicle.index : NONE;
+		vehicle_definition_index = ghost->vehicle.index;
 		break;
 	case _game_engine_vehicles_tank:
-		vehicle_definition_index = vehicle_number < 4 ? scorpion->vehicle.index : NONE;
+		vehicle_definition_index = scorpion->vehicle.index;
 		break;
 	}
 

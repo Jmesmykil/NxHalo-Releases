@@ -1091,6 +1091,19 @@ short network_game_client_get_state(
 	return client->state;
 }
 
+boolean network_game_client_is_connected(struct network_game_client *client)
+{
+	return client && (client->state == _network_game_client_state_pregame ||
+		client->state == _network_game_client_state_ingame ||
+		client->state == _network_game_client_state_postgame);
+}
+
+boolean network_game_client_is_playing(
+	struct network_game_client *client)
+{
+	return client && client->state == _network_game_client_state_ingame;
+}
+
 boolean network_game_client_set_machine(
 	struct network_game_client *client,
 	struct network_machine *machine)
