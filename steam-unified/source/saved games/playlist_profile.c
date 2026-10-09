@@ -82,10 +82,14 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "text/unicode.h"
 #include "saved games/saved_game_files.h"
+#include "saved games/playlist_profile_mode_codec.h"
 #include "tag_files/files.h"
 #include "game/game_engine_playlist.h"
 #include "text/text_group.h"
 #include "tag_files/tag_groups.h"
+#ifdef HALO_GAME_BROWSER
+#include "match_rules.h"
+#endif
 /* the saved game file checksum is an XDK content signature. */
 #include <xtl.h>
 
@@ -101,6 +105,8 @@ enum
 	PLAYLIST_PROFILE_OPTIONS_OFFSET = 0x100,
 	PLAYLIST_PROFILE_OPTIONS_MAGIC = 0x4F565047, /* 'GPVO' little-endian */
 	PLAYLIST_PROFILE_OPTIONS_VERSION = 1,
+	/* Kept after the existing v1 PC-options record so older builds ignore it. */
+	PLAYLIST_PROFILE_NATIVE_MODE_OFFSET = 0x140,
 	MAXIMUM_GAME_VARIANT_NAME_LENGTH = 12,
 	NUMBER_OF_DEFAULT_PLAYLIST_PROFILES = 26,
 };
@@ -186,12 +192,18 @@ static boolean playlist_profile_options_from_block(
 static void playlist_profile_options_to_block(
 	byte *block,
 	struct game_variant_options const *options);
+static boolean playlist_profile_native_mode_from_block(
+	byte const *block, short *preset, short *matchup);
+static void playlist_profile_native_mode_to_block(
+	byte *block, short preset, short matchup);
 
 /* ---------- globals */
 
 /* port: the options the asynchronous write writes (playlist_profile_write),
 the file's own when the saver gave none */
 static struct game_variant_options playlist_profile_write_options;
+static short playlist_profile_write_mode_preset;
+static short playlist_profile_write_mode_matchup;
 
 static struct playlist_profile_runtime_globals_prefix playlist_profile_globals = { 0 };
 static struct playlist_profile_data playlist_profile_default_data =
@@ -267,8 +279,13 @@ void playlist_profiles_dispose(
 void playlist_profile_delete(
 	long playlist_profile_index)
 {
-	if (playlist_profile_index != NONE &&
-		!delete_enumerated_saved_game_file(playlist_profile_index))
+	if (playlist_profile_index == NONE)
+		return;
+#ifdef HALO_GAME_BROWSER
+	if (match_rules_native_template_profile_reserved(playlist_profile_index))
+		return;
+#endif
+	if (!delete_enumerated_saved_game_file(playlist_profile_index))
 	{
 		error(
 			_error_silent,
@@ -444,7 +461,21 @@ boolean playlist_profile_get_display_name(
 	long playlist_profile_index,
 	wchar_t *display_name)
 {
-	wchar_t *name = saved_game_file_get_display_name(playlist_profile_index);
+	wchar_t *name;
+#ifdef HALO_GAME_BROWSER
+	short template_index = match_rules_native_template_index_from_profile_index(playlist_profile_index);
+	if (template_index != NONE)
+	{
+		char const *name = match_rules_native_template_name(template_index);
+		short index;
+		for (index = 0; name[index] && index < MAX_GAMENAME - 1; index++)
+			display_name[index] = (wchar_t)(unsigned char)name[index];
+		display_name[index] = 0;
+		return TRUE;
+	}
+	if (match_rules_native_template_profile_reserved(playlist_profile_index)) return FALSE;
+#endif
+	name = saved_game_file_get_display_name(playlist_profile_index);
 
 	if (name)
 	{
@@ -467,6 +498,15 @@ boolean playlist_profile_get(
 		"c:\\halo\\SOURCE\\saved games\\playlist_profile.c",
 		217,
 		variant);
+#ifdef HALO_GAME_BROWSER
+	{
+		short template_index = match_rules_native_template_index_from_profile_index(playlist_profile_index);
+		struct game_variant_options options;
+		if (template_index != NONE)
+			return match_rules_native_template_build(template_index, variant, &options, NULL, NULL);
+		if (match_rules_native_template_profile_reserved(playlist_profile_index)) return FALSE;
+	}
+#endif
 
 	if (playlist_profile_index == NONE)
 	{
@@ -503,6 +543,17 @@ boolean playlist_profile_get_options(
 	struct game_variant_options *options)
 {
 	byte block[SAVED_GAME_FILE_BLOCK_SIZE];
+#ifdef HALO_GAME_BROWSER
+	{
+		short template_index = match_rules_native_template_index_from_profile_index(playlist_profile_index);
+		if (template_index != NONE)
+		{
+			struct game_variant variant;
+			return match_rules_native_template_build(template_index, &variant, options, NULL, NULL);
+		}
+		if (match_rules_native_template_profile_reserved(playlist_profile_index)) return FALSE;
+	}
+#endif
 
 	if (playlist_profile_index != NONE &&
 		TEST_FLAG(playlist_profile_index, _saved_game_file_index_valid_bit) &&
@@ -516,19 +567,73 @@ boolean playlist_profile_get_options(
 	return FALSE;
 }
 
+boolean playlist_profile_get_native_mode(
+	long playlist_profile_index, short *preset, short *matchup)
+{
+	short local_preset = 0, local_matchup = 0;
+	byte block[SAVED_GAME_FILE_BLOCK_SIZE];
+	XCALCSIG_SIGNATURE checksum;
+	if (preset) *preset = 0;
+	if (matchup) *matchup = 0;
+#ifdef HALO_GAME_BROWSER
+	{
+		short template_index = match_rules_native_template_index_from_profile_index(playlist_profile_index);
+		if (template_index != NONE)
+		{
+			struct game_variant variant;
+			struct game_variant_options options;
+			return match_rules_native_template_build(template_index, &variant, &options,
+				preset, matchup);
+		}
+		if (match_rules_native_template_profile_reserved(playlist_profile_index)) return FALSE;
+	}
+#endif
+	if (playlist_profile_index == NONE ||
+		!TEST_FLAG(playlist_profile_index, _saved_game_file_index_valid_bit) ||
+		!playlist_profile_read_block(playlist_profile_index, block))
+		return FALSE;
+	saved_game_file_generate_checksum(block, PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE, &checksum);
+	if (csmemcmp(&checksum, block + PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE, sizeof(checksum)) ||
+		!playlist_profile_native_mode_from_block(block, &local_preset, &local_matchup))
+		return FALSE;
+	if (preset) *preset = local_preset;
+	if (matchup) *matchup = local_matchup;
+	return TRUE;
+}
+
 /* port: a gametype saved with its PC options */
 void playlist_profile_save_with_options(
 	long playlist_profile_index,
 	struct game_variant *variant,
 	struct game_variant_options const *options)
 {
+	short preset = 0, matchup = 0;
+	playlist_profile_get_native_mode(playlist_profile_index, &preset, &matchup);
+	playlist_profile_save_with_options_and_native_mode(playlist_profile_index, variant, options, preset, matchup);
+}
+
+void playlist_profile_save_with_options_and_native_mode(
+	long playlist_profile_index,
+	struct game_variant *variant,
+	struct game_variant_options const *options,
+	short preset,
+	short matchup)
+{
 	match_assert(
 		"c:\\halo\\SOURCE\\saved games\\playlist_profile.c",
 		305,
 		variant);
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\playlist_profile.c",
+		306,
+		options);
 
 	if (playlist_profile_index != NONE)
 	{
+#ifdef HALO_GAME_BROWSER
+		if (match_rules_native_template_profile_reserved(playlist_profile_index))
+			return;
+#endif
 		game_engine_variant_cleanup(variant);
 		/* (a write still running reads the options it was given: it ends
 		first) */
@@ -541,6 +646,8 @@ void playlist_profile_save_with_options(
 			playlist_profile_globals.thread = NULL;
 		}
 		playlist_profile_write_options = *options;
+		playlist_profile_write_mode_preset = preset >= 0 && preset <= 7 ? preset : 0;
+		playlist_profile_write_mode_matchup = matchup >= 0 && matchup <= 2 ? matchup : 0;
 		playlist_profile_write(playlist_profile_index, variant);
 	}
 
@@ -788,6 +895,8 @@ static unsigned long __stdcall playlist_profile_write_thread_proc(
 				sizeof(struct game_variant),
 				(struct _XCALCSIG_SIGNATURE *)(block + sizeof(struct game_variant)));
 			playlist_profile_options_to_block(block, &playlist_profile_write_options);
+			playlist_profile_native_mode_to_block(block,
+				playlist_profile_write_mode_preset, playlist_profile_write_mode_matchup);
 
 			if (!file_set_position(&file, 0) ||
 				!file_write(&file, sizeof(block), block))
@@ -959,3 +1068,35 @@ static void playlist_profile_options_to_block(
 typedef char verify_playlist_profile_options_fit[
 	PLAYLIST_PROFILE_OPTIONS_OFFSET + sizeof(struct playlist_profile_options_header) +
 		sizeof(struct game_variant_options) + sizeof(XCALCSIG_SIGNATURE) <= SAVED_GAME_FILE_BLOCK_SIZE ? 1 : -1];
+
+static void playlist_profile_native_mode_checksum(
+	byte *data, word size, byte *signature)
+{
+	saved_game_file_generate_checksum(data, size, (XCALCSIG_SIGNATURE *)signature);
+}
+
+static boolean playlist_profile_native_mode_from_block(
+	byte const *block, short *preset, short *matchup)
+{
+	return playlist_profile_mode_decode(block, SAVED_GAME_FILE_BLOCK_SIZE,
+		PLAYLIST_PROFILE_NATIVE_MODE_OFFSET, sizeof(XCALCSIG_SIGNATURE),
+		playlist_profile_native_mode_checksum, preset, matchup);
+}
+
+static void playlist_profile_native_mode_to_block(
+	byte *block, short preset, short matchup)
+{
+	playlist_profile_mode_encode(block, SAVED_GAME_FILE_BLOCK_SIZE,
+		PLAYLIST_PROFILE_NATIVE_MODE_OFFSET, sizeof(XCALCSIG_SIGNATURE),
+		preset, matchup, playlist_profile_native_mode_checksum);
+}
+
+typedef char verify_playlist_profile_native_mode_signature_limit[
+	sizeof(XCALCSIG_SIGNATURE) <= 32 ? 1 : -1];
+typedef char verify_playlist_profile_native_mode_after_options[
+	PLAYLIST_PROFILE_NATIVE_MODE_OFFSET >= PLAYLIST_PROFILE_OPTIONS_OFFSET +
+		sizeof(struct playlist_profile_options_header) + sizeof(struct game_variant_options) +
+		sizeof(XCALCSIG_SIGNATURE) ? 1 : -1];
+typedef char verify_playlist_profile_native_mode_fit[
+	PLAYLIST_PROFILE_NATIVE_MODE_OFFSET + sizeof(struct playlist_profile_mode_header) +
+	sizeof(XCALCSIG_SIGNATURE) <= SAVED_GAME_FILE_BLOCK_SIZE ? 1 : -1];

@@ -2007,7 +2007,7 @@ Xbox's networking, run by the engine's port entry points
 
 #define MAXIMUM_ADVERTISED_GAMES 9
 #define GAMETYPE_ROWS 10
-#define MAXIMUM_GAMETYPES 100
+#define MAXIMUM_GAMETYPES 109
 #define BROWSER_ROWS 15
 #define LOBBY_ROWS 11
 #define TEXT_FIELD_LENGTH 128
@@ -2546,6 +2546,8 @@ static boolean gametype_list_initialize(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "list_item_0_chooser_spinner", 0);
 	short last, index;
+	match_rules_clear_ui_preset_selection();
+	match_rules_take_profile_preset_materialized();
 
 	multiplayer.gametype_count = ui_widget_port_gametypes(multiplayer.gametypes, MAXIMUM_GAMETYPES, &last);
 	gametype_bank_read(multiplayer.gametype_count && !((unsigned long)multiplayer.gametypes[last] &
@@ -5255,7 +5257,7 @@ static boolean gametype_editing_gun_game(void)
 {
 	struct game_variant *variant = edit_variant();
 	return variant && variant->game_engine_index == game_engine_slayer &&
-		!ustrncmp(variant->human_readable_game_description, L"Gun Game", 8);
+		(gametype_edit.setup ? match_rules_preset_get() : player_ui_get_edit_playlist_native_mode()) == MATCH_RULES_PRESET_GUN_GAME;
 }
 
 /* "mp profile init X" (the list's creation): its spinners from the gametype */
@@ -5320,6 +5322,7 @@ before), edited by the editor's screens, the game's on START GAME */
 
 static void gametype_setup_begin(void)
 {
+	boolean profile_preset_materialized = match_rules_take_profile_preset_materialized();
 	if (gametype_edit.setup)
 		return;
 	if (!player_ui_game_variant_specified(&gametype_edit.setup_variant))
@@ -5327,7 +5330,7 @@ static void gametype_setup_begin(void)
 	gametype_edit.setup_options = *player_ui_get_game_variant_options();
 	/* Reopening the active lobby editor must preserve its current variant.
 	 * A saved preset is applied only by an explicit selection or new setup. */
-	if (!lobby_editing)
+	if (!lobby_editing && !profile_preset_materialized)
 		match_rules_apply_variant_preset(match_rules_preset_get(), &gametype_edit.setup_variant, &gametype_edit.setup_options);
 	gametype_edit.setup = TRUE;
 	gametype_edit.vehicle_side = 0;
@@ -5577,10 +5580,20 @@ static boolean gametype_engine_set(struct widget_instance *item)
 	{
 		if (!strcmp(item->name, engine_items[index]))
 		{
+			/* Editing a saved special profile goes through this base-engine
+			 * step to reach its options. Keeping that same engine preserves
+			 * its identity, including in the lobby. A different engine, Standard
+			 * preset or ordinary profile selection explicitly clears it. */
+			if (variant->game_engine_index == engine_of_item[index] &&
+				(gametype_edit.setup ? match_rules_preset_get() : player_ui_get_edit_playlist_native_mode()) != MATCH_RULES_PRESET_STANDARD)
+				return TRUE;
 			/* An explicit base-type choice supersedes any special preset and
 			 * clears its inherited display label, even when Slayer was selected. */
 			if (!gametype_setup_select_preset(MATCH_RULES_PRESET_STANDARD))
 				return FALSE;
+#ifdef HALO_GAME_BROWSER
+			player_ui_set_edit_playlist_native_mode(MATCH_RULES_PRESET_STANDARD, MATCH_RULES_MATCHUP_COVENANT_USMC);
+#endif
 			if (variant->game_engine_index != engine_of_item[index])
 				csmemset(&variant->game_engine_variant, 0, sizeof(variant->game_engine_variant));
 			variant->game_engine_index = engine_of_item[index];
@@ -5853,13 +5866,21 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "port match preset")) {
 			char const *last=strrchr(widget->name,'_');
-			return last && gametype_setup_select_preset((short)atoi(last+1));
+			short preset;
+			if (!last) return FALSE;
+			preset = (short)atoi(last + 1);
+			if (!gametype_setup_select_preset(preset)) return FALSE;
+			if (!gametype_edit.setup)
+				match_rules_note_ui_preset_selection(preset, match_rules_matchup_get());
+			return TRUE;
 		}
 		else if (!strcmp(name, "port faction matchup")) {
 			char const *last=strrchr(widget->name,'_');
-			return last &&
-				match_rules_matchup_set((short)atoi(last+1)) &&
-				gametype_setup_select_preset(MATCH_RULES_PRESET_FACTION);
+			if (!last || !match_rules_matchup_set((short)atoi(last + 1)) ||
+				!gametype_setup_select_preset(MATCH_RULES_PRESET_FACTION)) return FALSE;
+			if (!gametype_edit.setup)
+				match_rules_note_ui_preset_selection(MATCH_RULES_PRESET_FACTION, (short)atoi(last + 1));
+			return TRUE;
 		}
 		else if (!strcmp(name, "port character select")) {
 			extern boolean nxhalo_character_choice_set(boolean,long); char const *last=strrchr(widget->name,'_');

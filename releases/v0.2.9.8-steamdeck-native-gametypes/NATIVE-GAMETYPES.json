@@ -1,0 +1,30 @@
+{
+  "version": "2.9.8",
+  "candidate_sha256": "30cc23d435bbf4aa4b0103ee71f48838bb9350fb06b9284a360ae054b9735eed",
+  "result": "PASS_SCOPED_NATIVE_GAMETYPES",
+  "checks": {
+    "nine_template_source_enumeration": true,
+    "fixed_26_profile_abi": true,
+    "metadata_32_and_64_bit_tests": true,
+    "canonical_build": true,
+    "independent_defects_corrected": true,
+    "native_template_picker": true,
+    "rename_to_testladder_and_save": true,
+    "fresh_process_reload": true,
+    "saved_custom_ten_minute_limit_retained_when_hosting": true,
+    "gun_game_fixed_seven_ffa_no_order": true,
+    "lobby_time_edited_to_fifteen_and_reopened_with_preset7": true,
+    "different_engine_clears_preset": true
+  },
+  "evidence": {
+    "initial_ui": "/mnt/storage/data/nxhalo-multiplayer-lab22/runtime-proof/gungame-ui-46e4aee58c0e-20261008/gungame-modes",
+    "reload_ui": "/mnt/storage/data/nxhalo-multiplayer-lab22/runtime-proof/gametype-reload-298-40561147bfd2-20261008/gungame-modes",
+    "final_ui": "/mnt/storage/data/nxhalo-multiplayer-lab22/runtime-proof/gametype-reload-298-30cc23d435bb-20261008/gungame-modes",
+    "deck_proof": "/home/deck/Games/HaloCE/runtime-proof/host-rules-input-30cc23d435bb-20261009T005529Z"
+  },
+  "limits": [
+    "Actual UI rename/save/reload was exercised on Gun Game; other templates share the tested codec and were independently source-enumerated.",
+    "Malformed base signature rejection was reviewed in source; codec malformed inputs executed separately.",
+    "This does not close per-mode gameplay matrices, physical Switch, full race pack,128 real players, bots or human microphone acceptance."
+  ]
+}

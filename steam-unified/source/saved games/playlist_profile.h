@@ -43,6 +43,12 @@ struct game_variant_options;
 boolean playlist_profile_get_options(
 	long playlist_profile_index,
 	struct game_variant_options *options);
+/* Optional local-only mode metadata; old profiles default to Standard. */
+boolean playlist_profile_get_native_mode(
+	long playlist_profile_index, short *preset, short *matchup);
+void playlist_profile_save_with_options_and_native_mode(
+	long playlist_profile_index, struct game_variant *variant,
+	struct game_variant_options const *options, short preset, short matchup);
 void playlist_profile_save_with_options(
 	long playlist_profile_index,
 	struct game_variant *variant,

@@ -6053,8 +6053,17 @@ short ui_widget_port_gametypes(
 	char directory_path[256];
 	word count = (word)maximum;
 	short index;
+#ifdef HALO_GAME_BROWSER
+	short native_index;
+	if (maximum < MATCH_RULES_NATIVE_TEMPLATE_COUNT) return 0;
+	count = (word)(maximum - MATCH_RULES_NATIVE_TEMPLATE_COUNT);
+#endif
 
 	playlist_profiles_enumerate_available_to_local_player_index(0, &count, indices);
+#ifdef HALO_GAME_BROWSER
+	for (native_index = 0; native_index < MATCH_RULES_NATIVE_TEMPLATE_COUNT; native_index++)
+		indices[count++] = match_rules_native_template_profile_index(native_index);
+#endif
 	*last_used = 0;
 	if (saved_game_file_retrieve_last_used_multiplayer_variant_directory(directory_path))
 	{
@@ -6100,6 +6109,11 @@ boolean ui_widget_port_gametype_choose(
 {
 	struct game_variant profile;
 	char directory_path[256];
+#ifdef HALO_GAME_BROWSER
+	struct game_variant_options options;
+	short preset = MATCH_RULES_PRESET_STANDARD, matchup = MATCH_RULES_MATCHUP_COVENANT_USMC;
+	boolean explicit_mode = FALSE;
+#endif
 	void *server;
 
 	if (profile_index == NONE || !(profile_index & 0x80000000))
@@ -6109,19 +6123,60 @@ boolean ui_widget_port_gametype_choose(
 	}
 	if (!playlist_profile_get(profile_index, &profile))
 		return FALSE;
+#ifdef HALO_GAME_BROWSER
+	playlist_profile_get_options(profile_index, &options);
+	if (playlist_profile_get_native_mode(profile_index, &preset, &matchup) && preset != MATCH_RULES_PRESET_STANDARD)
+	{
+		/* A saved custom special mode already contains its edited rules. */
+		explicit_mode = TRUE;
+		match_rules_clear_ui_preset_selection();
+	}
+	else if (match_rules_take_ui_preset_selection(&preset, &matchup))
+	{
+		/* MODES is a one-shot intent applied to the selected ordinary profile. */
+		explicit_mode = TRUE;
+		if (!match_rules_apply_variant_preset_for_matchup(preset, matchup, &profile, &options))
+			return FALSE;
+	}
+	if (explicit_mode)
+	{
+		if (!match_rules_preset_set(preset) || !match_rules_matchup_set(matchup))
+			return FALSE;
+	}
+	else
+	{
+		match_rules_clear_ui_preset_selection();
+		match_rules_preset_set(MATCH_RULES_PRESET_STANDARD);
+	}
+#endif
 	server = global_network_game_server_get();
 	/* The mode picker owns the pending match preset. Confirming its selected
 	 * profile must not overwrite that choice; explicit Standard/base-type
 	 * actions clear it in the gametype editor. */
+#ifdef HALO_GAME_BROWSER
+	if (match_rules_native_template_index_from_profile_index(profile_index) == NONE &&
+		saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
+		saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
+#else
 	if (saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
 		saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
+#endif
+#ifdef HALO_GAME_BROWSER
+	match_rules_label_runtime_variant(preset, matchup, &profile);
+	if (explicit_mode && preset != MATCH_RULES_PRESET_STANDARD)
+		match_rules_note_profile_preset_materialized();
+#endif
 	player_ui_set_game_variant(&profile);
 	/* (and its PC options: game_engine.h) */
 	{
-		struct game_variant_options options;
+		struct game_variant_options saved_options;
 
-		playlist_profile_get_options(profile_index, &options);
-		player_ui_set_game_variant_options(&options);
+#ifdef HALO_GAME_BROWSER
+		saved_options = options;
+#else
+		playlist_profile_get_options(profile_index, &saved_options);
+#endif
+		player_ui_set_game_variant_options(&saved_options);
 	}
 	if (server)
 		network_game_server_change_game_variant(server, &profile);

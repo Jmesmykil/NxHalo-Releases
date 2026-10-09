@@ -48,6 +48,10 @@ struct game_variant *player_ui_get_edit_playlist_profile(
 /* port: the PC options (game_engine.h) of the gametype being edited, and of
 the multiplayer gametype (player_ui_set_game_variant's) */
 struct game_variant_options;
+#ifdef HALO_GAME_BROWSER
+short player_ui_get_edit_playlist_native_mode(void);
+void player_ui_set_edit_playlist_native_mode(short preset, short matchup);
+#endif
 struct game_variant_options *player_ui_get_edit_playlist_options(
 	void);
 void player_ui_set_game_variant_options(

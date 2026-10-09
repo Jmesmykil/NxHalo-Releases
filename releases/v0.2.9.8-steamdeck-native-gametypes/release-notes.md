@@ -1,6 +1,4 @@
-# NxHalo — Halo for Nintendo Switch and Steam Deck
-
-## Current Steam Deck/Linux 2.9.8 — native gametypes
+# Steam Deck/Linux 2.9.8 — native gametypes
 
 [Download runtime and matching source](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.8-steamdeck-native-gametypes).
 Executable SHA-256: 30cc23d435bbf4aa4b0103ee71f48838bb9350fb06b9284a360ae054b9735eed. Installed on the Steam Deck through the existing shortcut; 2.9.7 and the stable 2.9.6 rollback are retained.
@@ -47,22 +45,3 @@ clients. This release updates Linux; the separate Switch executable is unchanged
 [Gametype guide](steam-unified/docs/NATIVE-GAMETYPES-2.9.8.md) ·
 [Deck evidence](releases/v0.2.9.8-steamdeck-native-gametypes/DECK-GPU.json) ·
 [Gametype evidence](releases/v0.2.9.8-steamdeck-native-gametypes/NATIVE-GAMETYPES.json).
-## Nintendo Switch
-
-The newest Switch package remains [Co-op Lifecycle Preview 2.9.4](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.4-switch-coopfix1-preview): Homebrew Menu NRO, source and build evidence. NRO SHA-256: e98eea315b6733ff1b3d2f6d3b19d4539332540b32157181ec5d8ac328e2c2d0. Cross-build and UMS readback passed; physical launch is not confirmed. This Linux release does not replace the Switch executable.
-
-Use your own compatible data under sdmc:/switch/halo/maps/; this preview saves under sdmc:/switch/halo/save-community24/. Older Profile33/Build14 releases remain historical downloads.
-
-## Install and play
-
-Extract the Linux runtime, supply your own compatible game maps in assets/maps, and run launch_halo.sh natively with Proton OFF. Keep your existing settings and saves. No game maps, resource companions, console keys or personal saves are provided.
-
-Online campaign supports remote players without requiring a second local controller. Native multiplayer/campaign and classic PC/CE directories remain separately filtered by source and version; classic snapshots require a compatible classic client.
-
-CE609 maps needing external resources require owner-supplied bitmaps.map, sounds.map and loc.map under assets/maps/ce. DLL/Lua/OpenSauce/shader engine extensions need individual native ports. The texture catalogue is an initial compatible content source, not a claim that all CE mods run natively.
-
-## Source and credits
-
-Matching Linux source is in [steam-unified/](steam-unified/) and the release source ZIP. Original decompilation, OpenCE, port and library attribution/licenses remain intact. Optional authored texture packages retain their own licenses. Earlier releases remain available for rollback.
-
-This unofficial fan project is not endorsed by Microsoft, Bungie or Halo Studios.

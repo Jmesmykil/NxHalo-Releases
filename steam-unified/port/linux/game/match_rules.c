@@ -30,6 +30,7 @@
 #include "objects/objects.h"
 #include "../src/port_config.h"
 #include "match_rules.h"
+#include "match_rules_template_profile.h"
 #include "match_rules_melee.h"
 #include "gun_game_progression.h"
 #include "network_distributed.h"
@@ -47,6 +48,10 @@ static unsigned long cached_local_seed;
 static boolean local_seed_valid;
 static boolean race_warning_pending;
 static short race_warning_last_wait_reason = -1;
+static boolean ui_preset_selection_pending;
+static boolean ui_profile_preset_materialized;
+static short ui_pending_preset = MATCH_RULES_PRESET_STANDARD;
+static short ui_pending_matchup = MATCH_RULES_MATCHUP_COVENANT_USMC;
 static boolean zombies_initialized;
 static boolean zombies_ready;
 static boolean zombies_infected[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
@@ -64,6 +69,22 @@ static short const gun_game_weapon_list_indices[GUN_GAME_WEAPON_STAGE_COUNT] = {
 static char const * const match_preset_names[MATCH_RULES_PRESET_COUNT] = {
     "Standard", "Faction match", "SWAT", "Tower of Power",
     "Grenade Dodgeball", "Zombies", "Native Race", "Gun Game"
+};
+static char const * const native_template_names[MATCH_RULES_NATIVE_TEMPLATE_COUNT] = {
+    "SWAT", "Tower of Power", "Grenade Dodgeball", "Zombies", "Native Race", "Gun Game",
+    "Covenant-USMC", "USMC-Flood", "Flood-Covenant"
+};
+static short const native_template_presets[MATCH_RULES_NATIVE_TEMPLATE_COUNT] = {
+    MATCH_RULES_PRESET_SWAT, MATCH_RULES_PRESET_TOWER_OF_POWER, MATCH_RULES_PRESET_DODGEBALL,
+    MATCH_RULES_PRESET_ZOMBIES, MATCH_RULES_PRESET_RACING, MATCH_RULES_PRESET_GUN_GAME,
+    MATCH_RULES_PRESET_FACTION, MATCH_RULES_PRESET_FACTION, MATCH_RULES_PRESET_FACTION
+};
+static short const native_template_matchups[MATCH_RULES_NATIVE_TEMPLATE_COUNT] = {
+    MATCH_RULES_MATCHUP_COVENANT_USMC, MATCH_RULES_MATCHUP_COVENANT_USMC,
+    MATCH_RULES_MATCHUP_COVENANT_USMC, MATCH_RULES_MATCHUP_COVENANT_USMC,
+    MATCH_RULES_MATCHUP_COVENANT_USMC, MATCH_RULES_MATCHUP_COVENANT_USMC,
+    MATCH_RULES_MATCHUP_COVENANT_USMC, MATCH_RULES_MATCHUP_USMC_FLOOD,
+    MATCH_RULES_MATCHUP_FLOOD_COVENANT
 };
 static char const * const matchup_names[MATCH_RULES_MATCHUP_COUNT] = {
     "Covenant vs USMC", "USMC vs Flood", "Flood vs Covenant"
@@ -85,6 +106,65 @@ char const *match_rules_preset_name(short preset)
 char const *match_rules_matchup_name(short matchup)
 {
     return matchup >= 0 && matchup < MATCH_RULES_MATCHUP_COUNT ? matchup_names[matchup] : "Unknown";
+}
+
+long match_rules_native_template_profile_index(short template_index)
+{
+    return match_rules_template_profile_encode(template_index);
+}
+
+short match_rules_native_template_index_from_profile_index(long profile_index)
+{
+    return match_rules_template_profile_decode(profile_index);
+}
+
+boolean match_rules_native_template_profile_reserved(long profile_index)
+{
+    return match_rules_template_profile_reserved_namespace(profile_index);
+}
+
+char const *match_rules_native_template_name(short template_index)
+{
+    return template_index >= 0 && template_index < MATCH_RULES_NATIVE_TEMPLATE_COUNT ?
+        native_template_names[template_index] : "Unknown";
+}
+
+void match_rules_note_ui_preset_selection(short preset, short matchup)
+{
+    if (!match_rules_preset_supported(preset) || matchup < 0 || matchup >= MATCH_RULES_MATCHUP_COUNT)
+        return;
+    ui_pending_preset = preset;
+    ui_pending_matchup = matchup;
+    ui_preset_selection_pending = TRUE;
+}
+
+boolean match_rules_take_ui_preset_selection(short *preset, short *matchup)
+{
+    if (!ui_preset_selection_pending)
+        return FALSE;
+    if (preset) *preset = ui_pending_preset;
+    if (matchup) *matchup = ui_pending_matchup;
+    ui_preset_selection_pending = FALSE;
+    return TRUE;
+}
+
+void match_rules_note_profile_preset_materialized(void)
+{
+    ui_profile_preset_materialized = TRUE;
+}
+
+boolean match_rules_take_profile_preset_materialized(void)
+{
+    boolean value = ui_profile_preset_materialized;
+    ui_profile_preset_materialized = FALSE;
+    return value;
+}
+
+void match_rules_clear_ui_preset_selection(void)
+{
+    ui_preset_selection_pending = FALSE;
+    ui_pending_preset = MATCH_RULES_PRESET_STANDARD;
+    ui_pending_matchup = MATCH_RULES_MATCHUP_COVENANT_USMC;
 }
 
 boolean match_rules_preset_supported(short preset)
@@ -135,7 +215,9 @@ char const *match_rules_status(void) { return match_rules_message; }
 
 void match_rules_reset(void)
 {
+    ui_profile_preset_materialized = FALSE;
     set_message("");
+    match_rules_clear_ui_preset_selection();
     race_warning_pending = FALSE;
     race_warning_last_wait_reason = -1;
     local_seed_valid = FALSE;
@@ -467,11 +549,42 @@ static void match_rules_clear_special_label(struct game_variant *variant)
         base.human_readable_game_description, sizeof(variant->human_readable_game_description));
 }
 
+/* Saved profile names are user-editable. Advertise the canonical mode identity
+ * in the stock 12-wide-character network field without touching saved rules. */
+void match_rules_label_runtime_variant(short preset, short matchup, struct game_variant *variant)
+{
+    static wchar_t const *const labels[] = {
+        L"", L"", L"SWAT", L"Tower Power", L"Dodgeball", L"Zombies", L"Native Race", L"Gun Game"
+    };
+    static wchar_t const *const factions[] = { L"COV vs USMC", L"USMC vs Flood", L"Flood vs Cov" };
+    wchar_t const *label;
+    if (!variant || !match_rules_preset_supported(preset)) return;
+    if (preset == MATCH_RULES_PRESET_STANDARD)
+    {
+        match_rules_clear_special_label(variant);
+        return;
+    }
+    if (preset == MATCH_RULES_PRESET_FACTION &&
+        (matchup < 0 || matchup >= MATCH_RULES_MATCHUP_COUNT)) return;
+    label = preset == MATCH_RULES_PRESET_FACTION ? factions[matchup] : labels[preset];
+    csmemset(variant->human_readable_game_description, 0, sizeof(variant->human_readable_game_description));
+    ustrncpy(variant->human_readable_game_description, label,
+        NUMBEROF(variant->human_readable_game_description) - 1);
+}
+
 boolean match_rules_apply_variant_preset(short preset, struct game_variant *variant,
     struct game_variant_options *options)
 {
+    return match_rules_apply_variant_preset_for_matchup(preset, match_rules_matchup_get(), variant, options);
+}
+
+boolean match_rules_apply_variant_preset_for_matchup(short preset, short selected_matchup,
+    struct game_variant *variant, struct game_variant_options *options)
+{
     short team, vehicle;
-    if (!variant || !options || !match_rules_preset_supported(preset))
+    if (!variant || !options || !match_rules_preset_supported(preset) ||
+        (preset == MATCH_RULES_PRESET_FACTION &&
+            (selected_matchup < 0 || selected_matchup >= MATCH_RULES_MATCHUP_COUNT)))
         return FALSE;
 
     switch (preset)
@@ -484,7 +597,7 @@ boolean match_rules_apply_variant_preset(short preset, struct game_variant *vari
         variant->universal_variant.teams = TRUE;
         {
             static char const * const labels[] = { "COV vs USMC", "USMC vs Flood", "Flood vs Cov" };
-            short matchup = match_rules_matchup_get();
+            short matchup = selected_matchup;
             short i;
             char const *label = labels[matchup];
             for (i = 0; i < NUMBEROF(variant->human_readable_game_description) - 1 && label[i]; i++)
@@ -580,6 +693,27 @@ boolean match_rules_apply_variant_preset(short preset, struct game_variant *vari
     set_message(preset == MATCH_RULES_PRESET_TOWER_OF_POWER ?
         "Tower of Power: shotguns and mounted turret only; no shields, radar or grenades. Choose a map with a tower turret." :
         "Rules applied. Map compatibility is checked when loading.");
+    return TRUE;
+}
+
+boolean match_rules_native_template_build(short template_index, struct game_variant *variant,
+    struct game_variant_options *options, short *preset_out, short *matchup_out)
+{
+    short preset, matchup;
+    if (!variant || !options || template_index < 0 || template_index >= MATCH_RULES_NATIVE_TEMPLATE_COUNT)
+        return FALSE;
+    static char const * const bases[MATCH_RULES_NATIVE_TEMPLATE_COUNT] = {
+        "team_slayer", "team_slayer", "team_slayer", "team_slayer", "team_race",
+        "slayer", "team_slayer", "team_slayer", "team_slayer"
+    };
+    preset = native_template_presets[template_index];
+    matchup = native_template_matchups[template_index];
+    game_engine_get_variant_by_name(variant, bases[template_index]);
+    game_variant_options_default(variant, options);
+    if (!match_rules_apply_variant_preset_for_matchup(preset, matchup, variant, options))
+        return FALSE;
+    if (preset_out) *preset_out = preset;
+    if (matchup_out) *matchup_out = matchup;
     return TRUE;
 }
 
@@ -996,7 +1130,9 @@ static boolean match_rules_variant_is_zombies(void)
 	wchar_t const *description;
 	if (!variant || variant->game_engine_index != game_engine_slayer)
 		return FALSE;
-	description = variant->human_readable_game_description;
+	if (game_connection() != _game_connection_network_client && !network_game_distributed_client())
+        return match_rules_preset_get() == MATCH_RULES_PRESET_ZOMBIES;
+    description = variant->human_readable_game_description;
 	return (description[0] == L'Z' && description[1] == L'o' && description[2] == L'm' &&
 		description[3] == L'b' && description[4] == L'i' && description[5] == L'e' &&
 		description[6] == L's') ||
@@ -1011,6 +1147,8 @@ static boolean match_rules_variant_is_tower_of_power(void)
     wchar_t const *description;
     if (!variant || variant->game_engine_index != game_engine_slayer)
         return FALSE;
+    if (game_connection() != _game_connection_network_client && !network_game_distributed_client())
+        return match_rules_preset_get() == MATCH_RULES_PRESET_TOWER_OF_POWER;
     description = variant->human_readable_game_description;
     return description[0] == L'T' && description[1] == L'o' && description[2] == L'w' &&
         description[3] == L'e' && description[4] == L'r' && description[5] == L' ' &&
@@ -1033,6 +1171,8 @@ static boolean match_rules_variant_is_gun_game(void)
     wchar_t const *description;
     if (!variant || variant->game_engine_index != game_engine_slayer)
         return FALSE;
+    if (game_connection() != _game_connection_network_client && !network_game_distributed_client())
+        return match_rules_preset_get() == MATCH_RULES_PRESET_GUN_GAME;
     description = variant->human_readable_game_description;
     return description[0] == L'G' && description[1] == L'u' && description[2] == L'n' &&
         description[3] == L' ' && description[4] == L'G' && description[5] == L'a' &&

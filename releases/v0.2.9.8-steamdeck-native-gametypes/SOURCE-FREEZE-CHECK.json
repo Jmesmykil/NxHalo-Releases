@@ -1,0 +1,8 @@
+{
+  "frozen_runtime": "30cc23d435bbf4aa4b0103ee71f48838bb9350fb06b9284a360ae054b9735eed",
+  "frozen_source_matches": 1641,
+  "archive_entries": 2281,
+  "excluded_binary_artifacts": [
+    "source/bitmaps/libtiff/mkg3states"
+  ]
+}

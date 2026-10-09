@@ -27,7 +27,22 @@ short match_rules_matchup_get(void);
 boolean match_rules_matchup_set(short matchup);
 char const *match_rules_status(void);
 void match_rules_reset(void);
+enum { MATCH_RULES_NATIVE_TEMPLATE_COUNT = 9 };
+long match_rules_native_template_profile_index(short template_index);
+short match_rules_native_template_index_from_profile_index(long profile_index);
+boolean match_rules_native_template_profile_reserved(long profile_index);
+char const *match_rules_native_template_name(short template_index);
+boolean match_rules_native_template_build(short template_index, struct game_variant *variant,
+    struct game_variant_options *options, short *preset, short *matchup);
+void match_rules_label_runtime_variant(short preset, short matchup, struct game_variant *variant);
 boolean match_rules_apply_variant_preset(short preset, struct game_variant *variant, struct game_variant_options *options);
+boolean match_rules_apply_variant_preset_for_matchup(short preset, short matchup,
+    struct game_variant *variant, struct game_variant_options *options);
+void match_rules_note_ui_preset_selection(short preset, short matchup);
+boolean match_rules_take_ui_preset_selection(short *preset, short *matchup);
+void match_rules_clear_ui_preset_selection(void);
+void match_rules_note_profile_preset_materialized(void);
+boolean match_rules_take_profile_preset_materialized(void);
 long match_rules_host_spawn_definition(long player_index, long fallback_definition);
 void match_rules_host_prespawn_player(long player_index);
 void match_rules_host_player_killed(long player_index);

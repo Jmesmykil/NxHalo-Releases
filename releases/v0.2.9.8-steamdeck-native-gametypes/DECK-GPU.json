@@ -1,0 +1,21 @@
+{
+  "sha256": "30cc23d435bbf4aa4b0103ee71f48838bb9350fb06b9284a360ae054b9735eed",
+  "installed_baseline": "090807f68d38770fbd78d40a1f9ebe4e6e230f6f7a37600d0059722bc77988a7",
+  "checks": {
+    "gameplay": true,
+    "hardware": true,
+    "telemetry": true,
+    "identity": true,
+    "no_resolution_spam": true,
+    "private_online_disabled": true,
+    "both_players": true,
+    "stock_map_loaded": true,
+    "gun_game": true,
+    "stage_pistol": true,
+    "stage_assault rifle": true
+  },
+  "frames": 9,
+  "device": "Jupiter",
+  "proof": "/home/deck/Games/HaloCE/runtime-proof/host-rules-input-30cc23d435bb-20261009T005529Z",
+  "fixture_damage": "Real remote XTest mouse input; builtin position-only gathering; no scripted damage"
+}
