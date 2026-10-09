@@ -132,6 +132,7 @@ symbols in this file:
 #include "sound_cache.h"
 #include "texture_cache.h"
 #include "interface/ui_widget.h"
+#include "interface/virtual_keyboard.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_manager.h"
 #include "tag_schema.h"
@@ -615,6 +616,10 @@ char const *cache_files_map_directory(
 void scenario_tags_unload(
 	void)
 {
+	/* The keyboard holds pointers into loaded tag data. Invalidate them before
+	   menu_tags_unloaded restores the tag table and cache_file_close releases the map. */
+	virtual_keyboard_dispose();
+
 	/* port: the high-res HUD forgets this map's bitmaps (port/linux/game/hud_hires_tags.c) */
 	{
 		extern void hud_hires_tags_unloaded(void);

@@ -442,7 +442,7 @@ platform.h) */
 #define CE_CACHE_VERSION_HALOMD 7
 
 static struct cached_map_file ce_map_file;
-static char ce_map_name[64];
+static char ce_map_name[0x80];
 /* each request's file, if not the map's: a Custom Edition map's resource
 map, for its indexed tags' pixels and samples (port/linux/game/ce_resources.c) */
 static HANDLE ce_request_files[MAXIMUM_SIMULTANEOUS_CACHE_REQUESTS];
@@ -452,7 +452,7 @@ boolean ce_map_check(HANDLE file, char const *map_name, long file_length, long t
 /* the version of the map checked or loaded (port/linux/game/ce_resources.c) */
 extern long ce_map_cache_version;
 /* the last map refused (ce_map_check), its size and checksum */
-static char ce_refused_map_name[64];
+static char ce_refused_map_name[0x80];
 static unsigned long ce_refused_map_size;
 static unsigned long ce_refused_map_checksum;
 
@@ -462,9 +462,9 @@ static boolean ce_map_name_is(
 	return map_family_parse(map_name, NULL, 0) != _map_family_xbox;
 }
 
-/* the map named <name>@ce or <name>@md opened in its slot (once): FALSE if
-there is none, or it is not one, or it is refused (ce_map_check). The map
-open before stays open until another is accepted */
+/* the map named <name>@ce, <name>@md, or custom_maps\\<name> opened in its
+slot (once): FALSE if it is missing or refused (ce_map_check). The map open
+before stays open until another is accepted */
 static boolean ce_map_open(
 	const char *map_name)
 {
@@ -477,7 +477,7 @@ static boolean ce_map_open(
 
 	if (ce_map_file.file && !_stricmp(ce_map_name, map_name))
 		return TRUE;
-	if (strlen(map_name) >= sizeof(ce_map_name) - 1)
+	if (strlen(map_name) >= sizeof(ce_map_name))
 		return FALSE;
 	/* (its tag cache, which the platform layer maps at start-up: xbox_memory.c) */
 	{

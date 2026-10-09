@@ -23,6 +23,11 @@ static inline void gun_game_progression_clear(struct gun_game_progression *state
     state->won = 0;
 }
 
+static inline void gun_game_progression_restore(struct gun_game_progression *state, const struct gun_game_progression *previous)
+{
+    *state = *previous;
+}
+
 static inline void gun_game_progression_bind(struct gun_game_progression *state, long player_datum)
 {
     if (state->player_datum != player_datum)

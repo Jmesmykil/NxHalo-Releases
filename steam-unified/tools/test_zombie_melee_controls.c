@@ -1,5 +1,19 @@
 #include "../port/linux/game/match_rules_melee.h"
 
+/* units.h exposes unrelated inline random helpers; keep this policy test
+   linkable without pulling the game runtime into the focused harness. */
+unsigned long *get_global_random_seed_address(void)
+{
+    static unsigned long seed;
+    return &seed;
+}
+
+unsigned short seed_random(unsigned long *seed)
+{
+    *seed = *seed * 1664525UL + 1013904223UL;
+    return (unsigned short)(*seed >> 16);
+}
+
 int main(void)
 {
     struct unit_control_data control;
@@ -44,6 +58,42 @@ int main(void)
         !match_rules_infected_damage_allowed(TRUE, TRUE) ||
         match_rules_infected_damage_allowed(TRUE, FALSE))
         return 2;
+    /* Infected retain only the exact loaded melee tag; unavailable means empty inventory. */
+    if (!match_rules_infected_inventory_weapon_allowed(TRUE, 17, 17) ||
+        match_rules_infected_inventory_weapon_allowed(TRUE, 18, 17) ||
+        match_rules_infected_inventory_weapon_allowed(TRUE, 18, NONE) ||
+        !match_rules_infected_inventory_weapon_allowed(FALSE, 18, NONE))
+        return 8;
+    /* Zombies, Tower, and Gun Game reject grenade pickups; Standard permits them. */
+    if (match_rules_mode_grenade_pickup_allowed(TRUE, FALSE, FALSE) ||
+        match_rules_mode_grenade_pickup_allowed(FALSE, TRUE, FALSE) ||
+        match_rules_mode_grenade_pickup_allowed(FALSE, FALSE, TRUE) ||
+        !match_rules_mode_grenade_pickup_allowed(FALSE, FALSE, FALSE))
+        return 9;
+    /* Initial human role persists through death; late join/reused datum is infected; reset clears roles. */
+    {
+        boolean initialized = TRUE, ready = TRUE, initial[2] = { TRUE, TRUE };
+        boolean infected[2] = { FALSE, TRUE };
+        long tracked[2] = { 0x10001, 0x20001 };
+        if (match_rules_zombie_player_is_infected(tracked, initial, infected, 2, 0, 0x10001) ||
+            !match_rules_zombie_player_is_infected(tracked, initial, infected, 2, 1, 0x30001) ||
+            initial[1] ||
+            match_rules_zombie_player_is_infected(tracked, initial, infected, 2, 0, 0x10001))
+            return 11;
+        match_rules_zombie_state_reset(&initialized, &ready, initial, infected, tracked, 2);
+        if (initialized || ready || initial[0] || initial[1] || infected[0] || infected[1] ||
+            tracked[0] != NONE || tracked[1] != NONE)
+            return 12;
+        if (!match_rules_zombie_player_is_infected(tracked, initial, infected, 2, 0, 0x40001) ||
+            initial[0])
+            return 13;
+    }
+    /* Survivors keep only the stock shotgun, while infected keep only melee. */
+    if (!match_rules_restricted_weapon_allowed(TRUE, FALSE, FALSE, FALSE, FALSE, TRUE) ||
+        match_rules_restricted_weapon_allowed(TRUE, FALSE, FALSE, FALSE, FALSE, FALSE) ||
+        !match_rules_restricted_weapon_allowed(TRUE, FALSE, FALSE, TRUE, TRUE, FALSE) ||
+        match_rules_restricted_weapon_allowed(TRUE, FALSE, FALSE, TRUE, FALSE, TRUE))
+        return 10;
     if (!match_rules_infected_lunge_candidate_allowed(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 1.5f, 0.9f) ||
         match_rules_infected_lunge_candidate_allowed(FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 1.5f, 0.9f) ||
         match_rules_infected_lunge_candidate_allowed(TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, 1.5f, 0.9f) ||

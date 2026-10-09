@@ -4617,6 +4617,18 @@ void display_error_damaged_media(
 /* port: menu_tags.c's */
 char const *pc_menus_screen(char const *name);
 
+/* A completed native host round returns to its still-connected room. The
+   first hosting flow and stock Xbox menus retain their map-selection wizard. */
+static boolean network_game_native_host_round_returns_to_lobby(
+    struct network_game const *game)
+{
+    char const *pregame = "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen";
+    return game && game->number_of_games_played > 0 &&
+        game->variant.game_engine_index > game_engine_none &&
+        game->variant.game_engine_index <= game_engine_race &&
+        strcmp(pc_menus_screen(pregame), pregame) != 0;
+}
+
 void network_game_reset_to_pregame_ui(
 	void)
 {
@@ -4655,6 +4667,8 @@ void network_game_reset_to_pregame_ui(
 			chooses when to start the next mission. */
 			if (game && !game->variant.game_engine_index && game->difficulty >= 0 && game->difficulty < 4)
 				screen = "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen";
+            else if (network_game_native_host_round_returns_to_lobby(game))
+                screen = "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen";
 
 			network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
 			/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */

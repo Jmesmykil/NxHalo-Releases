@@ -1,5 +1,8 @@
 #include "cseries.h"
 #include "match_rules.h"
+#include "game/game.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 #include "halo_network_profile.h"
 #include "halo_map_families.h"
 #include "halo_ui_map_list.h"
@@ -2227,6 +2230,29 @@ static int modshop_has_selection;
 static void modshop_search_done(char const *text) { native_mod_catalog_set_query(text); }
 static void content_catalog_search_done(char const *text) { extern void content_setup_catalog_set_query(const char *); content_setup_catalog_set_query(text); }
 static void content_texture_pack_search_done(char const *text) { extern void content_setup_texture_pack_set_query(const char *); content_setup_texture_pack_set_query(text); }
+#ifdef HALO_CUSTOM_EDITION
+static struct ui_map_inventory_entry content_inventory_selected;
+static boolean content_inventory_has_selection;
+static char content_inventory_notice[160];
+static boolean content_inventory_selection_blocked(void)
+{
+ /* The animated UI map runs its clock too; only an actual match blocks selection. */
+ return (game_in_progress() && global_scenario_get()->type != _scenario_type_main_menu) ||
+  (global_network_game_client_get() && !global_network_game_server_get());
+}
+static void content_inventory_search_done(char const *text) { ui_map_inventory_set_query(text); content_inventory_notice[0]=0; }
+static char const *content_inventory_family_name(short family)
+{
+ static char const *const names[]={"Xbox","Custom Edition","HaloMD","Unknown"};
+ return family == NONE ? "All" : names[PIN(family,0,3)];
+}
+static char const *content_inventory_type_name(short type)
+{
+ static char const *const names[]={"Campaign","Multiplayer","UI","Resources","Unknown"};
+ return type == NONE ? "All" : names[PIN(type,0,4)];
+}
+
+#endif
 
 static void text_field_end(boolean keep)
 {
@@ -2302,7 +2328,8 @@ static void text_field_show(struct widget_instance *value, char const *text, boo
 /* ---- the menu */
 
 /* "mp type set mode": the item's (by its name) */
-enum { SERVER_VIEW_ALL, SERVER_VIEW_CAMPAIGN, SERVER_VIEW_MULTIPLAYER, SERVER_VIEW_LEGACY, SERVER_VIEW_CURRENT, SERVER_VIEW_ANNOUNCED, SERVER_VIEW_BROKER, SERVER_VIEW_CLASSIC_CE, SERVER_VIEW_CLASSIC_PC };
+#include "../src/directory_filter.h"
+#include "../src/directory_snapshot_id.h"
 static char map_ready_invite[96];
 static char map_download_invite[96];
 static short map_download_controller;
@@ -2323,7 +2350,8 @@ static void multiplayer_mode_set(struct widget_instance *widget)
 		network_profile_set_host_override(21);
 	else
 		network_profile_clear_host_override();
-	server_view = strstr(name, "join_classic_ce") ? SERVER_VIEW_CLASSIC_CE :
+	server_view = strstr(name, "join_v24") ? SERVER_VIEW_NATIVE_V24 :
+        strstr(name, "join_classic_ce") ? SERVER_VIEW_CLASSIC_CE :
 		strstr(name, "join_classic_pc") ? SERVER_VIEW_CLASSIC_PC :
 		strstr(name, "join_legacy") ? SERVER_VIEW_LEGACY :
 		strstr(name, "join_current") ? SERVER_VIEW_CURRENT :
@@ -3233,7 +3261,7 @@ hosts' listings, p2p_lobby.c). Joining one joins its invite (as Direct
 Link's PASTE LINK); once its host is reached its game is among the client's,
 and an A press (posted) joins it, or shows its lobby if under way */
 
-#define LOBBY_BROWSER_GAMES 512
+#define LOBBY_BROWSER_GAMES 2048
 /* milliseconds: a host not reached in this long is given up (p2p's own
 wait is longer) */
 #define LOBBY_BROWSER_JOIN_TIMEOUT 30000
@@ -3358,20 +3386,21 @@ static short lobby_browser_collect(void)
  }
  records = community_directory_classic_games(directory, LOBBY_BROWSER_GAMES);
  for (index = 0; index < records && count < LOBBY_BROWSER_GAMES; index++)
- { lobby_browser.games[count] = directory[index].listing; lobby_browser.versions[count] = directory[index].version; lobby_browser.sources[count++] = 3; }
+ {
+  for(read=0;read<count;read++)
+   if(lobby_browser.versions[read]==directory[index].version &&
+      !memcmp(lobby_browser.games[read].identifier,directory[index].listing.identifier,6))break;
+  if(read<count)continue;
+  lobby_browser.games[count] = directory[index].listing;
+  lobby_browser.versions[count] = directory[index].version;
+  lobby_browser.sources[count++] = 3;
+ }
  for (read = 0; read < count; read++)
  {
   wchar_t name[P2P_LISTING_NAME_SIZE + 1];
   struct p2p_listing *game = &lobby_browser.games[read];
-  if (server_view == SERVER_VIEW_CLASSIC_CE) { if (lobby_browser.versions[read] != -2) continue; }
-  else if (server_view == SERVER_VIEW_CLASSIC_PC) { if (lobby_browser.versions[read] != -3) continue; }
-  else if (lobby_browser.versions[read] < 0) continue;
-  if ((server_view == SERVER_VIEW_CAMPAIGN && game->engine_type != 0) ||
-      (server_view == SERVER_VIEW_MULTIPLAYER && game->engine_type == 0)) continue;
-  if ((server_view == SERVER_VIEW_LEGACY && (lobby_browser.versions[read] < 11 || lobby_browser.versions[read] > 20)) ||
-      (server_view == SERVER_VIEW_CURRENT && lobby_browser.versions[read] != 21) ||
-      (server_view == SERVER_VIEW_ANNOUNCED && lobby_browser.sources[read] != 2) ||
-      (server_view == SERVER_VIEW_BROKER && lobby_browser.sources[read] != 1)) continue;
+  if (!directory_filter_accepts(server_view, lobby_browser.versions[read],
+      lobby_browser.sources[read], game->engine_type)) continue;
   text_to_wide(game->name, name, NUMBEROF(name));
   if (!player_name_clean(name, NUMBEROF(name))) continue;
   if (written != read) { lobby_browser.games[written] = *game; lobby_browser.versions[written] = lobby_browser.versions[read]; lobby_browser.sources[written] = lobby_browser.sources[read]; }
@@ -3455,8 +3484,30 @@ static void lobby_browser_update(struct widget_instance *list)
 	wchar_t text[ROW_TEXT_LENGTH * 2];
 	unsigned long now = system_milliseconds();
 	short chosen;
+    short old_index=focused!=NONE?(short)(lobby_browser.first+focused):lobby_browser.chosen;
+    unsigned char selected_key[6];int selected_version=0;
+    boolean had_selection=old_index>=0 && old_index<lobby_browser.count;
+    boolean repositioned=FALSE;
+    if(had_selection){
+        csmemcpy(selected_key,lobby_browser.games[old_index].identifier,6);
+        selected_version=lobby_browser.versions[old_index];
+    }
 
 	lobby_browser.count = lobby_browser_collect();
+    if(had_selection && lobby_browser.count>0){
+        int selected=directory_selection_index(selected_key,selected_version,
+            lobby_browser.games[0].identifier,lobby_browser.versions,lobby_browser.count,sizeof(lobby_browser.games[0]));
+        if(selected==NONE)selected=MIN(old_index,lobby_browser.count-1);
+        lobby_browser.chosen=(short)selected;
+        if(selected!=old_index && focused!=NONE){
+            if(selected<lobby_browser.first)lobby_browser.first=(short)selected;
+            else if(selected>=lobby_browser.first+BROWSER_ROWS)lobby_browser.first=(short)(selected-BROWSER_ROWS+1);
+            lobby_browser.first=(short)PIN(lobby_browser.first,0,MAX(0,lobby_browser.count-BROWSER_ROWS));
+            focused=(short)(selected-lobby_browser.first);
+            lobby_browser_focus_row(list,focused);repositioned=TRUE;
+        }
+    }
+    if(!lobby_browser.count){lobby_browser.shown=FALSE;lobby_browser.chosen=0;}
 	{
 		char progress[256]; int state=community_map_download_status(progress,sizeof(progress));
 		if (map_download_retry_pending && state==COMMUNITY_MAP_DOWNLOAD_READY) {
@@ -3516,12 +3567,12 @@ static void lobby_browser_update(struct widget_instance *list)
 		}
 	}
 
-	if (focused == BROWSER_ROWS - 1 && lobby_browser.first + BROWSER_ROWS < lobby_browser.count)
+	if (!repositioned && focused == BROWSER_ROWS - 1 && lobby_browser.first + BROWSER_ROWS < lobby_browser.count)
 	{
 		lobby_browser.first++;
 		lobby_browser_focus_row(list, --focused);
 	}
-	else if (focused == 0 && lobby_browser.first > 0)
+	else if (!repositioned && focused == 0 && lobby_browser.first > 0)
 	{
 		lobby_browser.first--;
 		lobby_browser_focus_row(list, ++focused);
@@ -3567,7 +3618,7 @@ static void lobby_browser_update(struct widget_instance *list)
 		text_set(named(row, "server_item_players", 0), text);
 		/* (no ping yet: its host is reached only on joining) */
 		if (lobby_browser.versions[index])
-		{ usnprintf(text, ROW_TEXT_LENGTH - 1, lobby_browser.versions[index] < 0 ? L"CLASSIC" : L"V%d", lobby_browser.versions[index]); text_set(named(row, "server_item_ping", 0), text); }
+		{ usnprintf(text, ROW_TEXT_LENGTH - 1, lobby_browser.versions[index] < 0 ? L"-" : L"V%d", lobby_browser.versions[index]); text_set(named(row, "server_item_ping", 0), text); }
 		else text_set(named(row, "server_item_ping", 0), game->failed ? L"FAILED" : !game->open ? L"CLOSED" : game->in_progress ? L"LIVE" : L"-");
 		/* (the lock: a game with a password. Its bitmap's first frame is
 		empty, the PC version's for no lock; the next is the lock, in the
@@ -3671,7 +3722,14 @@ static void lobby_browser_update(struct widget_instance *list)
 				text_set(named(list,"ticker_player_info",0),L"Map saved. Lobby closed; choose another game.");
 			}
 		}
-		text_set(named(list, "ticker_rules_info", 0), L"");
+		{
+			/* Disclose a fresh empty response separately from cached failures. */
+			text_to_wide(server_view==SERVER_VIEW_CLASSIC_CE ? community_directory_browser_status(0) :
+                server_view==SERVER_VIEW_CLASSIC_PC ? community_directory_browser_status(1) :
+                server_view==SERVER_VIEW_ALL && (now/5000)%2 ? community_directory_browser_status(-1) :
+                community_directory_status(), text, NUMBEROF(text));
+			text_set(named(list, "ticker_rules_info", 0), text);
+		}
 	}
 	if (stats)
 	{
@@ -3729,6 +3787,10 @@ static boolean lobby_browser_select(struct widget_instance *widget, short contro
 		lobby_browser.joining = lobby_browser.ready = FALSE;
 		if (!found)
 			return campaign_fail();
+        /* A signed lobby preview is bounded to 32 bytes. Check v24's exact
+           family-qualified map from its direct settings before entering. */
+        if(network_profile_active_version()==24 && !ui_map_list_preflight(found->map_name))
+            return FALSE;
 		if (advertised_in_progress(found))
 		{
 			/* (player 1 joining it: others join them there) */
@@ -3768,7 +3830,7 @@ static boolean lobby_browser_select(struct widget_instance *widget, short contro
 	if (game->engine_type==0 && !network_profile_supports_coop()) return campaign_fail();
 	if (!game->open || (!game->invite[0] && !game->locked) || !config_boolean("network.online"))
 		return campaign_fail();
-	{
+    if(!(lobby_browser.versions[index]==24 && !strcmp(game->map,"Unknown"))) {
 		char file[64], target[512]; short family=map_family_parse(game->map,file,sizeof(file));
 		if (family!=_map_family_xbox && !ui_map_list_family_present(family,file)) {
 			extern char const *cache_files_map_directory(void); extern void platform_show_message(const char *,const char *);
@@ -3784,7 +3846,8 @@ static boolean lobby_browser_select(struct widget_instance *widget, short contro
 			return TRUE;
 		}
 	}
-	if(!ui_map_list_preflight(game->map)) { network_profile_clear_room(); return FALSE; }
+    if(!(lobby_browser.versions[index]==24 && !strcmp(game->map,"Unknown")) &&
+       !ui_map_list_preflight(game->map)) { network_profile_clear_room(); return FALSE; }
 	/* (a game with a password: its screen asks for it, then joins) */
 	if (game->locked)
 	{
@@ -5252,6 +5315,14 @@ static void vehicles_update(struct widget_instance *list)
 	}
 }
 
+static boolean gametype_editing_requires_teams(void)
+{
+ struct game_variant *variant=edit_variant();
+ short preset=gametype_edit.setup?match_rules_preset_get():player_ui_get_edit_playlist_native_mode();
+ return variant && variant->game_engine_index != 0 &&
+  (preset==MATCH_RULES_PRESET_ZOMBIES || preset==MATCH_RULES_PRESET_FACTION);
+}
+
 /* "mp profile init X" (the list's creation): its spinners from the gametype */
 static boolean gametype_editing_gun_game(void)
 {
@@ -5273,13 +5344,17 @@ static boolean gametype_options_init(struct widget_instance *list)
 		variant->universal_variant.score_to_win = 7;
 		variant->game_engine_variant.slayer.kill_in_order = FALSE;
 	}
+	if(gametype_editing_requires_teams())variant->universal_variant.teams=TRUE;
 	gametype_options_each(list, FALSE);
 	{
 		boolean gun_game = gametype_editing_gun_game();
+        boolean role_teams = gametype_editing_requires_teams();
 		if ((spinner = named(list, "kills_to_win_spinner", 0)) != NULL)
 			spinner->disabled = gun_game;
 		if ((spinner = named(list, "team_play_spinner", 0)) != NULL)
-			spinner->disabled = gun_game;
+			spinner->disabled = gun_game || role_teams;
+        if ((spinner = named(list, "koth_team_play_spinner", 0)) != NULL)
+            spinner->disabled = role_teams;
 		if ((spinner = named(list, "kill_penalty_spinner", 0)) != NULL)
 			spinner->disabled = gun_game;
 		/* These rows are fixed only for Gun Game. Restore ordinary Slayer
@@ -5287,8 +5362,9 @@ static boolean gametype_options_init(struct widget_instance *list)
 		text_set(named(list, "kills_to_win_label", 0),
 			gun_game ? L"STAGES TO WIN (FIXED):" : L"KILLS TO WIN:");
 		text_set(named(list, "team_play_label", 0),
-			gun_game ? L"FREE FOR ALL (FIXED):" : L"TEAM PLAY:");
-		text_set(named(list, "kill_penalty_label", 0),
+			gun_game ? L"FREE FOR ALL (FIXED):" : role_teams ? L"ROLE TEAMS (FIXED):" : L"TEAM PLAY:");
+		text_set(named(list, "koth_team_play_label", 0),role_teams ? L"ROLE TEAMS (FIXED):" : L"TEAM PLAY:");
+        text_set(named(list, "kill_penalty_label", 0),
 			gun_game ? L"KILL IN ORDER (FIXED):" : L"KILL IN ORDER:");
 	}
 	if (named(list, "op_team", 0))
@@ -5306,6 +5382,7 @@ static boolean gametype_options_save(struct widget_instance *widget)
 	if (named(list, "op_team", 0))
 		vehicles_keep(list);
 	gametype_options_each(list, TRUE);
+    if(gametype_editing_requires_teams())edit_variant()->universal_variant.teams=TRUE;
 	if (gametype_editing_gun_game())
 	{
 		struct game_variant *variant = edit_variant();
@@ -5333,6 +5410,14 @@ static void gametype_setup_begin(void)
 	if (!lobby_editing && !profile_preset_materialized)
 		match_rules_apply_variant_preset(match_rules_preset_get(), &gametype_edit.setup_variant, &gametype_edit.setup_options);
 	gametype_edit.setup = TRUE;
+    /* Normalize saved copies before lobby advertisement/peer setup as well as
+       after loading: role teams and the ladder are intrinsic mode rules. */
+    if(gametype_editing_requires_teams())gametype_edit.setup_variant.universal_variant.teams=TRUE;
+    if(gametype_editing_gun_game()){
+        gametype_edit.setup_variant.universal_variant.teams=FALSE;
+        gametype_edit.setup_variant.universal_variant.score_to_win=7;
+        gametype_edit.setup_variant.game_engine_variant.slayer.kill_in_order=FALSE;
+    }
 	gametype_edit.vehicle_side = 0;
 }
 
@@ -5602,6 +5687,11 @@ static boolean gametype_engine_set(struct widget_instance *item)
 				game_engine_get_variant_by_name(&base, base_variant_of_item[index]);
 				csmemcpy(variant->human_readable_game_description,
 					base.human_readable_game_description, sizeof(variant->human_readable_game_description));
+                if (!variant->human_readable_game_description[0]) {
+                    ustrncpy(variant->human_readable_game_description,engine_names[variant->game_engine_index],
+                        NUMBEROF(variant->human_readable_game_description)-1);
+                    variant->human_readable_game_description[NUMBEROF(variant->human_readable_game_description)-1]=0;
+                }
 			}
 			return TRUE;
 		}
@@ -5896,6 +5986,45 @@ boolean pc_menu_event_function_invoke(
             extern void content_setup_catalog_sort_cycle(void);
             extern const char *content_setup_texture_pack_query(void);
             extern int content_setup_texture_pack_page_move(int);
+#ifdef HALO_CUSTOM_EDITION
+            if (content_widget_named(widget, "maps_installed")) {
+                ui_widget_port_multiplayer_maps_refresh();
+                content_inventory_notice[0]=0;
+                return ui_widget_port_open(widget,"pc\\main_menu\\content\\inventory",widget_deleted);
+            } else if (content_widget_name_starts_with(widget,"inventory_")) {
+                if (content_widget_named(widget,"inventory_search")) {
+                    if(text_field_editing(widget))text_field_end(TRUE);
+                    else text_field_begin(widget,ui_map_inventory_query(),47,content_inventory_search_done);
+                } else if (content_widget_named(widget,"inventory_family")) {
+                    short family=ui_map_inventory_family_filter()+1;
+                    ui_map_inventory_filter_set(family>3?NONE:family,ui_map_inventory_type_filter());
+                } else if (content_widget_named(widget,"inventory_type")) {
+                    short type=ui_map_inventory_type_filter()+1;
+                    ui_map_inventory_filter_set(ui_map_inventory_family_filter(),type>4?NONE:type);
+                } else if (content_widget_named(widget,"inventory_refresh")) {
+                    ui_widget_port_multiplayer_maps_refresh();
+                    content_inventory_has_selection=FALSE;content_inventory_notice[0]=0;
+                } else if (content_widget_named(widget,"inventory_prev")) ui_map_inventory_page_move(-1);
+                else if (content_widget_named(widget,"inventory_next")) ui_map_inventory_page_move(1);
+                else if (content_widget_named(widget,"inventory_choose")) {
+                    long index=content_inventory_has_selection?ui_map_inventory_resolve(&content_inventory_selected):NONE;
+                    if (index==NONE || content_inventory_selection_blocked()) {
+                        snprintf(content_inventory_notice,sizeof(content_inventory_notice),"Cannot select this map here; refresh or return to Create Game.");
+                        return FALSE;
+                    }
+                    if (!ui_widget_port_multiplayer_map_choose((short)index)) return FALSE;
+                    snprintf(content_inventory_notice,sizeof(content_inventory_notice),"Selected %.63s for the next match.",content_inventory_selected.map_name);
+                } else if (content_widget_name_starts_with(widget,"inventory_map_")) {
+                    char const *last=strrchr(widget->name,'_');struct ui_map_inventory_entry entry;
+                    content_inventory_has_selection=last && ui_map_inventory_result(atoi(last+1),&entry) &&
+                        ui_map_inventory_check(&entry,&content_inventory_selected);
+                    content_inventory_notice[0]=0;
+                    if(!content_inventory_has_selection)return FALSE;
+                    return ui_widget_port_open(widget,"pc\\main_menu\\content\\inventory\\details",widget_deleted);
+                }
+                return TRUE;
+            } else 
+#endif
             if (content_widget_named(widget, "modshop_search")) {
                 if (text_field_editing(widget)) text_field_end(TRUE);
                 else text_field_begin(widget,native_mod_catalog_query(),47,modshop_search_done);
@@ -5957,7 +6086,7 @@ boolean pc_menu_event_function_invoke(
         }
 		else if (!strcmp(name, "port host profile")) {
 			int profile=network_profile_host_version();
-			return config_write("network.compatibility_version",profile==21?"20":profile==20?"11":"21");
+			return config_write("network.compatibility_version",profile==21?"24":profile==24?"20":profile==20?"11":"21");
 		}
 		else if (!strcmp(name, "port lobby edit match"))
 		{
@@ -6161,6 +6290,50 @@ void pc_menu_game_data_function_invoke(
             extern void content_setup_catalog_poll(void);
             extern int content_setup_catalog_result(int,char *,size_t,char *,size_t), content_setup_catalog_installed(const char *);
             wchar_t message[512]; char line[512],map[64],type[16]; int row;
+            if(content_widget_named(widget,"maps_installed")) {
+#ifdef HALO_CUSTOM_EDITION
+                widget->visible=TRUE;widget->disabled=FALSE;
+#else
+                widget->visible=FALSE;widget->disabled=TRUE;
+#endif
+                return;
+            }
+#ifdef HALO_CUSTOM_EDITION
+            if (content_widget_name_starts_with(widget,"inventory_")) {
+                if (content_widget_named(widget,"inventory_search")) {
+                    snprintf(line,sizeof(line),"SEARCH: %s",ui_map_inventory_query());
+                    text_field_show(widget,line,text_field_editing(widget));return;
+                } else if (content_widget_named(widget,"inventory_family")) snprintf(line,sizeof(line),"FAMILY: %s (A: cycle)",content_inventory_family_name(ui_map_inventory_family_filter()));
+                else if (content_widget_named(widget,"inventory_type")) snprintf(line,sizeof(line),"TYPE: %s (A: cycle)",content_inventory_type_name(ui_map_inventory_type_filter()));
+                else if (content_widget_named(widget,"inventory_refresh")) snprintf(line,sizeof(line),"REFRESH INSTALLED MAPS");
+                else if (content_widget_named(widget,"inventory_prev") || content_widget_named(widget,"inventory_next")) {
+                    int previous=content_widget_named(widget,"inventory_prev");
+                    widget->disabled=previous?ui_map_inventory_page()==0:ui_map_inventory_page()+1>=ui_map_inventory_page_count();
+                    snprintf(line,sizeof(line),previous?"< PREVIOUS":"NEXT >");
+                } else if (content_widget_name_starts_with(widget,"inventory_map_")) {
+                    char const *last=strrchr(widget->name,'_');struct ui_map_inventory_entry entry;
+                    if(last && ui_map_inventory_result(atoi(last+1),&entry)) {
+                        snprintf(line,sizeof(line),"%.35s  [%s] %s%s",entry.basename,
+                            content_inventory_family_name(entry.family),content_inventory_type_name(entry.map_type),
+                            entry.valid_header?"":" [CHECK FILE]");
+                        widget->disabled=FALSE;
+                    } else {line[0]=0;widget->disabled=TRUE;}
+                } else if(content_widget_named(widget,"inventory_details")) {
+                    struct ui_map_inventory_entry entry;
+                    if(content_inventory_has_selection && ui_map_inventory_check(&content_inventory_selected,&entry)) {
+                        char requirements[280];modshop_wrap(entry.requirements,requirements,sizeof(requirements),62);
+                        snprintf(line,sizeof(line),"%.63s\r\n%s / %s | %.1f MiB\r\n\r\n%s\r\n\r\n%.140s",
+                            entry.map_name,content_inventory_family_name(entry.family),content_inventory_type_name(entry.map_type),
+                            entry.file_size/1048576.0,requirements,content_inventory_notice);
+                    } else snprintf(line,sizeof(line),"This file changed or the library refreshed. Return and select it again.");
+                } else if(content_widget_named(widget,"inventory_choose")) {
+                    widget->disabled=!content_inventory_has_selection || content_inventory_selection_blocked() ||
+                        ui_map_inventory_resolve(&content_inventory_selected)==NONE;
+                    snprintf(line,sizeof(line),widget->disabled?"MAP UNAVAILABLE FOR MULTIPLAYER":"SET NEXT MATCH MAP");
+                } else snprintf(line,sizeof(line),"%.230s",ui_map_inventory_status());
+                text_to_wide(line,message,NUMBEROF(message));text_set_length(widget,message,NUMBEROF(message));return;
+            }
+#endif
             if (content_widget_name_starts_with(widget, "modshop_")) {
                 struct native_mod_catalog_entry entry;
                 native_mod_catalog_poll();

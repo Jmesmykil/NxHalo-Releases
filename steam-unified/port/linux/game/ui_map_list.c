@@ -181,7 +181,7 @@ enum
 	XBOX_MAP_COUNT = 13,
 	/* (the Xbox's thirteen, then the Custom Edition and HaloMD maps found,
 	up to this many rows in all) */
-	MAXIMUM_MAP_LIST = 256,
+	MAXIMUM_MAP_LIST = UI_MAP_INVENTORY_LIMIT,
 	MAP_NAME_LENGTH = 64,
 	DISPLAY_NAME_LENGTH = 48,
 	DESCRIPTION_LENGTH = 160,
@@ -204,6 +204,11 @@ enum
 	/* (the bitmaps' type of a 2D texture, as the game's) */
 	CE_BITMAP_TYPE_2D = 0,
 };
+
+/* The final dynamic text index must fit the engine signed-short ABI. */
+typedef char ui_map_list_string_bound[(UI_MAP_LIST_STRING_BASE +
+    (MAXIMUM_MAP_LIST - 1) * UI_MAP_LIST_STRINGS_PER_ROW + 3 <= 0x7fff) ? 1 : -1];
+typedef char ui_map_header_word_bound[(sizeof(unsigned int) == 4) ? 1 : -1];
 
 /* ---------- structures */
 
@@ -546,6 +551,11 @@ static void add_pc_entry(
 	short known;
 
 	name[0] = 0;
+	if (family == _map_family_xbox)
+	{
+		description = L"An installed Xbox map";
+		mark = L"XB";
+	}
 	if (family == _map_family_halomd)
 	{
 		wchar_t const *known_name = halomd_map_name(file);
@@ -578,7 +588,7 @@ static void add_pc_entry(
 			name[character] = (wchar_t)(unsigned char)file[character];
 		name[character] = 0;
 	}
-	if (ce_index < ce_ui.picture_count)
+	if (family == _map_family_custom_edition && ce_index < ce_ui.picture_count)
 		picture_index = (short)(UI_MAP_LIST_PICTURE_BASE + ce_index);
 	wide_copy(lobby_name, DISPLAY_NAME_LENGTH, name);
 	wide_append(lobby_name, DISPLAY_NAME_LENGTH, L" [");
@@ -592,59 +602,354 @@ static void add_pc_entry(
 	add_entry(map_name, display_name, lobby_name, description, NONE, picture_index);
 }
 
-/* the files found of a family's maps, while the list is filled */
-struct found_files
-{
-	char names[MAXIMUM_MAP_LIST][MAP_NAME_LENGTH];
-	long count;
-};
+/* INVENTORY_IMPLEMENTATION_BEGIN
+The Win32 filesystem shim preserves the host/guest ABI boundary. Do not use
+native struct stat or dirent here (the game uses -malign-double).
+*/
+static struct ui_map_inventory_entry inventory[UI_MAP_INVENTORY_LIMIT];
+static long inventory_count, inventory_overflow, inventory_matches;
+static long inventory_rows[UI_MAP_INVENTORY_LIMIT], inventory_page;
+static unsigned long inventory_generation;
+static char inventory_query[96], inventory_message[256];
+static short inventory_family_filter = NONE, inventory_type_filter = NONE;
 
-static void file_found(
-	char const *file,
-	void *context)
+static boolean inventory_contains(char const *text, char const *query)
 {
-	struct found_files *found = context;
-
-	if (found->count < MAXIMUM_MAP_LIST && strlen(file) < MAP_NAME_LENGTH - 3)
-		snprintf(found->names[found->count++], MAP_NAME_LENGTH, "%s", file);
+    size_t length = strlen(query);
+    if (!length) return TRUE;
+    for (; *text; text++)
+        if (!_strnicmp(text, query, length)) return TRUE;
+    return FALSE;
 }
+
+static void inventory_view(void)
+{
+    long row;
+    inventory_matches = 0;
+    for (row = 0; row < inventory_count; row++)
+    {
+        struct ui_map_inventory_entry const *entry = &inventory[row];
+        if ((inventory_family_filter != NONE && entry->family != inventory_family_filter) ||
+            (inventory_type_filter != NONE && entry->map_type != inventory_type_filter))
+            continue;
+        if (!inventory_contains(entry->basename, inventory_query) &&
+            !inventory_contains(entry->map_name, inventory_query) &&
+            !inventory_contains(entry->path, inventory_query))
+            continue;
+        inventory_rows[inventory_matches++] = row;
+    }
+    if (inventory_page >= (inventory_matches + UI_MAP_INVENTORY_PAGE_SIZE - 1) /
+        UI_MAP_INVENTORY_PAGE_SIZE)
+        inventory_page = inventory_matches ? (inventory_matches - 1) / UI_MAP_INVENTORY_PAGE_SIZE : 0;
+}
+
+/* Inspect actual bytes, never infer map family or scenario type from a title. */
+static void inventory_inspect(struct ui_map_inventory_entry *entry)
+{
+    unsigned int header[26];
+    DWORD bytes = 0, size;
+    char resolved[512];
+    HANDLE file;
+    entry->valid_header = FALSE;
+    entry->routable = FALSE;
+    entry->family = _ui_map_inventory_family_unknown;
+    entry->map_type = _ui_map_inventory_unknown;
+    entry->version = entry->file_size = entry->header_crc = 0;
+    entry->requirement_status = _ui_map_inventory_requirements_unchecked;
+    snprintf(entry->requirements, sizeof(entry->requirements), "Unreadable or incomplete cache header; details only.");
+    file = CreateFileA(entry->path, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (file == INVALID_HANDLE_VALUE) return;
+    size = GetFileSize(file, NULL);
+    entry->file_size = (unsigned int)size;
+    if (!ReadFile(file, header, sizeof(header), &bytes, NULL) || bytes != sizeof(header))
+    {
+        CloseHandle(file);
+        return;
+    }
+    CloseHandle(file);
+    entry->version = header[1];
+    entry->header_crc = header[25];
+    if (!_stricmp(entry->basename, "bitmaps") || !_stricmp(entry->basename, "sounds") ||
+        !_stricmp(entry->basename, "loc"))
+    {
+        entry->map_type = _ui_map_inventory_resource;
+        snprintf(entry->requirements, sizeof(entry->requirements), "External resource cache; not a playable scenario.");
+        return;
+    }
+    if (header[0] != (unsigned int)'head' || size == (DWORD)-1 || size < 0x800)
+        return;
+    if (header[1] == 5) entry->family = _map_family_xbox;
+    else if (header[1] == 609) entry->family = _map_family_custom_edition;
+    else if (header[1] == 7) entry->family = _map_family_halomd;
+    else
+    {
+        snprintf(entry->requirements, sizeof(entry->requirements), "Unsupported cache version %u; details only.", header[1]);
+        return;
+    }
+    entry->map_type = (short)(header[24] & 0xffff);
+    if (entry->map_type < _ui_map_inventory_campaign || entry->map_type > _ui_map_inventory_ui)
+    {
+        entry->map_type = _ui_map_inventory_unknown;
+        snprintf(entry->requirements, sizeof(entry->requirements), "Invalid scenario type in cache header; details only.");
+        return;
+    }
+    entry->valid_header = TRUE;
+    {
+        char stem[512], basename[64];
+        char const *filename = entry->path, *cursor;
+        size_t length;
+        short named_family;
+        for (cursor = entry->path; *cursor; cursor++)
+            if (*cursor == '/' || *cursor == '\\') filename = cursor + 1;
+        length = strlen(filename);
+        if (length <= 4 || length - 4 >= sizeof(stem))
+        {
+            snprintf(entry->requirements, sizeof(entry->requirements), "Filename exceeds engine name limits; details only.");
+            return;
+        }
+        memcpy(stem, filename, length - 4);
+        stem[length - 4] = 0;
+        named_family = map_family_parse(stem, basename, sizeof(basename));
+        if (strlen(stem) - strlen(map_family_suffix(named_family)) >= sizeof(entry->basename) ||
+            (named_family != _map_family_xbox && named_family != entry->family))
+        {
+            snprintf(entry->requirements, sizeof(entry->requirements),
+                "Filename too long or family suffix disagrees with header; details only.");
+            return;
+        }
+    }
+    if (strlen(entry->basename) + strlen(map_family_suffix(entry->family)) >= sizeof(entry->map_name) ||
+        strchr(entry->basename, ':') || strchr(entry->basename, '/') || strchr(entry->basename, '\\'))
+    {
+        snprintf(entry->requirements, sizeof(entry->requirements), "Filename exceeds engine name limits; details only.");
+        return;
+    }
+    snprintf(entry->map_name, sizeof(entry->map_name), "%s%s",
+        entry->basename, map_family_suffix(entry->family));
+    if (entry->family == _map_family_xbox)
+    {
+        snprintf(resolved, sizeof(resolved), "%s%s.map", cache_files_map_directory(), entry->basename);
+        entry->routable = !_stricmp(resolved, entry->path);
+    }
+    else
+        entry->routable = map_family_find(entry->family, entry->basename, resolved, sizeof(resolved)) &&
+            !_stricmp(resolved, entry->path);
+    snprintf(entry->requirements, sizeof(entry->requirements), "%s",
+        entry->routable ? "Cache header compatible; dependencies and native runtime not yet verified." :
+        "This copy is shadowed or outside its family resolver location; details only.");
+}
+
+static int inventory_compare(void const *left, void const *right)
+{
+    struct ui_map_inventory_entry const *a = left, *b = right;
+    int result = (int)a->family - (int)b->family;
+    if (!result) result = _stricmp(a->basename, b->basename);
+    if (!result) result = _stricmp(a->path, b->path);
+    return result;
+}
+
+static void inventory_scan(char const *folder)
+{
+    char pattern[544];
+    WIN32_FIND_DATAA data;
+    HANDLE find;
+    if (snprintf(pattern, sizeof(pattern), "%s*.map", folder) >= (int)sizeof(pattern))
+    {
+        inventory_overflow++;
+        return;
+    }
+    find = FindFirstFileA(pattern, &data);
+    if (find == INVALID_HANDLE_VALUE) return;
+    do
+    {
+        struct ui_map_inventory_entry *entry;
+        size_t length = strlen(data.cFileName), stem_length;
+        char stem[512];
+        if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || length <= 4 ||
+            _stricmp(data.cFileName + length - 4, ".map"))
+            continue;
+        if (inventory_count >= UI_MAP_INVENTORY_LIMIT)
+        {
+            inventory_overflow++;
+            continue;
+        }
+        entry = &inventory[inventory_count];
+        memset(entry, 0, sizeof(*entry));
+        if (snprintf(entry->path, sizeof(entry->path), "%s%s", folder, data.cFileName) >= (int)sizeof(entry->path))
+        {
+            inventory_overflow++;
+            continue;
+        }
+        stem_length = length - 4;
+        if (stem_length >= sizeof(stem))
+        {
+            inventory_overflow++;
+            continue;
+        }
+        memcpy(stem, data.cFileName, stem_length);
+        stem[stem_length] = 0;
+        map_family_parse(stem, entry->basename, sizeof(entry->basename));
+        entry->generation = inventory_generation;
+        inventory_inspect(entry);
+        inventory_count++;
+    } while (FindNextFileA(find, &data));
+    XFindClose(find); /* XDK declaration in xtl.h; closes the search HANDLE. */
+}
+
+static struct ui_map_inventory_entry *inventory_snapshot(struct ui_map_inventory_entry const *snapshot)
+{
+    long row;
+    struct ui_map_inventory_entry current;
+    if (!snapshot || !inventory_generation || snapshot->generation != inventory_generation) return NULL;
+    for (row = 0; row < inventory_count; row++)
+    {
+        struct ui_map_inventory_entry *entry = &inventory[row];
+        if (strcmp(snapshot->path, entry->path) || strcmp(snapshot->map_name, entry->map_name) ||
+            strcmp(snapshot->basename, entry->basename) || snapshot->family != entry->family ||
+            snapshot->map_type != entry->map_type || snapshot->version != entry->version ||
+            snapshot->file_size != entry->file_size || snapshot->header_crc != entry->header_crc ||
+            snapshot->valid_header != entry->valid_header || snapshot->routable != entry->routable)
+            continue;
+        current = *entry;
+        inventory_inspect(&current);
+        if (current.family != entry->family || current.map_type != entry->map_type ||
+            current.version != entry->version || current.file_size != entry->file_size ||
+            current.header_crc != entry->header_crc || current.valid_header != entry->valid_header ||
+            current.routable != entry->routable)
+            return NULL;
+        return entry;
+    }
+    return NULL;
+}
+
+long ui_map_inventory_count(void) { return inventory_count; }
+long ui_map_inventory_overflow(void) { return inventory_overflow; }
+long ui_map_inventory_filtered_count(void) { return inventory_matches; }
+long ui_map_inventory_page(void) { return inventory_page; }
+long ui_map_inventory_page_count(void)
+{
+    return inventory_matches ? (inventory_matches + UI_MAP_INVENTORY_PAGE_SIZE - 1) / UI_MAP_INVENTORY_PAGE_SIZE : 1;
+}
+void ui_map_inventory_set_query(char const *query)
+{
+    snprintf(inventory_query, sizeof(inventory_query), "%s", query ? query : "");
+    inventory_page = 0;
+    inventory_view();
+}
+char const *ui_map_inventory_query(void) { return inventory_query; }
+void ui_map_inventory_filter_set(short family, short map_type)
+{
+    inventory_family_filter = family >= NONE && family <= _ui_map_inventory_family_unknown ? family : NONE;
+    inventory_type_filter = map_type >= NONE && map_type <= _ui_map_inventory_unknown ? map_type : NONE;
+    inventory_page = 0;
+    inventory_view();
+}
+short ui_map_inventory_family_filter(void) { return inventory_family_filter; }
+short ui_map_inventory_type_filter(void) { return inventory_type_filter; }
+boolean ui_map_inventory_page_move(int direction)
+{
+    long target = inventory_page + (direction > 0 ? 1 : direction < 0 ? -1 : 0);
+    if (target < 0 || target >= ui_map_inventory_page_count() || target == inventory_page) return FALSE;
+    inventory_page = target;
+    return TRUE;
+}
+boolean ui_map_inventory_result(int page_row, struct ui_map_inventory_entry *entry)
+{
+    long row = inventory_page * UI_MAP_INVENTORY_PAGE_SIZE + page_row;
+    if (!entry || page_row < 0 || page_row >= UI_MAP_INVENTORY_PAGE_SIZE ||
+        row < 0 || row >= inventory_matches) return FALSE;
+    *entry = inventory[inventory_rows[row]];
+    return TRUE;
+}
+char const *ui_map_inventory_status(void)
+{
+    snprintf(inventory_message, sizeof(inventory_message),
+        "%ld installed files | %ld matching | page %ld/%ld | %ld omitted (limit %d)",
+        inventory_count, inventory_matches, inventory_page + 1, ui_map_inventory_page_count(),
+        inventory_overflow, UI_MAP_INVENTORY_LIMIT);
+    return inventory_message;
+}
+long ui_map_inventory_resolve(struct ui_map_inventory_entry const *snapshot)
+{
+    struct ui_map_inventory_entry *entry = inventory_snapshot(snapshot);
+    if (!entry || !entry->valid_header || !entry->routable ||
+        entry->requirement_status == _ui_map_inventory_requirements_failed ||
+        snapshot->requirement_status == _ui_map_inventory_requirements_failed ||
+        entry->map_type != _ui_map_inventory_multiplayer) return NONE;
+    return ui_map_list_find(entry->map_name);
+}
+boolean ui_map_inventory_check(struct ui_map_inventory_entry const *snapshot,
+    struct ui_map_inventory_entry *details)
+{
+    extern boolean ce_map_preflight(char const *, char *, long);
+    struct ui_map_inventory_entry *entry = inventory_snapshot(snapshot);
+    char reason[512];
+    if (!entry || !details) return FALSE;
+    if (entry->valid_header && entry->routable && entry->family != _map_family_xbox &&
+        entry->requirement_status == _ui_map_inventory_requirements_unchecked)
+    {
+        reason[0] = 0;
+        if (ce_map_preflight(entry->map_name, reason, sizeof(reason)))
+        {
+            entry->requirement_status = _ui_map_inventory_requirements_present;
+            snprintf(entry->requirements, sizeof(entry->requirements),
+                "Dependency preflight passed; native runtime loading remains unverified.");
+        }
+        else
+        {
+            entry->requirement_status = _ui_map_inventory_requirements_failed;
+            snprintf(entry->requirements, sizeof(entry->requirements), "%s", reason[0] ? reason : "Dependency preflight failed.");
+        }
+    }
+    *details = *entry;
+    return TRUE;
+}
+/* INVENTORY_IMPLEMENTATION_END */
 
 /* ---------- public code */
 
-/* the list anew: the Xbox's maps (the game's thirteen names, in its order),
-then the Custom Edition maps found, then HaloMD's */
-void ui_map_list_refresh(
-	char *const *xbox_maps)
+/* Original Xbox order/indices survive absent files; other families sort by basename. */
+void ui_map_list_refresh(char *const *xbox_maps)
 {
-	static struct found_files found;
-	/* (the counts last logged, to log each change once) */
-	static long logged_counts[NUMBER_OF_MAP_FAMILIES] = { -1, -1, -1 };
-	long counts[NUMBER_OF_MAP_FAMILIES] = { XBOX_MAP_COUNT, 0, 0 };
-	short index, family;
-
-	ui_map_list_count_value = 0;
-	for (index = 0; index < XBOX_MAP_COUNT; index++)
-		add_entry(xbox_maps[index], L"", L"", L"", index, index);
-	for (family = _map_family_custom_edition; family < NUMBER_OF_MAP_FAMILIES; family++)
-	{
-		long file;
-
-		found.count = 0;
-		map_family_list(family, file_found, &found);
-		if (found.count)
-			ce_ui_read();
-		/* (in the order of their names, as the list shows them) */
-		qsort(found.names, found.count, MAP_NAME_LENGTH, (int (*)(void const *, void const *))_stricmp);
-		for (file = 0; file < found.count; file++)
-			add_pc_entry(family, found.names[file]);
-		counts[family] = found.count;
-	}
-	if (memcmp(counts, logged_counts, sizeof(counts)))
-	{
-		memcpy(logged_counts, counts, sizeof(counts));
-		error(_error_silent, "the menus' map list: %ld Custom Edition maps, %ld HaloMD maps",
-			counts[_map_family_custom_edition], counts[_map_family_halomd]);
-	}
+    char folder[512];
+    long row;
+    short index, family;
+    ui_map_list_count_value = 0;
+    inventory_count = inventory_overflow = 0;
+    if (!++inventory_generation) inventory_generation++;
+    inventory_scan(cache_files_map_directory());
+    snprintf(folder, sizeof(folder), "%sce\\", cache_files_map_directory());
+    inventory_scan(folder);
+    inventory_scan("d:\\md_maps\\");
+    qsort(inventory, inventory_count, sizeof(inventory[0]), inventory_compare);
+    for (index = 0; xbox_maps && index < XBOX_MAP_COUNT; index++)
+    {
+        for (row = 0; row < inventory_count; row++)
+        {
+            struct ui_map_inventory_entry const *entry = &inventory[row];
+            if (entry->family == _map_family_xbox && entry->valid_header && entry->routable &&
+                entry->map_type == _ui_map_inventory_multiplayer && !_stricmp(entry->map_name, xbox_maps[index]))
+            {
+                add_entry(xbox_maps[index], L"", L"", L"", index, index);
+                break;
+            }
+        }
+    }
+    for (family = _map_family_xbox; family < NUMBER_OF_MAP_FAMILIES; family++)
+    {
+        for (row = 0; row < inventory_count; row++)
+        {
+            struct ui_map_inventory_entry const *entry = &inventory[row];
+            if (entry->family != family || !entry->valid_header || !entry->routable ||
+                entry->map_type != _ui_map_inventory_multiplayer || ui_map_list_find(entry->map_name) != NONE)
+                continue;
+            if (family != _map_family_xbox) ce_ui_read();
+            add_pc_entry(family, entry->basename);
+        }
+    }
+    inventory_view();
+    error(_error_silent, "installed map inventory: %s; %ld playable picker rows",
+        ui_map_inventory_status(), ui_map_list_count_value);
 }
 
 long ui_map_list_count(
@@ -682,7 +987,7 @@ short ui_map_list_string_index(
 	long row,
 	short kind)
 {
-	if (row < 0 || row >= ui_map_list_count_value)
+	if (row < 0 || row >= ui_map_list_count_value || kind < 0 || kind >= NUMBER_OF_UI_MAP_LIST_STRINGS)
 		return 0;
 	if (ui_map_list[row].xbox_index != NONE)
 		return ui_map_list[row].xbox_index;

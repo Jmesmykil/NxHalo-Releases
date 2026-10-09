@@ -1,0 +1,18 @@
+{
+  "version": "2.9.9",
+  "tag": "v0.2.9.9-steamdeck-lobby-stability",
+  "runtime": "13661136b9dc51b454d6d665df0c4306415bcd3c01f2c862180166591fc4229b",
+  "assets": {
+    "NxHalo-SteamDeck-unified-runtime-2.9.9-lobby-stability.tar.gz": {
+      "sha256": "1f4b506c6b40e208ba68fe9530ff96da067a12b336ad04639b7cba2e9131a710",
+      "bytes": 22294573
+    },
+    "NxHalo-Unified-source-2.9.9-lobby-stability.zip": {
+      "sha256": "fb496ac5f7a55c1937a05f0a8bc4b13b5a84bafc0841cce58da885562c5149de",
+      "bytes": 18008688
+    }
+  },
+  "source_entries": 2292,
+  "platform": "Steam Deck/Linux",
+  "switch_runtime_changed": false
+}

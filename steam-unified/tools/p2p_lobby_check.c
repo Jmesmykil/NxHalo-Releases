@@ -25,6 +25,7 @@ alone. Prints PASS or the failures.
 pthread_mutex_t p2p_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static unsigned long clock_now = 1000;
+static int host_profile = 21;
 static unsigned char seed[P2P_SEED_SIZE] = { 42 };
 static unsigned char signing_key[P2P_KEY_SIZE], x25519_secret[P2P_KEY_SIZE], x25519_public[P2P_KEY_SIZE];
 static unsigned char published[512];
@@ -35,6 +36,7 @@ static const unsigned char *hosting_token;
 void posix_random_bytes(void *buffer, unsigned long size) { memset(buffer, 0x5a, size); }
 unsigned long p2p_now(void) { return clock_now; }
 int config_boolean(const char *name) { (void)name; return 1; }
+int network_profile_host_version(void) { return host_profile; }
 void platform_log(const char *format, ...) { (void)format; }
 
 void p2p_hex(const unsigned char *bytes, int size, char *text)
@@ -315,6 +317,37 @@ static void lobby_checks(void)
 	hear(published, published_size, 0, NULL);
 	check(games(&listing) == 1 && !listing.locked && !strcmp(listing.invite, expected_invite),
 		"a game whose password is taken off is listed open");
+	/* v24 advertises the exact qualified map only when its signed 32-byte
+	 * preview can hold it; a longer identity becomes explicitly unknown. */
+	host_profile = 24;
+	p2p_set_game_listing(NULL, "custom_maps\\layout-8v8-ctf-king-oddball-race-01", NULL, 2, 1, 0, 1);
+	clock_now += 6000;
+	lobby_update(token, 3, 16);
+	hear(published, published_size, 0, NULL);
+	check(games(&listing) == 1 && listing.version == 24 && !strcmp(listing.map, "Unknown"),
+		"v24 long custom map preview is unknown instead of falsely truncated");
+	p2p_set_game_listing(NULL, "custom_maps\\b30", NULL, 2, 1, 0, 1);
+	clock_now += 6000;
+	lobby_update(token, 3, 16);
+	hear(published, published_size, 0, NULL);
+	check(games(&listing) == 1 && listing.version == 24 && !strcmp(listing.map, "custom_maps\\b30"),
+		"v24 short custom map preview retains its family-qualified identity");
+	/* Existing e3 profile keeps the historical basename and signed length. */
+	host_profile = 21;
+	p2p_set_game_listing(NULL, "bloodgulch", NULL, 2, 1, 0, 1);
+	clock_now += 6000;
+	lobby_update(token, 3, 16);
+	hear(published, published_size, 0, NULL);
+	{
+		int offset, original_map_offset = -1;
+		for (offset = 1; offset + 10 <= first_size; offset++)
+			if (!memcmp(first + offset, "bloodgulch", 10))
+				original_map_offset = offset;
+		check(games(&listing) == 1 && listing.version == 21 && !strcmp(listing.map, "bloodgulch") &&
+			published_size == first_size && original_map_offset > 0 &&
+			!memcmp(published + original_map_offset - 1, first + original_map_offset - 1, 11),
+			"legacy listing map bytes match the original v21 wire fixture");
+	}
 }
 
 int main(void)

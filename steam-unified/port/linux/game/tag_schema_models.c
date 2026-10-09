@@ -1087,7 +1087,7 @@ static struct tag_schema_field const animation_graph_fields[] =
 {
 	TAG_SCHEMA_BLOCK(struct animation_graph, object_overlays, animation_graph_object_overlay_schema,
 		MAXIMUM_OBJECT_OVERLAYS_PER_GRAPH),
-	TAG_SCHEMA_BLOCK(struct animation_graph, unit_seats, animation_graph_unit_seat_schema,
+	TAG_SCHEMA_CE_BLOCK(struct animation_graph, unit_seats, animation_graph_unit_seat_schema,
 		MAXIMUM_UNIT_SEATS_PER_GRAPH),
 	TAG_SCHEMA_BLOCK(struct animation_graph, weapon_animations, animation_graph_weapon_animations_schema, 1),
 	TAG_SCHEMA_BLOCK(struct animation_graph, vehicle_animations, vehicle_animation_schema, 1),
@@ -1099,7 +1099,7 @@ static struct tag_schema_field const animation_graph_fields[] =
 	TAG_SCHEMA_BLOCK(struct animation_graph, sound_references, animation_graph_sound_reference_schema,
 		MAXIMUM_SOUND_REFERENCES_PER_ANIMATION_GRAPH),
 	TAG_SCHEMA_BLOCK(struct animation_graph, nodes, animation_graph_node_schema, MAXIMUM_NODES_PER_ANIMATION),
-	TAG_SCHEMA_BLOCK(struct animation_graph, animations, animation_schema, MAXIMUM_ANIMATIONS_PER_GRAPH),
+	TAG_SCHEMA_CE_BLOCK(struct animation_graph, animations, animation_schema, MAXIMUM_ANIMATIONS_PER_GRAPH),
 	TAG_SCHEMA_CHECK(animation_graph_check),
 	TAG_SCHEMA_END
 };

@@ -1,0 +1,55 @@
+{
+  "runtime_sha256": "13661136b9dc51b454d6d665df0c4306415bcd3c01f2c862180166591fc4229b",
+  "required_checks": {
+    "gun_game_natural_restart": true,
+    "keyboard_cache_transition": true,
+    "keyboard_production_32bit_unit": true,
+    "v24_player_admission": true
+  },
+  "independent_review": {
+    "accepted": true,
+    "path": "INDEPENDENT-REVIEW.json",
+    "reviewer": "/root/unified_characters"
+  },
+  "cases": {
+    "GunGame": {
+      "receipt_sha256": "a4201bc55284d169a7a3b46d79024109ac0f54668f609d3d56e4527bd7817f4c",
+      "peer": "e3cdc7999eb273329daca96b90201b8263f20b0963902f1d036170670f474bec",
+      "proof": "7realFenemykills/all7weapons/winner; naturalpostgame->sameconnectedlobby->nextstart; bothplayersrank0solepistol",
+      "limits": [
+        "privateBSPpositiongathering",
+        "source39checkscoverbroadercustomsettings; realrestartisGunGame",
+        "notallhistoricalgametypeacceptance"
+      ]
+    },
+    "keyboard": {
+      "production_32bit_receipt_sha256": "e82c54729742d25d64ff6392fd1b7ae9dc779904ad0a97d840df159b71f2503f",
+      "post_map_typing": "BUILD12 actualmap->menu->profilekeyboard hi screenshot; sameproductionkeyboardhashinBUILD13",
+      "limits": [
+        "nosave",
+        "noprocesspointermeasurement"
+      ]
+    },
+    "v24": {
+      "receipt_sha256": "161ac735fc1b7c632c286f8a558272e469efef1bc077c8e8fd5ee6ccf7f3751a",
+      "official_sha256": "c0448427c66465bf0956a7773a1a68053f410ac8052866c48f611010e8c2ff83",
+      "candidate_host_to_official_client": true,
+      "map": "beavercreek",
+      "mode": "Slayer",
+      "typed_samples": 6,
+      "players_each": 2,
+      "vehicle_set": 2,
+      "vehicles_each": 0,
+      "exits": {
+        "host": 0,
+        "client": 0
+      },
+      "limits": [
+        "noCE609authoredvehicleproof",
+        "noreverseorientationclaim",
+        "norealcapacityclaim",
+        "v22stilllistingonly"
+      ]
+    }
+  }
+}

@@ -1,6 +1,6 @@
-## NxHalo Steam Deck/Linux update: 2.9.8
+## NxHalo Steam Deck/Linux update: 2.9.9
 
-[Runtime and source](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.9.8-steamdeck-native-gametypes). Read the [native gametype guide](docs/NATIVE-GAMETYPES-2.9.8.md) and [content guide](docs/NATIVE-MODS-2.9.6.md). Supply your own game data.
+[Runtime and source](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.9.9-steamdeck-lobby-stability). Read the [lobby stability guide](docs/LOBBY-STABILITY-2.9.9.md) and [gametype guide](docs/NATIVE-GAMETYPES-2.9.8.md). Supply your own game data.
 
 Upstream project documentation follows.
 

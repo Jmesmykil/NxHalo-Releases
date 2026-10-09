@@ -882,7 +882,7 @@ int network_profile_host_version(void)
 	configured = config_integer("network.compatibility_version");
 	/* Only stable profile choices are hostable. Invalid config falls back to
 	 * current OpenCE 21; it never silently advertises another wire. */
-	return configured == 11 || configured == 20 || configured == 21 ? (int)configured : 21;
+	return configured == 11 || configured == 20 || configured == 21 || configured == 24 ? (int)configured : 21;
 }
 
 int network_profile_active_version(void)
@@ -2494,6 +2494,25 @@ static boolean network_game_client_map_name_is_valid(
 
 	if (!memchr(map_name, '\0', size))
 		return FALSE;
+	/* OpenCE 24 names CE maps by a flat custom_maps\ leaf. Keep this
+	   identifier exact-profile-only; 11-21 retain their suffix/path rules. */
+	if (!_strnicmp(map_name, "custom_maps\\", 12))
+	{
+		if (network_profile_active_version() != 24)
+			return FALSE;
+		leaf = map_name + 12;
+		if (!*leaf || strlen(leaf) >= 64 || strchr(leaf, '\\') || strchr(leaf, '/') || strchr(leaf, '@') ||
+			strstr(leaf, "..") || leaf[strlen(leaf) - 1] == '.' || leaf[strlen(leaf) - 1] == ' ')
+			return FALSE;
+		for (character = leaf; *character; character++)
+		{
+			if (!((*character >= 'a' && *character <= 'z') || (*character >= 'A' && *character <= 'Z') ||
+				(*character >= '0' && *character <= '9') || *character == '_' || *character == '-' ||
+				*character == '.' || *character == ' '))
+				return FALSE;
+		}
+		return leaf[strspn(leaf, ". ")] != 0;
+	}
 	leaf = strrchr(map_name, '\\');
 	leaf = leaf ? leaf+1 : map_name;
 	family = strchr(map_name, '@');

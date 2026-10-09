@@ -3,7 +3,7 @@
 
 int main(void)
 {
-    struct gun_game_progression a, reused, late;
+    struct gun_game_progression a, reused, late, before_failed_equip;
     int kill;
     gun_game_progression_clear(&a);
     gun_game_progression_bind(&a, 0x10001);
@@ -44,5 +44,23 @@ int main(void)
         assert(gun_game_progression_credit_kill(&late, 1));
     assert(gun_game_progression_stage(&late) == 3);
     assert(gun_game_progression_score(&late) == 3);
+
+    /* A death/rebind with the same player datum preserves the mid-ladder stage. */
+    gun_game_progression_bind(&late, 0x20001);
+    assert(gun_game_progression_stage(&late) == 3);
+    assert(gun_game_progression_score(&late) == 3);
+
+    /* Suicide/friendly-fire/uncredited events do not advance the ladder. */
+    assert(!gun_game_progression_credit_kill(&late, 0));
+    assert(gun_game_progression_stage(&late) == 3);
+    assert(gun_game_progression_score(&late) == 3);
+
+    /* Failed stock weapon allocation rolls the tentative stage back completely. */
+    before_failed_equip = late;
+    assert(gun_game_progression_credit_kill(&late, 1));
+    gun_game_progression_restore(&late, &before_failed_equip);
+    assert(gun_game_progression_stage(&late) == 3);
+    assert(gun_game_progression_score(&late) == 3);
+    assert(!gun_game_progression_complete(&late));
     return 0;
 }

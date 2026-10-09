@@ -222,14 +222,12 @@ void match_rules_reset(void)
     race_warning_last_wait_reason = -1;
     local_seed_valid = FALSE;
     cached_local_seed = 0;
-    zombies_initialized = FALSE;
-    zombies_ready = FALSE;
     short index;
-    csmemset(zombies_infected, 0, sizeof(zombies_infected));
-    csmemset(zombies_initial_roster, 0, sizeof(zombies_initial_roster));
+    match_rules_zombie_state_reset(&zombies_initialized, &zombies_ready,
+        zombies_initial_roster, zombies_infected, zombies_tracked_player,
+        HALO_PORT_MAXIMUM_NETWORK_PLAYERS);
     for (index = 0; index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; index++)
     {
-        zombies_tracked_player[index] = NONE;
         gun_game_progression_clear(&gun_game_players[index]);
         lunge_tracked_player[index] = NONE;
         lunge_button_held[index] = FALSE;
@@ -410,6 +408,11 @@ boolean match_rules_validate_loaded_map(void)
 
     race_warning_pending = FALSE;
     race_warning_last_wait_reason = -1;
+    /* Roles depend on teams even when a saved custom copy edited this field.
+       Enforce only the mode invariant; leave health, timing and score custom. */
+    if (host_authority && variant && variant->game_engine_index != 0 &&
+        (preset == MATCH_RULES_PRESET_ZOMBIES || preset == MATCH_RULES_PRESET_FACTION))
+        variant->universal_variant.teams = TRUE;
     /* Validate the running variant: host setup can override the saved preset. */
     if (variant && variant->game_engine_index == game_engine_race)
     {
@@ -743,16 +746,9 @@ static boolean zombies_player_is_infected(long player_index)
     if (player_index == NONE)
         return FALSE;
     absolute = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
-    if (absolute < 0 || absolute >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
-        return FALSE;
-    if (zombies_tracked_player[absolute] != player_index)
-    {
-        /* A different datum identifier means this is a late joiner or a recycled slot. */
-        zombies_tracked_player[absolute] = player_index;
-        zombies_initial_roster[absolute] = FALSE;
-        zombies_infected[absolute] = TRUE;
-    }
-    return zombies_infected[absolute];
+    return match_rules_zombie_player_is_infected(zombies_tracked_player,
+        zombies_initial_roster, zombies_infected, HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
+        absolute, player_index);
 }
 
 static long active_roster(long *roster, short capacity)
@@ -809,10 +805,10 @@ static boolean zombies_initialize(void)
         {
             zombies_initial_roster[absolute] = TRUE;
             zombies_tracked_player[absolute] = roster[index];
+            /* Initialize every role, including a previously spawned solo human. */
+            zombies_infected[absolute] = roster[index] == chosen;
         }
         update_host_team(player, roster[index], roster[index] == chosen ? 1 : 0);
-        if (roster[index] == chosen && absolute >= 0 && absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
-            zombies_infected[absolute] = TRUE;
     }
     zombies_ready = TRUE;
     set_message("Zombies: one infected chosen; infected use melee and cannot fire or throw grenades.");
@@ -866,6 +862,7 @@ static boolean gun_game_equip_player_stage(long player_index)
     long definition_index;
     long weapon_index;
     long old_weapon_index;
+    short old_current_slot, old_desired_slot, new_slot, slot;
     int absolute;
     if (player_index == NONE || game_connection() == _game_connection_network_client ||
         network_game_distributed_client())
@@ -881,6 +878,8 @@ static boolean gun_game_equip_player_stage(long player_index)
     unit->unit.grenade_counts[_unit_grenade_human_fragmentation] = 0;
     unit->unit.grenade_counts[_unit_grenade_covenant_plasma] = 0;
     unit->unit.desired_grenade_index = NONE;
+    old_current_slot = unit->unit.current_weapon_index;
+    old_desired_slot = unit->unit.desired_weapon_index;
     old_weapon_index = unit->unit.current_weapon_index >= 0 &&
         unit->unit.current_weapon_index < MAXIMUM_WEAPONS_PER_UNIT ?
         unit->unit.weapon_object_indices[unit->unit.current_weapon_index] : NONE;
@@ -900,27 +899,54 @@ static boolean gun_game_equip_player_stage(long player_index)
         set_message("Gun Game could not create the next stage weapon; progression was held.");
         return FALSE;
     }
-    /* Replace only after the new object is valid and passes the normal inventory
-       gate, so an allocation or compatibility failure keeps the current weapon. */
-    if (!unit_add_weapon_to_inventory(unit_index, weapon_index, _unit_add_weapon_replace))
+    /* Attach without destructive replacement. Keep the previous inventory
+       and selectors until putting away the old current weapon commits. */
+    if (!unit_add_weapon_to_inventory(unit_index, weapon_index, _unit_add_weapon_normal))
     {
         object_delete(weapon_index);
         set_message("Gun Game could not equip the next stage weapon; progression was held.");
+        return FALSE;
+    }
+    new_slot = NONE;
+    for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
+        if (unit->unit.weapon_object_indices[slot] == weapon_index)
+            new_slot = slot;
+    if (new_slot == NONE)
+    {
+        object_delete(weapon_index);
+        unit->unit.current_weapon_index = old_current_slot;
+        unit->unit.desired_weapon_index = old_desired_slot;
+        set_message("Gun Game could not verify the next weapon slot; progression was held.");
         return FALSE;
     }
     if (old_weapon_index != NONE && old_weapon_index != weapon_index)
     {
         if (!unit_drop_current_weapon(unit_index, TRUE))
         {
-            /* The next weapon is in a noncurrent slot. Remove it and keep the
-               current stage weapon if the engine cannot put that weapon away. */
-            unit_delete_all_weapons(unit_index);
+            /* Only undo this transaction's newly attached weapon; do not prune
+               pre-existing slots or leave the player's desired slot cleared. */
+            if (new_slot != NONE && unit->unit.weapon_object_indices[new_slot] == weapon_index)
+                unit->unit.weapon_object_indices[new_slot] = NONE;
+            object_delete(weapon_index);
+            unit->unit.current_weapon_index = old_current_slot;
+            unit->unit.desired_weapon_index = old_desired_slot;
             set_message("Gun Game could not switch weapons; the current stage is retained.");
             return FALSE;
         }
         if (object_try_and_get(old_weapon_index))
             object_delete(old_weapon_index);
     }
+    /* The switch committed. Remove only old-stage/backup objects, retaining
+       the new object's slot for the normal weapon readiness path. */
+    for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
+    {
+        long other = unit->unit.weapon_object_indices[slot];
+        if (other == NONE || other == weapon_index)
+            continue;
+        unit->unit.weapon_object_indices[slot] = NONE;
+        object_delete(other);
+    }
+    unit->unit.desired_weapon_index = new_slot;
     return TRUE;
 }
 
@@ -939,11 +965,11 @@ void match_rules_host_player_scored_kill(long killer_player_index, long dead_pla
         killer_absolute = gun_game_bind_player(killer_player_index);
         if (credited_player_kill && killer_absolute >= 0)
         {
-            int previous_stage = gun_game_progression_stage(&gun_game_players[killer_absolute]);
+            struct gun_game_progression previous = gun_game_players[killer_absolute];
             gun_game_progression_credit_kill(&gun_game_players[killer_absolute], TRUE);
             if (!gun_game_progression_complete(&gun_game_players[killer_absolute]) &&
                 !gun_game_equip_player_stage(killer_player_index))
-                gun_game_players[killer_absolute].stage = previous_stage;
+                gun_game_progression_restore(&gun_game_players[killer_absolute], &previous);
             if (gun_game_progression_stage(&gun_game_players[killer_absolute]) == GUN_GAME_STAGE_COUNT - 1 &&
                 !gun_game_progression_complete(&gun_game_players[killer_absolute]))
                 set_message("Gun Game: rocket stage reached; the next credited enemy kill wins.");
@@ -1224,8 +1250,8 @@ boolean match_rules_weapon_allowed_for_unit(long unit_index, long weapon_definit
 boolean match_rules_grenade_pickup_allowed(long unit_index)
 {
     (void)unit_index;
-    return !match_rules_variant_is_zombies() && !match_rules_variant_is_tower_of_power() &&
-        !match_rules_variant_is_gun_game();
+    return match_rules_mode_grenade_pickup_allowed(match_rules_variant_is_zombies(),
+        match_rules_variant_is_tower_of_power(), match_rules_variant_is_gun_game());
 }
 
 boolean match_rules_player_melee_only(long player_index)
@@ -1421,6 +1447,68 @@ void match_rules_filter_player_control(long player_index, struct unit_control_da
 	match_rules_filter_infected_control(TRUE, unit->unit.current_weapon_index, control);
 }
 
+static void match_rules_host_prune_infected_inventory(long unit_index, long melee_definition)
+{
+    struct unit_datum *unit = unit_try_and_get(unit_index);
+    long kept_weapon = NONE;
+    short slot;
+    if (!unit)
+        return;
+
+    for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
+    {
+        long weapon_index = unit->unit.weapon_object_indices[slot];
+        struct object_datum *weapon = weapon_index != NONE ? object_try_and_get(weapon_index) : NULL;
+        if (weapon && match_rules_infected_inventory_weapon_allowed(TRUE,
+                weapon->definition_index, melee_definition) && kept_weapon == NONE)
+        {
+            kept_weapon = weapon_index;
+            continue;
+        }
+        if (weapon_index == NONE)
+            continue;
+
+        /* unit_delete_all_weapons deliberately preserves the current weapon.
+           Drop and delete that one explicitly, then remove every other gun. */
+        if (slot == unit->unit.current_weapon_index)
+        {
+            if (!unit_drop_current_weapon(unit_index, TRUE))
+            {
+                object_delete(weapon_index);
+                unit->unit.weapon_object_indices[slot] = NONE;
+                unit->unit.current_weapon_index = NONE;
+                if (unit->unit.desired_weapon_index == slot)
+                    unit->unit.desired_weapon_index = NONE;
+            }
+            else if (object_try_and_get(weapon_index))
+            {
+                object_delete(weapon_index);
+            }
+        }
+        else
+        {
+            object_delete(weapon_index);
+            unit->unit.weapon_object_indices[slot] = NONE;
+            if (unit->unit.desired_weapon_index == slot)
+                unit->unit.desired_weapon_index = NONE;
+        }
+    }
+
+    if (kept_weapon != NONE)
+    {
+        for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
+        {
+            if (unit->unit.weapon_object_indices[slot] == kept_weapon)
+            {
+                unit->unit.desired_weapon_index = slot;
+                return;
+            }
+        }
+    }
+    unit->unit.current_weapon_index = NONE;
+    unit->unit.desired_weapon_index = NONE;
+}
+
 /* Called after standard loadout and grenades have been assigned. */
 void match_rules_host_postspawn_player(long player_index)
 {
@@ -1449,10 +1537,17 @@ void match_rules_host_postspawn_player(long player_index)
         unit->unit.grenade_counts[_unit_grenade_human_fragmentation] = 0;
         unit->unit.grenade_counts[_unit_grenade_covenant_plasma] = 0;
         unit->unit.desired_grenade_index = NONE;
-        if (absolute >= 0 && absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS && zombies_player_is_infected(player_index))
+        /* The datum helper treats an unknown player as a late infected join.
+           Before initial assignment a solo player is still an unassigned human. */
+        if (zombies_ready && absolute >= 0 && absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS &&
+            zombies_player_is_infected(player_index))
         {
-            if (!nxhalo_give_zombie_melee_weapon(unit_index))
-                set_message("Melee weapon could not be equipped; infected still cannot fire or throw grenades.");
+            long melee_definition = match_rules_zombie_melee_weapon_definition();
+            if (melee_definition == NONE)
+                set_message("No map melee weapon is loaded; infected are unarmed and cannot fire or throw grenades.");
+            else if (!nxhalo_give_zombie_melee_weapon(unit_index))
+                set_message("Melee grant failed; infected keep only a loaded melee weapon and cannot fire or throw grenades.");
+            match_rules_host_prune_infected_inventory(unit_index, melee_definition);
         }
     }
     else if (preset == MATCH_RULES_PRESET_GUN_GAME)

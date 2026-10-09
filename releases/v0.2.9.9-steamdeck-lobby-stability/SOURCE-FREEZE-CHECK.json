@@ -1,0 +1,12 @@
+{
+  "frozen_runtime": "13661136b9dc51b454d6d665df0c4306415bcd3c01f2c862180166591fc4229b",
+  "frozen_source_matches": 2293,
+  "archive_entries": 2292,
+  "excluded_binary_artifacts": [
+    "source/bitmaps/libtiff/mkg3states"
+  ],
+  "documented_postbuild_markdown_only": [
+    "README.md",
+    "docs/LOBBY-STABILITY-2.9.9.md"
+  ]
+}

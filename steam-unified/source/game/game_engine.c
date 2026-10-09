@@ -544,6 +544,7 @@ symbols in this file:
 #include "game_engine_list.h"
 #include "game_engine_place.h"
 #include "match_rules.h" /* port: native host match rules */
+#include "halo_network_profile.h"
 
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmap_group_lookup.h"
@@ -7103,6 +7104,10 @@ boolean game_engine_vehicle_placement_allowed(
 		return mode_vehicle_policy != 0;
 	side = global_variant.universal_variant.teams ? game_engine_nearest_team(&placement->position) : 0;
 	set = options->vehicle_set[side];
+	/* OpenCE 24's PC set leaves every map-eligible vehicle placement intact.
+	   Older profiles retain the old enum interpretation below. */
+	if (set == VARIANT_VEHICLE_SET_PC && network_profile_active_version() == 24)
+		return TRUE;
 	type = game_engine_variant_vehicle_type(TAG_BLOCK_GET_ELEMENT(palette, placement->palette_entry_index,
 		struct scenario_object_palette_entry)->reference.index);
 	/* (the map's own: the multiplayer ones of the globals, as the Xbox
@@ -7199,6 +7204,11 @@ long game_engine_remap_vehicle(
 	short mode_vehicle_policy = game_engine ? match_rules_vehicle_policy(vehicle_definition_index) : -1;
 	if (mode_vehicle_policy >= 0)
 		return mode_vehicle_policy ? vehicle_definition_index : NONE;
+
+	if (game_engine && network_profile_active_version() == 24 &&
+		(game_variant_options_get()->vehicle_set[0] == VARIANT_VEHICLE_SET_PC ||
+		 game_variant_options_get()->vehicle_set[1] == VARIANT_VEHICLE_SET_PC))
+		return result;
 
 	if (game_engine)
 	{

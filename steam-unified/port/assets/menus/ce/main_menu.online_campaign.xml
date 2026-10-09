@@ -54,14 +54,19 @@
  </widget>
  <widget name="main_menu/online_campaign/filter_title" type="text" controller="1" left="40" top="40" width="560" height="60" text="SERVER FILTERS" font="ui\large_ui" color="#FF2896FF" />
  <widget name="main_menu/online_campaign/filter_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
-  <child widget="main_menu/online_campaign/multiplayer_type_join_current_item" y="132" />
-  <child widget="main_menu/online_campaign/multiplayer_type_join_legacy_item" y="186" />
-  <child widget="main_menu/online_campaign/multiplayer_type_join_broker_item" y="240" />
-  <child widget="main_menu/online_campaign/multiplayer_type_join_announced_item" y="294" />
-  <child widget="main_menu/online_campaign/mp_join_classic_ce" y="348" />
-  <child widget="main_menu/online_campaign/mp_join_classic_pc" y="402" />
+  <child widget="main_menu/online_campaign/multiplayer_type_join_v24_item" y="108" />
+  <child widget="main_menu/online_campaign/multiplayer_type_join_current_item" y="154" />
+  <child widget="main_menu/online_campaign/multiplayer_type_join_legacy_item" y="200" />
+  <child widget="main_menu/online_campaign/multiplayer_type_join_broker_item" y="246" />
+  <child widget="main_menu/online_campaign/multiplayer_type_join_announced_item" y="292" />
+  <child widget="main_menu/online_campaign/mp_join_classic_ce" y="338" />
+  <child widget="main_menu/online_campaign/mp_join_classic_pc" y="384" />
  </widget>
- <widget name="main_menu/online_campaign/multiplayer_type_join_current_item" type="text" controller="1" left="50" width="540" height="38" bitmap="bitmaps/list_item_bkd" text="CURRENT NATIVE ROOMS (V21)" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="6">
+ <widget name="main_menu/online_campaign/multiplayer_type_join_v24_item" type="text" controller="1" left="50" width="540" height="38" bitmap="bitmaps/list_item_bkd" text="LATEST NATIVE ROOMS (V24)" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="6">
+  <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
+ <widget name="main_menu/online_campaign/multiplayer_type_join_current_item" type="text" controller="1" left="50" width="540" height="38" bitmap="bitmaps/list_item_bkd" text="NATIVE V21 ROOMS" font="ui\large_ui" color="#FF2896FF" text_x="15" text_y="6">
   <on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/join_game/join_game_screen" />
   <on event="left_mouse" run="mouse emit accept event" />
  </widget>

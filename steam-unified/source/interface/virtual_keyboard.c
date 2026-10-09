@@ -347,56 +347,24 @@ static rectangle2d keyboard_rect[NUMBER_OF_VIRTUAL_KEYS] =
 
 static struct virtual_keyboard_globals virtual_keyboard_globals= {0};
 
-/* ---------- public code */
-
-boolean virtual_keyboard_initialize(
-	void)
+static boolean virtual_keyboard_definition_is_usable(
+	struct virtual_keyboard_definition const *keyboard)
 {
-	long keyboard_index;
-
-	virtual_keyboard_globals.active = FALSE;
-	virtual_keyboard_globals.shift_active = FALSE;
-	virtual_keyboard_globals.caps_active = FALSE;
-	virtual_keyboard_globals.symbols_active = FALSE;
-
-	keyboard_index = tag_loaded(VIRTUAL_KEYBOARD_TAG, "ui\\english");
-	if (keyboard_index != NONE)
-	{
-		virtual_keyboard_globals.keyboard = virtual_keyboard_definition_get(keyboard_index);
-		match_assert(
-			"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
-			364,
-			virtual_keyboard_globals.keyboard);
-
-		virtual_keyboard_globals.row = 0;
-		virtual_keyboard_globals.column = 0;
-		virtual_keyboard_globals.buffer_size = 0;
-		virtual_keyboard_globals.last_event = NONE;
-		virtual_keyboard_globals.last_key = NONE;
-		virtual_keyboard_globals.number_of_event_repeats = 0;
-		virtual_keyboard_globals.text_buffer = NULL;
-		virtual_keyboard_globals.cursor = NULL;
-		virtual_keyboard_globals.time_of_last_event = 0;
-	}
-	else
-	{
-		error(2, "failed to load virtual keyboard for '%s' language", "<unknown>");
-	}
-
-	virtual_keyboard_globals.caret_bitmap_index =
-		tag_loaded(BITMAP_GROUP_TAG, "ui\\shell\\bitmaps\\white");
-	if (virtual_keyboard_globals.caret_bitmap_index == NONE)
-	{
-		error(
-			2,
-			"failed to load virtual keyboard caret bitmap '%s'",
-			"ui\\shell\\bitmaps\\white");
-	}
-
-	return virtual_keyboard_globals.keyboard != NULL;
+	return keyboard &&
+		keyboard->keys.count >= NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS &&
+		keyboard->keys.address;
 }
 
-void virtual_keyboard_dispose(
+static boolean virtual_keyboard_selection_is_usable(
+	void)
+{
+	return virtual_keyboard_globals.row >= 0 &&
+		virtual_keyboard_globals.row < VIRTUAL_KEYBOARD_ROW_COUNT &&
+		virtual_keyboard_globals.column >= 0 &&
+		virtual_keyboard_globals.column < VIRTUAL_KEYBOARD_COLUMN_COUNT;
+}
+
+static void virtual_keyboard_forget_tag_data(
 	void)
 {
 	virtual_keyboard_globals.active = FALSE;
@@ -410,9 +378,69 @@ void virtual_keyboard_dispose(
 	virtual_keyboard_globals.last_event = NONE;
 	virtual_keyboard_globals.last_key = NONE;
 	virtual_keyboard_globals.number_of_event_repeats = 0;
+	virtual_keyboard_globals.caption_index = 0;
+	virtual_keyboard_globals.last_exit_saved_text = FALSE;
+	virtual_keyboard_globals.first_key_replaces_buffer = FALSE;
 	virtual_keyboard_globals.text_buffer = NULL;
 	virtual_keyboard_globals.cursor = NULL;
 	virtual_keyboard_globals.time_of_last_event = 0;
+	virtual_keyboard_globals.caret_bitmap_index = NONE;
+	virtual_keyboard_globals.saved_text[0] = L'\0';
+}
+
+/* ---------- public code */
+
+boolean virtual_keyboard_initialize(
+	void)
+{
+	long keyboard_index;
+
+	/* A tag lookup can fail while caches are changing. Never let a failed
+	   rebind report success using the previous map's definition pointer. */
+	virtual_keyboard_forget_tag_data();
+	virtual_keyboard_globals.shift_active = FALSE;
+	virtual_keyboard_globals.caps_active = FALSE;
+	virtual_keyboard_globals.symbols_active = FALSE;
+
+	keyboard_index = tag_loaded(VIRTUAL_KEYBOARD_TAG, "ui\\english");
+	if (keyboard_index != NONE)
+	{
+		struct virtual_keyboard_definition *keyboard =
+			virtual_keyboard_definition_get(keyboard_index);
+
+		if (virtual_keyboard_definition_is_usable(keyboard))
+			virtual_keyboard_globals.keyboard = keyboard;
+	}
+
+	if (!virtual_keyboard_globals.keyboard)
+	{
+		error(
+			_error_silent,
+			"failed to load a usable virtual keyboard definition for '%s' language",
+			"<unknown>");
+		return FALSE;
+	}
+
+	virtual_keyboard_globals.caret_bitmap_index =
+		tag_loaded(BITMAP_GROUP_TAG, "ui\\shell\\bitmaps\\white");
+	if (virtual_keyboard_globals.caret_bitmap_index == NONE)
+	{
+		error(
+			2,
+			"failed to load virtual keyboard caret bitmap '%s'",
+			"ui\\shell\\bitmaps\\white");
+	}
+
+	return TRUE;
+}
+
+void virtual_keyboard_dispose(
+	void)
+{
+	virtual_keyboard_forget_tag_data();
+	virtual_keyboard_globals.shift_active = FALSE;
+	virtual_keyboard_globals.caps_active = FALSE;
+	virtual_keyboard_globals.symbols_active = FALSE;
 
 	event_manager_flush();
 
@@ -578,14 +606,13 @@ static wchar_t virtual_keyboard_get_character(
 	struct virtual_keyboard_key *key;
 	wchar_t character;
 
-	match_assert(
-		"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
-		987,
-		virtual_keyboard_globals.keyboard != NULL);
-	match_assert(
-		"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
-		988,
-		keycode < NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS);
+	if (keycode >= NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS ||
+		!virtual_keyboard_definition_is_usable(virtual_keyboard_globals.keyboard))
+	{
+		error(_error_silent, "virtual keyboard tag data became unavailable; closing keyboard");
+		virtual_keyboard_forget_tag_data();
+		return 0x7F;
+	}
 
 	key = virtual_keyboard_key_get(virtual_keyboard_globals.keyboard, keycode);
 	if (virtual_keyboard_globals.shift_active)
@@ -621,6 +648,13 @@ static wchar_t virtual_keyboard_get_character(
 static wchar_t virtual_keyboard_get_current_character(
 	void)
 {
+	if (!virtual_keyboard_selection_is_usable())
+	{
+		error(_error_silent, "virtual keyboard selection is outside its layout; closing keyboard");
+		virtual_keyboard_forget_tag_data();
+		return 0x7F;
+	}
+
 	return virtual_keyboard_get_character(virtual_keyboard_layout_table[
 		virtual_keyboard_globals.row][virtual_keyboard_globals.column]);
 }
@@ -949,7 +983,18 @@ void virtual_keyboard_render(
 	void)
 {
 	if (virtual_keyboard_globals.active)
-		virtual_keyboard_render_internal();
+	{
+		if (!virtual_keyboard_definition_is_usable(virtual_keyboard_globals.keyboard) ||
+			!virtual_keyboard_selection_is_usable())
+		{
+			error(_error_silent, "virtual keyboard tag data became unavailable; closing keyboard");
+			virtual_keyboard_forget_tag_data();
+		}
+		else
+		{
+			virtual_keyboard_render_internal();
+		}
+	}
 
 	return;
 }
@@ -963,6 +1008,13 @@ void virtual_keyboard_process(
 		extern void platform_text_typing(int typing);
 
 		platform_text_typing(virtual_keyboard_globals.active);
+	}
+	if (virtual_keyboard_globals.active &&
+		(!virtual_keyboard_definition_is_usable(virtual_keyboard_globals.keyboard) ||
+			!virtual_keyboard_selection_is_usable()))
+	{
+		error(_error_silent, "virtual keyboard tag data became unavailable; closing keyboard");
+		virtual_keyboard_forget_tag_data();
 	}
 	if (virtual_keyboard_globals.active)
 		virtual_keyboard_process_internal();

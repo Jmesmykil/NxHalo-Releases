@@ -664,7 +664,9 @@ static void update_browsing(void)
 		int good;
 
 		memmove(lobby.queue, lobby.queue + 1, sizeof(*lobby.queue) * (size_t)(--lobby.queue_count));
-		if (!listing_read(queued.payload, queued.size, &listing) || !network_profile_known_version((unsigned int)listing.version) ||
+		/* Discovery includes newer signed listing versions even when their game
+           wire profile is not implemented. Joining remains profile-gated. */
+        if (!listing_read(queued.payload, queued.size, &listing) ||
 			!signing_key_hash(listing.key, key_hash) || memcmp(key_hash, queued.key_hash, P2P_KEY_HASH_SIZE))
 		{
 			continue;
@@ -761,11 +763,18 @@ void p2p_set_game_listing(const char *name, const char *map, const char *gametyp
 	char new_name[P2P_LISTING_NAME_SIZE + 1];
 	char new_map[P2P_LISTING_MAP_SIZE + 1];
 	char new_gametype[P2P_LISTING_GAMETYPE_SIZE + 1];
+	const char *map_name = map ? map : lobby.map;
 	int flags = (open ? _listing_open : 0) | (in_progress ? _listing_in_progress : 0) |
 		(has_teams ? _listing_has_teams : 0);
 
 	sanitize(new_name, P2P_LISTING_NAME_SIZE, name ? name : lobby.name, P2P_LISTING_NAME_SIZE);
-	sanitize(new_map, P2P_LISTING_MAP_SIZE, map ? map : lobby.map, P2P_LISTING_MAP_SIZE);
+	/* The official v24 listing reader still caps this signed preview at 32
+	 * bytes. Preserve legacy truncation exactly; for v24, never truncate a
+	 * qualified map into a different, apparently valid map name. The full
+	 * identity arrives in the authoritative game settings before preflight. */
+	if (network_profile_host_version() == 24 && strlen(map_name) > P2P_LISTING_MAP_SIZE)
+		map_name = "Unknown";
+	sanitize(new_map, P2P_LISTING_MAP_SIZE, map_name, P2P_LISTING_MAP_SIZE);
 	sanitize(new_gametype, P2P_LISTING_GAMETYPE_SIZE, gametype ? gametype : lobby.gametype,
 		P2P_LISTING_GAMETYPE_SIZE);
 	/* (only the game's server writes these: unchanged, it need not wait for

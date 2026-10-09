@@ -286,7 +286,7 @@ static const struct config_setting config_settings[] =
 		"instead of the local network's broadcast address (for VPNs); empty for\n"
 		"the local network." },
 	{ "network.compatibility_version", _config_integer, "21", "HALO_NET_COMPATIBILITY_VERSION", _environment_value, _platform_all,
-		"Native network profile to advertise while hosting: 11, 20 or 21. Version 11 is the legacy native wire; 20 keeps additive versions 12-20; 21 enables current OpenCE behavior." },
+		"Native network profile to advertise while hosting: 11, 20, 21 or 24. Version 11 is the legacy native wire; 20 keeps additive versions 12-20; 21 is the current compatible default; 24 is a separate exact-match OpenCE profile." },
 	{ "network.online", _config_boolean, "true", "HALO_NET_ONLINE", _environment_value, _platform_all,
 		"Internet play: hosting makes an invite link (logged, and put on the\n"
 		"clipboard) that lets whoever has it join over the internet; opening a\n"

@@ -6045,6 +6045,31 @@ void ui_widget_port_multiplayer_maps_refresh(void)
 
 /* the gametypes (the built-in ones and those saved): their count, and the
 one used last (else 0) */
+#ifdef HALO_GAME_BROWSER
+/* This is only a local picker preference, not a filesystem directory or peer
+   identity. Ordinary saved gametypes keep the legacy directory record. */
+static short port_native_template_record_index(char const *record)
+{
+    static char const prefix[] = "native-template:";
+    unsigned int index = 0;
+    char const *digit;
+    if (!record || csstrncmp(record, prefix, sizeof(prefix) - 1))
+        return NONE;
+    digit = record + sizeof(prefix) - 1;
+    if (!*digit)
+        return NONE;
+    for (; *digit; digit++)
+    {
+        if (*digit < '0' || *digit > '9')
+            return NONE;
+        index = index * 10 + (unsigned int)(*digit - '0');
+        if (index >= MATCH_RULES_NATIVE_TEMPLATE_COUNT)
+            return NONE;
+    }
+    return (short)index;
+}
+#endif
+
 short ui_widget_port_gametypes(
 	long *indices,
 	short maximum,
@@ -6067,7 +6092,16 @@ short ui_widget_port_gametypes(
 	*last_used = 0;
 	if (saved_game_file_retrieve_last_used_multiplayer_variant_directory(directory_path))
 	{
-		long profile_index = saved_game_file_find_profile_index_for_directory_path(directory_path, 1);
+        long profile_index;
+#ifdef HALO_GAME_BROWSER
+        if (!csstrncmp(directory_path, "native-template:", 16))
+        {
+            short remembered = port_native_template_record_index(directory_path);
+            profile_index = remembered != NONE ? match_rules_native_template_profile_index(remembered) : NONE;
+        }
+        else
+#endif
+            profile_index = saved_game_file_find_profile_index_for_directory_path(directory_path, 1);
 
 		for (index = 0; profile_index != NONE && index < (short)count; index++)
 		{
@@ -6154,9 +6188,17 @@ boolean ui_widget_port_gametype_choose(
 	 * profile must not overwrite that choice; explicit Standard/base-type
 	 * actions clear it in the gametype editor. */
 #ifdef HALO_GAME_BROWSER
-	if (match_rules_native_template_index_from_profile_index(profile_index) == NONE &&
-		saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
-		saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
+    {
+        short native_index = match_rules_native_template_index_from_profile_index(profile_index);
+        if (native_index != NONE)
+        {
+            csmemset(directory_path, 0, sizeof(directory_path));
+            csprintf(directory_path, "native-template:%d", native_index);
+            saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
+        }
+        else if (saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
+            saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
+    }
 #else
 	if (saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
 		saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);

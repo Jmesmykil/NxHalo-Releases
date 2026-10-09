@@ -1,0 +1,75 @@
+{
+  "review": "scoped-final-2.9.9-urgent-batch",
+  "status": "accepted_scoped",
+  "reviewed_at": "2026-10-08",
+  "runtime_sha256": "13661136b9dc51b454d6d665df0c4306415bcd3c01f2c862180166591fc4229b",
+  "evidence": {
+    "native_gun_game_restart": {
+      "path": "LAB/finalization-20261009/gungame-edges/natural-next-13661136b9dc/RESULT.json",
+      "peer_sha256": "e3cdc7999eb273329daca96b90201b8263f20b0963902f1d036170670f474bec",
+      "error": null,
+      "process_exit_codes": [0, 0, 0, 0],
+      "observed": [
+        "seven credited enemy kills advanced all seven weapon stages and produced winner score 7",
+        "natural postgame input returned to the connected lobby",
+        "starting the next match reset both players to pistol and ladder rank 0"
+      ],
+      "scope_note": "Private native host plus unchanged peer; the receipt separately labels initial BSP positioning as synthetic. No scripted end event, rank write, or preset mask was used in the natural case."
+    },
+    "keyboard_lifetime": {
+      "unit_result": "LAB/finalization-20261009/keyboard-unit/RESULT.json",
+      "unit_source_sha256": "2ad84384e48ba472cb5623179529aff0ed27df528e6fba9c5189cf1f5e7bff56",
+      "unit_compile_exit": 0,
+      "unit_execution_exit": 0,
+      "abi": "Clang i686 Linux release ABI (-m32, -fshort-wchar, -malign-double)",
+      "visible_post_map_input": "LAB/finalization-20261009/keyboard-mapmenu-pair-build12-visible/host/name-keyboard-typed-hi.bmp",
+      "visible_test_runtime_sha256": "10d4799812a67704dfcfb095f348c68053623bb97a3031fdff4cd8b35846f942",
+      "keyboard_source_sha256_build12_and_13": "7d12e2fb88a5d826ce6a9cc0dab40f7d0c4753218c05c832b227230d1f52f9ee",
+      "observed": "After a real private map load and return to the menu, the visible name keyboard accepted XTest input and displayed 'hi'; all owned processes exited 0.",
+      "scope_note": "No profile save or raw keyboard pointer/block-count measurement is claimed."
+    },
+    "official_v24_join": {
+      "path": "LAB/runtime-proof/stock-client-capabilities-20261008/root-v24-stock-13661136b9dc/build10-host-official-client/RESULT.json",
+      "summary": "LAB/runtime-proof/stock-client-capabilities-20261008/root-v24-stock-13661136b9dc/SUMMARY.json",
+      "runtime_sha256": "13661136b9dc51b454d6d665df0c4306415bcd3c01f2c862180166591fc4229b",
+      "official_client_sha256": "c0448427c66465bf0956a7773a1a68053f410ac8052866c48f611010e8c2ff83",
+      "staged_ce_map_sha256": "a676c21c4ad75cdf5dc88ed4f76335ec018948efa84d92107ea5370e86635c9d",
+      "actual_stock_map_sha256": "c65ac17d830552cdebfc173c1e8aa17f1f009149138c2c8e72afda1f79f88a60",
+      "loaded_both": true,
+      "v24_join_marker": true,
+      "sample_pairs": 6,
+      "each_sample": "host and client had positive ticks, 2 players, Slayer engine index 2, vehicle set 2, and zero spawned vehicles",
+      "process_exit_codes": [0, 0, 0, 0],
+      "boundary": "Private loopback, official client, stock Beavercreek map (actual host and client map hash c65ac17d830552cdebfc173c1e8aa17f1f009149138c2c8e72afda1f79f88a60). The separate staged CE map hash is not the tested map. This does not establish CE609 map compatibility, V24 authored-vehicle behavior, or real-player capacity."
+    },
+    "steam_deck_gpu": {
+      "path": "outputs/release-finalization/DECK-GPU.json",
+      "runtime_sha256": "13661136b9dc51b454d6d665df0c4306415bcd3c01f2c862180166591fc4229b",
+      "all_recorded_checks_passed": true,
+      "check_count": 11,
+      "duration_seconds": 55,
+      "peer_path": "outputs/release-finalization/DECK-PEER.json",
+      "scope_note": "Receipt covers the recorded Deck GPU/gameplay checks and two stages. It is not evidence of a seven-stage Deck win or Switch runtime acceptance."
+    }
+  },
+  "release_package_review": {
+    "runtime_tar_sha256": "1f4b506c6b40e208ba68fe9530ff96da067a12b336ad04639b7cba2e9131a710",
+    "source_zip_sha256": "fb496ac5f7a55c1937a05f0a8bc4b13b5a84bafc0841cce58da885562c5149de",
+    "source_entries": 2292,
+    "source_freeze_matches": 2293,
+    "excluded_source_artifact": "source/bitmaps/libtiff/mkg3states",
+    "scope_note": "Local staged runtime and source ZIP bytes match release-manifest.json. Public upload/download readback is not part of this review."
+  },
+  "remaining_gates": [
+    "Complete DECK-INSTALL.json and ACCEPTANCE.json staging before running the publisher.",
+    "After draft publication, download each release asset and compare bytes; verify all source ZIP entries against the committed source mirror."
+  ],
+  "not_reviewed_or_claimed": [
+    "completion of the overall backlog",
+    "real 128-player capacity",
+    "CE609 maps or authored V24 vehicles",
+    "physical Switch boot/gameplay",
+    "human microphone acceptance",
+    "complete race routes, specialized bots, Prop Hunt, persistent friends, or full campaign lifecycle"
+  ]
+}

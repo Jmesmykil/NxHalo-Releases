@@ -9,7 +9,9 @@ Runtime selection of the native OpenCE-compatible network wire profile.
 
 /* Version 11 introduced the last breaking change before OpenCE 21. Versions
  * 12 through 20 are additive: older machines drop the newer message types.
- * Version 21 has profile-specific damage and co-op BSP semantics.
+ * Version 21 has profile-specific damage and co-op BSP semantics. Version 24
+ * is an exact-match profile with its own Custom Edition map, tag-block, and
+ * PC vehicle-set behavior; it is not an alias for 21.
  */
 #define HALO_NETWORK_PROFILE_VERSIONS(X) \
  X(11, 11, 11, 0, 0) \
@@ -22,7 +24,8 @@ Runtime selection of the native OpenCE-compatible network wire profile.
  X(18, 11, 18, 0, 1) \
  X(19, 11, 19, 0, 1) \
  X(20, 11, 20, 0, 1) \
- X(21, 21, 21, 1, 1)
+ X(21, 21, 21, 1, 1) \
+ X(24, 24, 24, 1, 1)
 
 int network_profile_set_host_override(unsigned int version);
 void network_profile_clear_host_override(void);

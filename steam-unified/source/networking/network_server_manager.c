@@ -466,6 +466,7 @@ symbols in this file:
 #include "networking/network_game_ui.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
+#include "halo_network_profile.h"
 #include "networking/network_server_manager_internal.h"
 #include "networking/network_server_message_handler.h"
 #include "saved games/player_profile.h"
@@ -1468,8 +1469,13 @@ static void network_game_server_list(
 			snprintf(gametype + length, sizeof(gametype) - length, " %.0f%%HP",
 				game->variant.universal_variant.health * 100.0f);
 	}
-	/* (the scenario's name, not its path: the listing has 32 characters) */
-	p2p_set_game_listing(name, tag_name_strip_path(game->map.name), gametype, game->variant.game_engine_index, open,
+	/* Legacy listings keep their historical basename. v24 listings carry a
+	 * family-qualified preview when it fits the official 32-byte field; the
+	 * lobby encoder substitutes Unknown for a longer name instead of
+	 * publishing a false truncated identity. The direct game settings remain
+	 * authoritative for map preflight. */
+	p2p_set_game_listing(name, network_profile_host_version() == 24 ? game->map.name :
+		tag_name_strip_path(game->map.name), gametype, game->variant.game_engine_index, open,
 		in_progress, game->variant.universal_variant.teams);
 }
 
@@ -3324,6 +3330,76 @@ void network_game_server_pause_countdown(
 	return;
 }
 
+static boolean network_game_server_map_leaf_is_valid(char const *leaf, long length)
+{
+	char const *character;
+
+	if (!leaf || length <= 0 || length > 63 || leaf[length - 1] == '.' || leaf[length - 1] == ' ' ||
+		strstr(leaf, ".."))
+		return FALSE;
+	for (character = leaf; character < leaf + length; character++)
+	{
+		if (!((*character >= 'a' && *character <= 'z') || (*character >= 'A' && *character <= 'Z') ||
+			(*character >= '0' && *character <= '9') || *character == '_' || *character == '-' ||
+			*character == '.' || *character == ' '))
+			return FALSE;
+	}
+	return TRUE;
+}
+
+/* Convert the local CE suffix to OpenCE 24's flat map identifier before
+ * putting it in the transmitted network_game record. Other profiles keep
+ * their original map names. */
+static boolean network_game_server_map_name_for_profile(
+	char *destination,
+	long destination_size,
+	char const *map_name)
+{
+	char const *leaf;
+	long length;
+
+	if (!destination || destination_size <= 0 || !map_name || !map_name[0])
+		return FALSE;
+	if (network_profile_host_version() != 24)
+	{
+		length = (long)strlen(map_name);
+		if (length >= destination_size)
+			return FALSE;
+		csstrncpy(destination, map_name, destination_size);
+		return TRUE;
+	}
+	if (!_strnicmp(map_name, "custom_maps\\", 12))
+	{
+		leaf = map_name + 12;
+		if (!*leaf || strchr(leaf, 92) || strchr(leaf, '/') || strstr(leaf, ".."))
+			return FALSE;
+		length = (long)strlen(leaf);
+		if (!network_game_server_map_leaf_is_valid(leaf, length) || length + 12 >= destination_size)
+			return FALSE;
+		csstrncpy(destination, map_name, destination_size);
+		return TRUE;
+	}
+	leaf = strrchr(map_name, 92);
+	if (!leaf || (strrchr(map_name, '/') && strrchr(map_name, '/') > leaf))
+		leaf = strrchr(map_name, '/');
+	leaf = leaf ? leaf + 1 : map_name;
+	length = (long)strlen(leaf);
+	if (length > 3 && !_stricmp(leaf + length - 3, "@ce"))
+		length -= 3;
+	else
+	{
+		length = (long)strlen(map_name);
+		if (length >= destination_size)
+			return FALSE;
+		csstrncpy(destination, map_name, destination_size);
+		return TRUE;
+	}
+	if (!network_game_server_map_leaf_is_valid(leaf, length) || length + 12 >= destination_size)
+		return FALSE;
+	snprintf(destination, (size_t)destination_size, "custom_maps\\%.*s", (int)length, leaf);
+	return TRUE;
+}
+
 void network_game_server_change_map_name(
 	struct network_game_server *server,
 	char const *map_name)
@@ -3354,11 +3430,16 @@ void network_game_server_change_map_name(
 		}
 	}
 
-	csstrncpy(
-		server->game.map.name,
-		map_name,
-		NETWORK_GAME_MAP_NAME_LENGTH - 1);
-	server->game.map.name[NETWORK_GAME_MAP_NAME_LENGTH - 1] = 0;
+	{
+		char wire_map_name[NETWORK_GAME_MAP_NAME_LENGTH];
+		if (!network_game_server_map_name_for_profile(wire_map_name, sizeof(wire_map_name), map_name))
+		{
+			network_event("cannot encode map name '%s' for profile %d", map_name, network_profile_host_version());
+			return;
+		}
+		csstrncpy(server->game.map.name, wire_map_name, NETWORK_GAME_MAP_NAME_LENGTH - 1);
+		server->game.map.name[NETWORK_GAME_MAP_NAME_LENGTH - 1] = 0;
+	}
 
 	if (!network_game_server_send_game_data_pregame(server))
 	{
@@ -4076,6 +4157,64 @@ void network_game_server_port_cooperative_won(
 	network_game_server_reset_to_pregame(server);
 }
 
+/* The native host UI edits its actual room, not the legacy global_stage.
+   The latter has no rotation and can still contain the startup Carousel stage.
+   Carry only the completed multiplayer room's rules, never its player/object
+   state; co-op continues to use its explicit next-mission transaction below. */
+struct network_multiplayer_round_settings
+{
+    boolean captured;
+    wchar_t name[NETWORK_GAME_NAME_LENGTH];
+    struct network_game_map map;
+    struct game_variant variant;
+    struct game_variant_options options;
+    char minimum_players;
+    byte maximum_players;
+    byte maximum_teams;
+    short difficulty;
+};
+
+static void network_game_server_capture_multiplayer_round(
+    struct network_game_server const *server,
+    struct network_multiplayer_round_settings *settings)
+{
+    csmemset(settings, 0, sizeof(*settings));
+    if (server->state != _network_game_server_state_postgame ||
+        server->game.variant.game_engine_index <= game_engine_none ||
+        server->game.variant.game_engine_index > game_engine_race)
+        return;
+    settings->captured = TRUE;
+    csmemcpy(settings->name, server->game.name, sizeof(settings->name));
+    settings->map = server->game.map;
+    settings->variant = server->game.variant;
+    settings->options = server->game.variant_options;
+    settings->minimum_players = server->game.minimum_players;
+    settings->maximum_players = server->game.maximum_players;
+    settings->maximum_teams = server->game.maximum_teams;
+    settings->difficulty = server->game.difficulty;
+}
+
+static void network_game_server_restore_multiplayer_round(
+    struct network_game_server *server,
+    struct network_multiplayer_round_settings const *settings)
+{
+    if (!settings->captured)
+        return;
+    csmemcpy(server->game.name, settings->name, sizeof(settings->name));
+    server->game.map = settings->map;
+    server->game.variant = settings->variant;
+    server->game.variant_options = settings->options;
+    server->game.minimum_players = settings->minimum_players;
+    server->game.maximum_players = settings->maximum_players;
+    server->game.maximum_teams = settings->maximum_teams;
+    server->game.difficulty = settings->difficulty;
+    /* The next lobby editor reads these in-memory copies. No disk preferences
+       or peer protocol fields are changed by this reset. */
+    player_ui_set_game_variant(&server->game.variant);
+    player_ui_set_game_variant_options(&server->game.variant_options);
+    main_set_multiplayer_map_name(server->game.map.name);
+}
+
 /* port: reapply the co-op settings after a won round, since the playlist
 the next round is set up from (network_game_server_setup_game_from_playlist)
 has a multiplayer gametype and map */
@@ -4085,7 +4224,11 @@ static void network_game_server_cooperative_round(
 	struct game_variant variant;
 	short friendly_fire = network_game_server_cooperative_next_friendly_fire;
 
-	if (!network_game_server_cooperative_next_map[0])
+	char wire_map_name[sizeof(network_game_server_cooperative_next_map)];
+
+	if (!network_game_server_cooperative_next_map[0] ||
+		!network_game_server_map_name_for_profile(wire_map_name, sizeof(wire_map_name),
+			network_game_server_cooperative_next_map))
 		return;
 	csmemset(&variant, 0, sizeof(variant));
 	ustrncpy(variant.human_readable_game_description, L"Co-op",
@@ -4096,7 +4239,7 @@ static void network_game_server_cooperative_round(
 	server->game.variant_options.friendly_fire = friendly_fire;
 	if (network_game_server_cooperative_next_maximum_players > 0)
 		server->game.maximum_players = MIN(network_game_server_cooperative_next_maximum_players, MAXIMUM_NETWORK_PLAYER_COUNT);
-	csstrncpy(server->game.map.name, network_game_server_cooperative_next_map, sizeof(server->game.map.name) - 1);
+	csstrncpy(server->game.map.name, wire_map_name, sizeof(server->game.map.name) - 1);
 	server->game.map.name[sizeof(server->game.map.name) - 1] = 0;
 	main_set_multiplayer_map_name(server->game.map.name);
 	server->game.maximum_teams = 1;
@@ -4169,7 +4312,18 @@ static boolean network_game_server_setup_game_from_playlist(
 	network_event("setting up a net game");
 	if (game_engine_get_current_stage(&server->game.variant, server->game.map.name))
 	{
+		char wire_map_name[NETWORK_GAME_MAP_NAME_LENGTH];
 		wchar_t machine_name[MAXIMUM_MACHINE_NAME_LENGTH] = L"<unknown>";
+
+		if (!network_game_server_map_name_for_profile(wire_map_name, sizeof(wire_map_name),
+			server->game.map.name))
+		{
+			network_event("cannot encode playlist map '%s' for profile %d", server->game.map.name,
+				network_profile_host_version());
+			return FALSE;
+		}
+		csstrncpy(server->game.map.name, wire_map_name, sizeof(server->game.map.name) - 1);
+		server->game.map.name[sizeof(server->game.map.name) - 1] = 0;
 
 		network_game_generate_local_machine_name(machine_name);
 		ustrncpy(server->game.name, machine_name, NETWORK_GAME_NAME_LENGTH - 1);
@@ -4825,8 +4979,10 @@ boolean network_game_server_reset_to_pregame(
 	struct message_server_switch_to_pregame message_packet = { 0 };
 	struct network_message *message;
 	int i;
+	struct network_multiplayer_round_settings multiplayer_round;
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x324, server);
+	network_game_server_capture_multiplayer_round(server, &multiplayer_round);
 
 	csmemset(&server->countdown_state, 0, sizeof(server->countdown_state));
 	server->next_update_number = 0;
@@ -4912,6 +5068,7 @@ boolean network_game_server_reset_to_pregame(
 			network_game_reset_for_next_round(&server->game, FALSE);
 			if (network_game_server_setup_game_from_playlist(server))
 			{
+				network_game_server_restore_multiplayer_round(server, &multiplayer_round);
 				network_game_server_cooperative_round(server);
 				/* the settings record goes out in pieces */
 				/* (the pregame whatever a machine missed: the machines are in it,

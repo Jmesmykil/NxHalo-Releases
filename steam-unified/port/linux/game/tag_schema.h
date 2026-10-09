@@ -17,7 +17,8 @@ What happens to a field that is wrong:
   a runtime value written to one would land in another): the map is refused,
   as nothing after it can be trusted;
 - a block with more elements than the game has room for: its count is cut to
-  that maximum;
+  that maximum, except a CE-marked block on exact profile 24 and a v609 CE
+  cache, whose full block is retained after the same bounds and overlap checks;
 - a tag reference or tag index that is not a tag of the right group: NONE;
 - a block index past its block: NONE where the game takes NONE, otherwise 0
   (NONE if the block is empty);
@@ -77,6 +78,8 @@ enum tag_schema_field_flags
 	/* (set by the macros) an index or enum of an unsigned type, whose NONE
 	is all ones */
 	_tag_schema_unsigned_bit,
+	/* a CE block whose tool cap is lifted only on exact native profile 24 */
+	_tag_schema_ce_preserve_bit,
 	NUMBER_OF_TAG_SCHEMA_FIELD_FLAGS
 };
 
@@ -120,6 +123,10 @@ TAG_SCHEMA_END */
 
 #define TAG_SCHEMA_BLOCK(type, field, definition, maximum) \
 	{ _tag_schema_block, sizeof(struct tag_block), 1, 0, \
+		TAG_SCHEMA_OFFSET(type, field, struct tag_block), (maximum), 0, 0, &(definition), NULL, #field }
+
+#define TAG_SCHEMA_CE_BLOCK(type, field, definition, maximum) \
+	{ _tag_schema_block, sizeof(struct tag_block), 1, FLAG(_tag_schema_ce_preserve_bit), \
 		TAG_SCHEMA_OFFSET(type, field, struct tag_block), (maximum), 0, 0, &(definition), NULL, #field }
 
 #define TAG_SCHEMA_DATA(type, field, maximum) \

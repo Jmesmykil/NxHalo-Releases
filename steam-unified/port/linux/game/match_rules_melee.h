@@ -30,6 +30,50 @@ static boolean match_rules_infected_damage_allowed(boolean infected, boolean mel
     return !infected || melee;
 }
 
+/* An infected player without a loaded melee tag must be truly unarmed. */
+static boolean match_rules_infected_inventory_weapon_allowed(
+    boolean infected, long weapon_definition, long melee_definition)
+{
+    return !infected || (melee_definition != NONE && weapon_definition == melee_definition);
+}
+
+static boolean match_rules_mode_grenade_pickup_allowed(boolean zombies, boolean tower, boolean gun_game)
+{
+    return !zombies && !tower && !gun_game;
+}
+
+/* A new datum in a roster slot is a late join/reuse and starts infected. */
+static boolean match_rules_zombie_player_is_infected(
+    long *tracked_players, boolean *initial_roster, boolean *infected,
+    short capacity, short slot, long player_datum)
+{
+    if (!tracked_players || !initial_roster || !infected || slot < 0 ||
+        slot >= capacity || player_datum == NONE)
+        return FALSE;
+    if (tracked_players[slot] != player_datum)
+    {
+        tracked_players[slot] = player_datum;
+        initial_roster[slot] = FALSE;
+        infected[slot] = TRUE;
+    }
+    return infected[slot];
+}
+
+static void match_rules_zombie_state_reset(
+    boolean *initialized, boolean *ready, boolean *initial_roster,
+    boolean *infected, long *tracked_players, short capacity)
+{
+    short slot;
+    if (initialized) *initialized = FALSE;
+    if (ready) *ready = FALSE;
+    for (slot = 0; slot < capacity; slot++)
+    {
+        if (initial_roster) initial_roster[slot] = FALSE;
+        if (infected) infected[slot] = FALSE;
+        if (tracked_players) tracked_players[slot] = NONE;
+    }
+}
+
 /* Pure inventory policy shared by the runtime and focused regression.
    Tower vehicles retain their authored mounted weapons; player bipeds stay
    restricted to the selected mode's loadout. */

@@ -22,14 +22,55 @@
 #define CONTENT_TARGET_DIRECTORY "d:\\maps\\ce\\"
 static char content_status_text[192]="CE content: .map / ZIP + resource companions\r\nOpenSauce .yelo / DLL extensions need separate ports.";
 static char const *content_basename(char const *path) { char const *base=path,*p; for(p=path;*p;p++) if(*p=='/'||*p=='\\')base=p+1; return base; }
-static void content_file_selected(void *ctx,char const * const *files,int count) {
- char const *base;(void)ctx;(void)count;if(!files||!files[0])return;base=content_basename(files[0]);
- if(!SDL_strcasecmp(base,"bitmaps.map")||!SDL_strcasecmp(base,"sounds.map")||!SDL_strcasecmp(base,"loc.map")) community_map_download_import_resource(files[0],CONTENT_TARGET_DIRECTORY);
- else community_map_download_install_local(files[0],CONTENT_TARGET_DIRECTORY);
+/* SDL callbacks may run on another thread; copy their short-lived result and
+   apply it when the game's menu polls status. The final argument is a filter
+   index (often -1 for folders), never a path count. */
+struct content_dialog_result { int active, ready, failed; char path[1024], message[160]; };
+static pthread_mutex_t content_dialog_lock=PTHREAD_MUTEX_INITIALIZER;
+static struct content_dialog_result content_map_dialog,content_texture_dialog;
+static void content_dialog_selected(void *ctx,const char * const *paths,int filter) {
+ struct content_dialog_result *result=ctx;size_t n;(void)filter;
+ pthread_mutex_lock(&content_dialog_lock);
+ result->active=0;result->ready=1;result->failed=0;result->path[0]=0;
+ if(!paths){result->failed=1;snprintf(result->message,sizeof(result->message),"Could not open chooser: %.120s",SDL_GetError());}
+ else if(!paths[0]||!paths[0][0])snprintf(result->message,sizeof(result->message),"Import canceled");
+ else if((n=strlen(paths[0]))==0||n>=sizeof(result->path)){result->failed=1;snprintf(result->message,sizeof(result->message),"Selected path is empty or too long");}
+ else {memcpy(result->path,paths[0],n+1);result->message[0]=0;}
+ platform_log("content chooser: %s",result->path[0]?"selection received":result->message);
+ pthread_mutex_unlock(&content_dialog_lock);
+}
+static int content_dialog_take(struct content_dialog_result *result,struct content_dialog_result *copy) {
+ int ready;pthread_mutex_lock(&content_dialog_lock);ready=result->ready;
+ if(ready){*copy=*result;result->ready=0;result->path[0]=0;}
+ pthread_mutex_unlock(&content_dialog_lock);return ready;
+}
+static int content_dialog_begin(struct content_dialog_result *result) {
+ int started=0;pthread_mutex_lock(&content_dialog_lock);
+ if(!content_map_dialog.active&&!content_texture_dialog.active&&!result->ready){result->active=1;started=1;}
+ pthread_mutex_unlock(&content_dialog_lock);return started;
+}
+static void content_dialog_dispatch_failed(struct content_dialog_result *result) {
+ pthread_mutex_lock(&content_dialog_lock);result->active=0;result->ready=1;result->failed=1;result->path[0]=0;
+ snprintf(result->message,sizeof(result->message),"Could not queue chooser: %.120s",SDL_GetError());pthread_mutex_unlock(&content_dialog_lock);
+}
+static void content_show_file_dialog(void *unused) {
+ static const SDL_DialogFileFilter filters[]={{"Halo CE maps and ZIP archives","map;zip"},{"Resource maps","map"}};
+ (void)unused;platform_log("content chooser: opening map chooser (SDL main=%d)",SDL_IsMainThread());
+ SDL_ShowOpenFileDialog(content_dialog_selected,&content_map_dialog,SDL_GetKeyboardFocus(),filters,2,NULL,false);
 }
 void content_setup_import_local(void) {
- static const SDL_DialogFileFilter filters[]={{"Halo CE maps and ZIP archives","map;zip"},{"Resource maps","map"}};
- SDL_ShowOpenFileDialog(content_file_selected,NULL,NULL,filters,2,NULL,false);
+ if(!content_dialog_begin(&content_map_dialog))return;
+ snprintf(content_status_text,sizeof(content_status_text),"Choose a local map or ZIP archive");
+ if(SDL_IsMainThread())content_show_file_dialog(NULL);
+ else if(!SDL_RunOnMainThread(content_show_file_dialog,NULL,false))content_dialog_dispatch_failed(&content_map_dialog);
+}
+static void content_map_apply_dialog(void) {
+ struct content_dialog_result selected;const char *base;
+ if(!content_dialog_take(&content_map_dialog,&selected))return;
+ if(!selected.path[0]){snprintf(content_status_text,sizeof(content_status_text),"%s",selected.message);return;}
+ base=content_basename(selected.path);
+ if(!SDL_strcasecmp(base,"bitmaps.map")||!SDL_strcasecmp(base,"sounds.map")||!SDL_strcasecmp(base,"loc.map"))community_map_download_import_resource(selected.path,CONTENT_TARGET_DIRECTORY);
+ else community_map_download_install_local(selected.path,CONTENT_TARGET_DIRECTORY);
 }
 static int content_safe_map_name(char const *in,char *out,size_t size) {
  char const *start=in,*end;size_t n,i;if(!in)return 0;end=strstr(in,"map=");
@@ -215,7 +256,9 @@ static int content_pack_import_worker(void *unused) {
  ok=texture_pack_install(name,path);
  pthread_mutex_lock(&content_pack_lock);content_pack_import_ok=ok;content_pack_finished=1;content_pack_running=0;pthread_mutex_unlock(&content_pack_lock);return 0;
 }
+static void content_pack_apply_dialog(void);
 static void content_pack_apply_pending(void) {
+ content_pack_apply_dialog();
  SDL_Thread *finished=NULL;int apply=0,ok=0;char name[64];
  pthread_mutex_lock(&content_pack_lock);
  if(content_pack_thread&&content_pack_finished){finished=content_pack_thread;content_pack_thread=NULL;apply=1;ok=content_pack_import_ok;snprintf(name,sizeof(name),"%s",content_pack_import_name);content_pack_finished=0;}
@@ -223,8 +266,7 @@ static void content_pack_apply_pending(void) {
  if(finished)SDL_WaitThread(finished,NULL);
  if(apply){
   content_pack_removal_name[0]=0;
-  if(ok&&texture_pack_select(name)){texture_pack_set_enabled(1);snprintf(content_pack_message,sizeof(content_pack_message),"Imported, selected and enabled: %.80s",name);}
-  else if(ok)snprintf(content_pack_message,sizeof(content_pack_message),"Imported %.70s; choose it below to activate",name);
+  if(ok)snprintf(content_pack_message,sizeof(content_pack_message),"Imported %.70s; choose it below to activate",name);
   else snprintf(content_pack_message,sizeof(content_pack_message),"Import failed; use relative tag keys and PNG/TGA/DDS replacements");
   content_pack_next_refresh=0;
  }
@@ -322,19 +364,35 @@ const char *content_setup_texture_pack_status(void) {
  snprintf(message,sizeof(message),"%s",content_pack_message);pthread_mutex_unlock(&content_pack_lock);
  snprintf(line,sizeof(line),"%d packs | %d matches | page %d/%d | Selected: %.63s (%s)\r\n%s",content_pack_count,n,content_pack_page+1,n?(n-1)/CONTENT_TEXTURE_PACK_PAGE_SIZE+1:1,texture_pack_selected()[0]?content_basename(texture_pack_selected()):"none",texture_pack_enabled()?"ON":"OFF",message);return line;
 }
-static void content_pack_folder_selected(void *ctx,const char * const *paths,int count) {
- char path[1024],name[64];const char *base;size_t n;(void)ctx;if(!paths||count<1||!paths[0])return;
- base=content_basename(paths[0]);n=strlen(base);while(n&&base[n-1]=='/')n--;if(!n||n>=sizeof(name)){pthread_mutex_lock(&content_pack_lock);snprintf(content_pack_message,sizeof(content_pack_message),"Texture pack folder name is not usable");pthread_mutex_unlock(&content_pack_lock);return;}
- memcpy(name,base,n);name[n]=0;snprintf(path,sizeof(path),"%s",paths[0]);
+static void content_pack_apply_dialog(void) {
+ struct content_dialog_result selected;char name[64];const char *base;size_t n;
+ if(!content_dialog_take(&content_texture_dialog,&selected))return;
  pthread_mutex_lock(&content_pack_lock);
+ if(!selected.path[0]){snprintf(content_pack_message,sizeof(content_pack_message),"%.127s",selected.message);pthread_mutex_unlock(&content_pack_lock);return;}
+ n=strlen(selected.path);while(n>1&&(selected.path[n-1]=='/'||selected.path[n-1]=='\\'))selected.path[--n]=0;
+ base=content_basename(selected.path);n=strlen(base);
+ if(!n||n>=sizeof(name)){snprintf(content_pack_message,sizeof(content_pack_message),"Texture pack folder name is not usable");pthread_mutex_unlock(&content_pack_lock);return;}
+ memcpy(name,base,n+1);
  if(content_pack_running){snprintf(content_pack_message,sizeof(content_pack_message),"A texture pack import is already running");pthread_mutex_unlock(&content_pack_lock);return;}
- snprintf(content_pack_import_path,sizeof(content_pack_import_path),"%s",path);snprintf(content_pack_import_name,sizeof(content_pack_import_name),"%s",name);
+ snprintf(content_pack_import_path,sizeof(content_pack_import_path),"%s",selected.path);snprintf(content_pack_import_name,sizeof(content_pack_import_name),"%s",name);
  content_pack_running=1;content_pack_finished=0;content_pack_thread=SDL_CreateThread(content_pack_import_worker,"texture pack import",NULL);
  if(!content_pack_thread){content_pack_running=0;snprintf(content_pack_message,sizeof(content_pack_message),"Could not start texture pack import");}
  else snprintf(content_pack_message,sizeof(content_pack_message),"Importing texture pack in background");
  pthread_mutex_unlock(&content_pack_lock);
 }
-void content_setup_texture_pack_import(void) { SDL_ShowOpenFolderDialog(content_pack_folder_selected,NULL,NULL,NULL,false); }
+static void content_show_pack_dialog(void *unused) {
+ (void)unused;platform_log("content chooser: opening texture chooser (SDL main=%d)",SDL_IsMainThread());
+ SDL_ShowOpenFolderDialog(content_dialog_selected,&content_texture_dialog,SDL_GetKeyboardFocus(),NULL,false);
+}
+void content_setup_texture_pack_import(void) {
+ pthread_mutex_lock(&content_pack_lock);
+ if(content_pack_running){snprintf(content_pack_message,sizeof(content_pack_message),"A texture pack import is already running");pthread_mutex_unlock(&content_pack_lock);return;}
+ pthread_mutex_unlock(&content_pack_lock);
+ if(!content_dialog_begin(&content_texture_dialog))return;
+ pthread_mutex_lock(&content_pack_lock);snprintf(content_pack_message,sizeof(content_pack_message),"Choose a texture pack folder");pthread_mutex_unlock(&content_pack_lock);
+ if(SDL_IsMainThread())content_show_pack_dialog(NULL);
+ else if(!SDL_RunOnMainThread(content_show_pack_dialog,NULL,false))content_dialog_dispatch_failed(&content_texture_dialog);
+}
 
 int content_setup_deck_upscaling_available(void) {
  const char *role=getenv("HALO_DEVICE_ROLE");char vendor[128]="",product[128]="";FILE *f;
@@ -345,5 +403,5 @@ int content_setup_deck_upscaling_available(void) {
  return !strcasecmp(vendor,"Valve")&&(!strcasecmp(product,"Jupiter")||!strcasecmp(product,"Galileo"));
 }
 
-char const *content_setup_status(void){char msg[192];int state=community_map_download_status(msg,sizeof(msg));if(state!=COMMUNITY_MAP_DOWNLOAD_IDLE)snprintf(content_status_text,sizeof(content_status_text),"%s",msg);return content_status_text;}
+char const *content_setup_status(void){char msg[192];content_map_apply_dialog();int state=community_map_download_status(msg,sizeof(msg));if(state!=COMMUNITY_MAP_DOWNLOAD_IDLE)snprintf(content_status_text,sizeof(content_status_text),"%s",msg);return content_status_text;}
 void content_setup_clear_status(void){community_map_download_clear();content_status_text[0]=0;}
