@@ -48,7 +48,7 @@ APP_JSON	:=	$(CURDIR)/halo.json
 APP_TITLE	:=	HALO: Combat Evolved
 APP_AUTHOR	:=	NxHalo contributors
 ifeq ($(DEKO3D),1)
-APP_VERSION := 0.2.9.9-dk1
+APP_VERSION := 0.2.9.9-dk2
 else
 APP_VERSION := 0.2.9.9-u36
 endif

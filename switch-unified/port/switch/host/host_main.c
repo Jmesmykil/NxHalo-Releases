@@ -13,8 +13,8 @@ Based on the Android port's host_main.c, adapted for Switch/libnx:
 
 #include "host.h"
 #ifdef HALO_SWITCH_DEKO3D
-#define NXHALO_BUILD_LABEL "native-unified37-deko-build114-protocol21-default-v24-experimental"
-#define NXHALO_LOG_PATH "sdmc:/switch/halo/halo-unified37-deko.log"
+#define NXHALO_BUILD_LABEL "native-unified38-opence-fixes-protocol21-default-v24-experimental"
+#define NXHALO_LOG_PATH "sdmc:/switch/halo/halo-unified38-deko.log"
 #else
 #define NXHALO_BUILD_LABEL "native-unified36-deck2.9.9-protocol21-default-v24-experimental"
 #define NXHALO_LOG_PATH "sdmc:/switch/halo/halo-unified36.log"

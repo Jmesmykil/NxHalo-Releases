@@ -157,7 +157,10 @@ static boolean distributed_damage_authorized;
 /* whether this machine runs objects' shields (their stun, recharge and
 overcharge): not a client of the distributed netcode, which has the host's
 (damage_set_network_state) */
-#define objects_update_shields() (!network_game_distributed_client())
+boolean network_damage_static_target(long object_index);
+/* Static scenery receives damage events, not shield-state updates. */
+#define objects_update_shields(object_index) \
+	(!network_game_distributed_client() || network_damage_static_target(object_index))
 
 /* ---------- constants */
 
@@ -2016,10 +2019,10 @@ void object_damage_update(
 				FLAG(_object_die_act_of_god_no_statistics_bit));
 	}
 
-	if (objects_update_shields())
+	if (objects_update_shields(object_index))
 		SET_FLAG(object->object.damage_flags, _object_shield_charging_bit, FALSE);
 	damage_flags = object->object.damage_flags;
-	if (objects_update_shields() &&
+	if (objects_update_shields(object_index) &&
 		object->object.maximum_shield_vitality > 0.f &&
 		!TEST_FLAG(damage_flags, _object_dead_bit))
 	{

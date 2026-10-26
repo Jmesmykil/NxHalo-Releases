@@ -502,12 +502,18 @@ static boolean distributed_damage_to_data(
 	return TRUE;
 }
 
-/* whether the object is scenery or a device that damage can destroy */
+/* Map scenery/devices whose body or shield can break (OpenCE 5744d2d17475). */
 static boolean static_target(
 	long object_index)
 {
 	return object_try_and_get_and_verify_type(object_index, STATIC_TARGET_TYPES) &&
-		object_get_maximum_body_vitality(object_index, TRUE) > 0.0f;
+		(object_get_maximum_body_vitality(object_index, TRUE) > 0.0f ||
+			object_get_maximum_shield_vitality(object_index, TRUE) > 0.0f);
+}
+
+boolean network_damage_static_target(long object_index)
+{
+	return static_target(object_index);
 }
 
 /* ---------- object_cause_damage (damage.c) */
