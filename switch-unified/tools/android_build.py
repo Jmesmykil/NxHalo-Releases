@@ -29,7 +29,7 @@ from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_
                           compile_launcher, game_defines_and_includes, game_sources, miniupnpc_sources,
                           musl_math_sources, pgo_mode, pgo_profile,
                           profile_use_flags, xdk_headers)
-from .embed_assets import hud_assets_build, hud_configure_inputs
+from .embed_assets import hud_assets_build, hud_configure_inputs, ui_fonts_build
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
@@ -69,6 +69,8 @@ GUEST_ABI_FLAGS = [
     "-D__linux__=1",
     "-D__unix__=1",
     "-DHALO_ANDROID=1",
+    "-DHALO_CUSTOM_EDITION",
+    "-DHALO_GAME_BROWSER",
     # ARMv8.0: nothing the emulator's binary translation or an older
     # device could lack (Darwin targets otherwise assume pointer
     # authentication and FP16)
@@ -188,15 +190,12 @@ def _musl_sources() -> List[Path]:
     src = MUSL_DIR / "src"
     result = set()
     for directory in MUSL_DIRECTORIES:
-        for path in (src / directory).glob("*.c"):
-            # ExFAT/macOS may expose AppleDouble companions as `._name.c`;
-            # they are binary metadata, not translation units.
-            if not path.name.startswith("._"):
-                result.add(path)
+        for path in (src / directory).glob("[!.]*.c"):
+            result.add(path)
     for name in MUSL_FILES:
         result.add(src / name)
-    for path in (src / "thread").glob("*.c"):
-        if path.name.startswith(MUSL_THREAD_PREFIXES) and not path.name.startswith("._"):
+    for path in (src / "thread").glob("[!.]*.c"):
+        if path.name.startswith(MUSL_THREAD_PREFIXES):
             result.add(path)
     sources = []
     for path in sorted(result):
@@ -216,7 +215,9 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     if not config_path.is_file() or not (PORT_DIR / "host").is_dir():
         return
     ndk = Path(sln.android_ndk) if getattr(sln, "android_ndk", None) else _find_ndk()
-    if not ndk or not ndk.is_dir():
+    deko = os.environ.get("HALO_SWITCH_DEKO3D") == "1"
+    switch_guest_only = not ndk and Path("/opt/devkitpro/devkitA64/bin/aarch64-none-elf-ld").is_file()
+    if not switch_guest_only and (not ndk or not ndk.is_dir()):
         n.comment("Android build: no NDK found (set ANDROID_NDK_HOME or pass --android-ndk)")
         return
     try:
@@ -227,7 +228,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     import json
     config: Dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
 
-    prebuilt = ndk / "toolchains" / "llvm" / "prebuilt"
+    prebuilt = (ndk / "toolchains" / "llvm" / "prebuilt") if ndk else Path("/opt/homebrew/opt")
     _host_tag = os.environ.get("ANDROID_NDK_HOST_TAG", "")
     if not _host_tag:
         if sys.platform == "darwin":
@@ -236,19 +237,22 @@ def generate_android_build(n: Writer, sln: Any) -> None:
             _host_tag = "windows-x86_64"
         else:
             _host_tag = "linux-x86_64"
-    if not (prebuilt / _host_tag).is_dir():
+    if not switch_guest_only and not (prebuilt / _host_tag).is_dir():
         # an NDK that names its host folder differently: take the one there is
         _tags = sorted(entry.name for entry in prebuilt.iterdir() if entry.is_dir()) if prebuilt.is_dir() else []
         if not _tags:
             n.comment("Android build: the NDK has no LLVM toolchain")
             return
         _host_tag = _tags[0]
-    toolchain = prebuilt / _host_tag
-    sysroot_include = toolchain / "sysroot" / "usr" / "include"
+    toolchain = Path("/opt/homebrew/opt/llvm") if switch_guest_only else prebuilt / _host_tag
+    sysroot_include = Path("dependencies/include").resolve() if switch_guest_only else toolchain / "sysroot" / "usr" / "include"
     host_cc = toolchain / "bin" / f"aarch64-linux-android{ANDROID_API}-clang"
     ndk_bin = toolchain / "bin"
     guest_cc = getattr(sln, "android_guest_cc", None) or "clang"
-    switch_guest = bool(getattr(sln, "android_switch_guest", False))
+    # -nostdinc deliberately selects the ILP32 musl headers. C11 atomics
+    # are compiler-provided; search Clang's headers only after musl.
+    guest_resource_include = Path(subprocess.check_output(
+        [guest_cc, "-print-resource-dir"], text=True).strip()) / "include"
 
     guest_dir = BUILD / "guest"
     obj_dir = guest_dir / "obj"
@@ -324,7 +328,8 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     posix_imports = gen_dir / "posix_imports.list"
     n.rule(
         name="android_posix_stubs",
-        command=f"{python} tools/android_posix_stubs.py {LINUX_DIR}/src/posix.h {guest_posix_c} {posix_imports}",
+        command=f"{python} tools/android_posix_stubs.py {LINUX_DIR}/src/posix.h {guest_posix_c} {posix_imports}" +
+                (" --content-bridge" if switch_guest_only else ""),
         description="ANDROID POSIX STUBS",
     )
     n.build(outputs=[guest_posix_c, posix_imports], rule="android_posix_stubs",
@@ -339,7 +344,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         description="ANDROID IMPORTS",
     )
     n.build(outputs=[imports_s, host_table_c], rule="android_imports",
-            inputs=[host_imports_list, posix_imports, gl_imports],
+            inputs=[host_imports_list, posix_imports, gl_imports] + ([Path("port/switch/host_imports.list")] if deko else []),
             implicit=[Path("tools/android_imports.py")])
 
     generated_headers = [*xdk_headers(), alltypes, syscall_h, version_h, gl_stamp,
@@ -367,6 +372,8 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         f"-isystem {MUSL_DIR}/include",
     ]
     guest_abi = " ".join(GUEST_ABI_FLAGS + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
+    if deko:
+        guest_abi += " -DHALO_SWITCH=1 -DHALO_SWITCH_DEKO3D=1"
     guest_code = " ".join(GUEST_CODE_FLAGS)
     tool_implicit = [Path("tools/android_asm_convert.py"), *generated_headers]
     # profile-guided optimisation with the Linux build's profile (committed,
@@ -414,44 +421,52 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         "-Wno-error=implicit-int",
         "-Wno-error=return-type",
     ]
-    if switch_guest:
-        game_flags.append("-DHALO_SWITCH_GUEST")
     game_cflags = " ".join([
         guest_abi, guest_code, " ".join(game_flags), profile_flags,
         f"-include {prefix_header}", f"-include {semantics_header}",
-        f"-I{LINUX_DIR}/include",
-        "-Iport/include",
-        f"-I{PORT_DIR}/include",
-        f"-I{SDL_DIR}/include",
+        f"-I{LINUX_DIR}/include", f"-I{SDL_DIR}/include",
         # the headers of the port's own game units (port/linux/game), for the
         # game sources that call them
         f"-iquote {Path(config['game_sources'])}",
         game_defines_and_includes(config), *libc_includes, f"-idirafter {XDK_INCLUDE}",
     ])
     for source in game_sources(config):
+        if source.name.startswith("._"):
+            continue
         cflags = game_cflags
         if source.as_posix() in VARIADIC_PROTOTYPE_FILES:
             cflags += f" -include {PORT_DIR}/include/halo_android_variadic_prototypes.h"
         objects.append(guest_object(source, cflags))
-    for source in sorted(Path(config["game_sources"]).glob("*.c")):
+    for source in sorted(Path(config["game_sources"]).glob("[!.]*.c")):
         objects.append(guest_object(source, game_cflags))
 
     # the platform layer shared with Linux, and the guest runtime
     platform_cflags = " ".join([
-        guest_abi, guest_code, "-std=gnu11", "-D_GNU_SOURCE", "-DHALO_LINUX_PLATFORM_LAYER", "-DHAVE_ALLOCA_H", *(["-DHALO_SWITCH_GUEST"] if switch_guest else []), "-w", profile_flags,
+        guest_abi, guest_code, "-std=gnu11", "-D_GNU_SOURCE", "-DHALO_LINUX_PLATFORM_LAYER", "-w", profile_flags,
         f"-include {prefix_header}", f"-include {platform_semantics_header}",
-        f"-I{LINUX_DIR}/src", f"-I{LINUX_DIR}/include", f"-I{PORT_DIR}/include", f"-I{PORT_DIR}/guest/runtime",
+        f"-I{LINUX_DIR}/src", f"-I{LINUX_DIR}/include", f"-I{PORT_DIR}/guest/runtime",
         f"-I{PORT_DIR}/include", f"-I{TOML_DIR}", f"-I{EXPAT_DIR}", f"-I{KCP_DIR}", f"-I{MONOCYPHER_DIR}",
-        f"-I{ZLIB_DIR}", "-Iport/third_party/stb", "-Isource -Isource/cseries",
+        f"-I{ZLIB_DIR}", "-Isource -Isource/cseries",
         f"-I{SDL_DIR}/include", f"-I{gl_include}", *libc_includes, f"-idirafter {XDK_INCLUDE}",
     ])
-    guest_host_only = {"memory_watch.c"}  # replaced by guest_memory_watch.c
-    for source in sorted((LINUX_DIR / "src").glob("*.c")):
-        if (source.name.startswith("posix_") and source.name != "posix_ui_font.c") or source.name in guest_host_only:
+    guest_host_only = {"memory_watch.c", "ui_font_data.c"}  # guest runtime / generated assets
+    if deko:
+        guest_host_only.update({"d3d8_gl.c", "xbox_textures.c", "xgpu_post.c"})
+        for source in sorted(Path("port/switch/guest").glob("[!.]*.c")):
+            objects.append(guest_object(source, platform_cflags))
+    for source in sorted((LINUX_DIR / "src").glob("[!.]*.c")):
+        if source.name == "posix_ui_font.c":
+            objects.append(guest_object(source, f"{platform_cflags} -Iport/third_party/stb"))
             continue
-        objects.append(guest_object(source, platform_cflags))
+        if source.name.startswith("posix_") or source.name in guest_host_only:
+            continue
+        flags = platform_cflags
+        if source.name == "native_voice_runtime.c":
+            flags += f" -idirafter {guest_resource_include}"
+        objects.append(guest_object(source, flags))
     # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
-    for source in hud_assets_build(n, "android", gen_dir / "hud_hires_assets.c"):
+    for source in (hud_assets_build(n, "android", gen_dir / "hud_hires_assets.c")
+                   + ui_fonts_build(n, "android", gen_dir / "ui_fonts.c")):
         objects.append(guest_object(source, platform_cflags))
     # the settings file's parser (port/third_party/tomlc17)
     objects.append(guest_object(TOML_DIR / "tomlc17.c", platform_cflags))
@@ -477,6 +492,8 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         f"-include {MUSL_MATH_DIR}/include/libm.h",
     ])
     for source in musl_math_sources():
+        if source.name.startswith("._"):
+            continue
         objects.append(guest_object(source, musl_math_cflags))
     runtime_internal_cflags = " ".join([
         guest_abi, "-std=c99", "-ffreestanding", "-fno-common", "-D_XOPEN_SOURCE=700", "-D_GNU_SOURCE",
@@ -491,7 +508,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         f"-I{SDL_DIR}/include", f"-I{gl_include}", *libc_includes,
     ])
     runtime_dir = PORT_DIR / "guest" / "runtime"
-    for source in sorted(runtime_dir.glob("*.c")):
+    for source in sorted(runtime_dir.glob("[!.]*.c")):
         if source.name in ("guest_thread.c", "guest_start.c"):
             objects.append(guest_object(source, runtime_internal_cflags))
         elif source.name == "guest_memory_watch.c":
@@ -509,9 +526,12 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     linker_script = PORT_DIR / "guest" / "guest.ld"
     n.rule(
         name="android_guest_link",
-        command=(f"$android_ndk_bin/ld.lld -m aarch64linux -static -nostdlib -T {linker_script} "
+        command=((f"/opt/devkitpro/devkitA64/bin/aarch64-none-elf-ld -m aarch64elf -static -nostdlib -T {linker_script} "
+                  f"-Map $out.map -o $out @$out.rsp {libguestc} "
+                  "$$('/opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc' -print-libgcc-file-name)") if switch_guest_only else
+                 (f"$android_ndk_bin/ld.lld -m aarch64linux -static -nostdlib -T {linker_script} "
                  f"-Map $out.map -o $out @$out.rsp {libguestc} "
-                 "$$($android_host_cc -print-libgcc-file-name)"),
+                 "$$($android_host_cc -print-libgcc-file-name)")),
         description="ANDROID LINK $out",
         rspfile="$out.rsp",
         rspfile_content="$in_newline",

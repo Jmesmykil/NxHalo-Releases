@@ -711,9 +711,39 @@ void lights_dispose(
 	return;
 }
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+extern int config_boolean(char const *name);
+extern void platform_log(char const *format, ...);
+/* Only spatial partition inputs are cached; light transforms and shading
+ * still update on every refresh. Entries never outlive a map/BSP or datum. */
+static struct light_partition_snapshot {
+    long datum;
+    boolean valid;
+    real_point3d center;
+    real radius;
+    struct location location;
+} light_partition_snapshots[HALO_PORT_MAXIMUM_LIGHTS_PER_MAP];
+static boolean light_partition_reuse = TRUE;
+static unsigned long light_partition_hits, light_partition_refreshes;
+#endif
+
+void lights_reconnect_profile_report(void)
+{
+#if defined(__linux__) || defined(HALO_ANDROID)
+    platform_log("[light_partition] reuse=%d hits=%lu refreshes=%lu", light_partition_reuse,
+        light_partition_hits, light_partition_refreshes);
+    light_partition_hits=0; light_partition_refreshes=0;
+#endif
+}
+
 void lights_initialize_for_new_map(
 	void)
 {
+#if defined(__linux__) || defined(HALO_ANDROID)
+    memset(light_partition_snapshots,0,sizeof(light_partition_snapshots));
+    light_partition_reuse=config_boolean("display.light_partition_reuse");
+    light_partition_hits=0; light_partition_refreshes=0;
+#endif
 	data_make_valid(light_data);
 	lights_game_globals->render_lights = TRUE;
 	cluster_partition_make_valid(&light_cluster_partition);
@@ -1426,6 +1456,10 @@ void light_disconnect_from_map(
 	long light_index)
 {
 	struct light_datum *light = light_get(light_index);
+#if defined(__linux__) || defined(HALO_ANDROID)
+    unsigned slot = (unsigned short)light_index;
+    if (slot < HALO_PORT_MAXIMUM_LIGHTS_PER_MAP) light_partition_snapshots[slot].valid=FALSE;
+#endif
 
 	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit))
 	{
@@ -1850,8 +1884,8 @@ void lights_render_specular(
 	return;
 }
 
-void light_reconnect_to_map(
-	long light_index)
+static void light_reconnect_internal(
+	long light_index, boolean refresh)
 {
 	struct light_datum *light = light_get(light_index);
 	struct point_light_definition *definition = light_definition_get(light->definition_index);
@@ -1890,10 +1924,7 @@ void light_reconnect_to_map(
 			TRUE,
 			&position,
 			&radius);
-		match_assert(
-			"c:\\halo\\SOURCE\\objects\\object_lights.c",
-			0x4F9,
-			!TEST_FLAG(light->flags, _point_light_connected_to_map_bit));
+
 		if (light->object_index != NONE && object_try_and_get(light->object_index))
 		{
 			object_get_location(light->object_index, &location);
@@ -1902,6 +1933,23 @@ void light_reconnect_to_map(
 		{
 			scenario_location_from_point(&location, &position);
 		}
+#if defined(__linux__) || defined(HALO_ANDROID)
+        unsigned slot=(unsigned short)light_index;
+        struct light_partition_snapshot *cached=slot<HALO_PORT_MAXIMUM_LIGHTS_PER_MAP ? &light_partition_snapshots[slot] : NULL;
+        light_partition_refreshes++;
+        if (refresh && light_partition_reuse && TEST_FLAG(light->flags, _point_light_connected_to_map_bit) &&
+            cached && cached->valid && cached->datum==light_index &&
+            cached->center.x==position.x && cached->center.y==position.y && cached->center.z==position.z &&
+            cached->radius==radius && cached->location.leaf_index==location.leaf_index &&
+            cached->location.cluster_index==location.cluster_index && cached->location.bonus==location.bonus) {
+            light_partition_hits++;
+            return;
+        }
+#endif
+        if (refresh && TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
+            light_disconnect_from_map(light_index);
+        match_assert("c:\\halo\\SOURCE\\objects\\object_lights.c", 0x4F9,
+            !TEST_FLAG(light->flags, _point_light_connected_to_map_bit));
 		cluster_partition_reconnect(
 			&light_cluster_partition,
 			light_index,
@@ -1910,9 +1958,23 @@ void light_reconnect_to_map(
 			radius,
 			&location);
 		SET_FLAG(light->flags, _point_light_connected_to_map_bit, TRUE);
+#if defined(__linux__) || defined(HALO_ANDROID)
+        if(cached) { cached->datum=light_index; cached->center=position; cached->radius=radius;
+            cached->location=location; cached->valid=TRUE; }
+#endif
 	}
 
 	return;
+}
+
+void light_reconnect_to_map(long light_index)
+{
+    light_reconnect_internal(light_index, FALSE);
+}
+
+void light_refresh_map_attachment(long light_index)
+{
+    light_reconnect_internal(light_index, TRUE);
 }
 
 /* a light of a cluster, for find_point_lights_for_object_in_cluster: as

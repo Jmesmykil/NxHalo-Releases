@@ -1,0 +1,46 @@
+{
+  "version": "Unified37",
+  "platform": "Nintendo Switch 1",
+  "title_id": "010048414c210000",
+  "title_version": 65560,
+  "display_version": "0.2.9.9-dk1",
+  "guest_sha256": "10a9be9c131a5586243996310718d687d40d1c0b1435f796d01d62f2a864ec4d",
+  "donor_commit": "201e0f18011a30ea6d098ad249bf17eba005d653",
+  "hardware_evidence": {
+    "kind": "owner report",
+    "date": "2026-10-25",
+    "statement": "I just etsted it works great",
+    "device": "Switch 1",
+    "scope": "gameplay report; not measured FPS or exhaustive campaign/lobby validation"
+  },
+  "source_files": 2766,
+  "source_policy": "filtered; generated shader instruction includes excluded; not independently reproduced",
+  "u38_changes_included": false,
+  "assets": [
+    {
+      "name": "Halo_CE_Unified37.nsp",
+      "bytes": 27793624,
+      "sha256": "0c7d3abf235d98149e42e634f518b8d89e1290ae89ae3f6615cfbb89f6aac98d"
+    },
+    {
+      "name": "NxHalo-Switch-source-Unified37.zip",
+      "bytes": 20500992,
+      "sha256": "5868243fceadaf82539c79f24802f18c1bcb1a045586e0e002b41d51a3c3a2bc"
+    },
+    {
+      "name": "SOURCE-HASHES.sha256",
+      "bytes": 373817,
+      "sha256": "ea6c1b0bd4773a855df9a84848af1cb6816f8082c61bed304f3d243aed0e68b3"
+    },
+    {
+      "name": "BUILD-NOTES.md",
+      "bytes": 1906,
+      "sha256": "0cb61ca223f4af7323d9777265e74e15027ecfba91021554f055aa5a2f68441d"
+    },
+    {
+      "name": "RELEASE-NOTES.md",
+      "bytes": 2041,
+      "sha256": "c57bfc36f3da9f2f6af8be3667086d4abf978face6f5ddb9454e463a00234ad1"
+    }
+  ]
+}

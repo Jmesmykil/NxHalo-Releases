@@ -81,9 +81,12 @@ static int port_unused(unsigned short port)
 	if (socket < 0)
 		return 0;
 	memset(&address, 0, sizeof(address));
+	address.sin_len = sizeof(address);
 	address.sin_family = AF_INET;
 	address.sin_port = port;
-	unused = posix_socket_bind(socket, &address, sizeof(address)) == 0;
+	/* This is host libc's BSD sockaddr, not the guest Winsock layout.
+	 * Passing it through posix_socket_bind reads len/family as uint16. */
+	unused = bind(socket, (const struct sockaddr *)&address, sizeof(address)) == 0;
 	posix_socket_close(socket);
 	return unused;
 }

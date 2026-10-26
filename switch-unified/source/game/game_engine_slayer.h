@@ -15,6 +15,8 @@ GAME_ENGINE_SLAYER.H
 void update_speed_for_score(
 	long dead_player_index,
 	long killing_player_index);
+/* Native host-only mode integration: set a Free-for-All Slayer scoreboard value. */
+void game_engine_slayer_set_player_score(long player_index, long score);
 
 /* ---------- globals */
 

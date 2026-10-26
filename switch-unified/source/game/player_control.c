@@ -1312,6 +1312,8 @@ static void get_local_player_input_blob(
 
 			{
 				byte effective_buttons[NUMBER_OF_ACTION_CONTROL_BUTTONS] = {0};
+				boolean vehicle_boost_requested = FALSE;
+				boolean vehicle_boost_driver = FALSE;
 				word buttons_to_reset =
 					control->inhibited_button_bit_vector &
 					control->reset_button_when_released_bit_vector;
@@ -1324,7 +1326,9 @@ static void get_local_player_input_blob(
 						button_index++)
 					{
 						if (TEST_FLAG(buttons_to_reset, button_index) &&
-							!input_state->buttons[button_index])
+							!input_state->buttons[button_index] &&
+							!(button_index == _button_flashlight &&
+							  input_abstraction_port_vehicle_boost(gamepad_index)))
 						{
 							SET_FLAG(
 								control->inhibited_button_bit_vector,
@@ -1353,6 +1357,17 @@ static void get_local_player_input_blob(
 				if (player->unit_index != NONE)
 				{
 					struct biped_datum *biped = biped_try_and_get(player->unit_index);
+
+					if (biped && biped->object.parent_object_index != NONE &&
+						vehicle_supports_boost(biped->object.parent_object_index) &&
+						unit_seat_is_driver(biped->object.parent_object_index, biped->unit.parent_seat_index))
+					{
+						vehicle_boost_driver = TRUE;
+						vehicle_boost_requested =
+							!TEST_FLAG(control->inhibited_button_bit_vector, _button_flashlight) &&
+							(input_abstraction_port_vehicle_boost(gamepad_index) ||
+							 gamepad->buttons[_gamepad_analog_button_white]);
+					}
 
 					if (biped &&
 						(controls_enable_crouch ||
@@ -1410,7 +1425,11 @@ static void get_local_player_input_blob(
 				SET_FLAG(
 					input->unit_control_flags,
 					_unit_control_integrated_light_bit,
-					effective_buttons[_button_flashlight]);
+					effective_buttons[_button_flashlight] && !vehicle_boost_requested);
+				/* Ghost drivers use this wire bit only for their explicit boost control. */
+				if (vehicle_boost_driver)
+					SET_FLAG(input->unit_control_flags, _unit_control_crouch_modifier_bit,
+						vehicle_boost_requested);
 				SET_FLAG(
 					input->unit_control_flags,
 					_unit_control_jump_bit,

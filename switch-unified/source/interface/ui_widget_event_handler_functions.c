@@ -923,6 +923,7 @@ symbols in this file:
 #include "networking/network_game_manager.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
+#include "match_rules.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "saved games/game_state.h"
 #include "saved games/player_profile.h"
@@ -933,6 +934,7 @@ symbols in this file:
 
 #ifdef HALO_CUSTOM_EDITION
 #include "halo_ui_map_list.h"
+#include "halo_network_profile.h"
 #endif
 
 /* ---------- constants */
@@ -2023,7 +2025,8 @@ static boolean pause_game_restart_at_checkpoint(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	/* The host main-loop revert resynchronizes the saved state to co-op clients. */
+	/* The host main-loop revert restamps its clock and resends the saved
+	state to every co-op client. A remote client cannot choose a checkpoint. */
 	if (network_coop_active() && game_connection() != _game_connection_network_server)
 		return FALSE;
 	main_revert_map();
@@ -2035,7 +2038,9 @@ static boolean pause_game_restart_level(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	/* Host restart returns all peers to the synchronized same-map lobby. */
+	/* A host restart uses the synchronized round transition on the same
+	mission, without marking that mission completed in the player profile.
+	The connected lobby lets the host start when everyone is ready. */
 	if (network_coop_active())
 	{
 		if (game_connection() != _game_connection_network_server)
@@ -2374,6 +2379,7 @@ static boolean main_menu_initialize(
 	player_ui_clear_multiplayer_variant();
 	dispose_global_network_game_client();
 	dispose_global_network_game_server();
+	network_profile_clear_host_override();
 	network_game_accept_remote_connections(FALSE);
 	player_spawn_count = 1;
 	/* port: as multiplayer_type_menu_initialize */
@@ -3452,6 +3458,39 @@ boolean ui_widget_event_handler_function_invoke(
 		if (!result)
 			console_warning("event handler '%s' failed", event_handler_function_list.names[(short)function_index]);
 		return result;
+	}
+	/* Keep invalid callback diagnostics useful without flooding a controller loop.
+	 * Log each callback/widget-definition pair once, up to sixteen distinct pairs.
+	 * Only read the validated widget instance fields; do not dereference the
+	 * invalid handler or resolve the tag here. */
+	{
+		static struct
+		{
+			word function_index;
+			long definition_tag_index;
+		} reported[16];
+		static long reported_count = 0;
+		long index;
+		boolean already_reported = FALSE;
+
+		for (index = 0; index < reported_count; index++)
+		{
+			if (reported[index].function_index == function_index &&
+				reported[index].definition_tag_index == widget->definition_tag_index)
+			{
+				already_reported = TRUE;
+				break;
+			}
+		}
+		if (!already_reported && reported_count < NUMBEROF(reported))
+		{
+			reported[reported_count].function_index = function_index;
+			reported[reported_count].definition_tag_index = widget->definition_tag_index;
+			reported_count++;
+			console_warning("invalid event handler index %u on widget '%s' (definition tag %ld)",
+				(unsigned)function_index, widget->name ? widget->name : "<unnamed>",
+				widget->definition_tag_index);
+		}
 	}
 	error(2, "invalid event_handler_function");
 	return FALSE;
@@ -6006,6 +6045,31 @@ void ui_widget_port_multiplayer_maps_refresh(void)
 
 /* the gametypes (the built-in ones and those saved): their count, and the
 one used last (else 0) */
+#ifdef HALO_GAME_BROWSER
+/* This is only a local picker preference, not a filesystem directory or peer
+   identity. Ordinary saved gametypes keep the legacy directory record. */
+static short port_native_template_record_index(char const *record)
+{
+    static char const prefix[] = "native-template:";
+    unsigned int index = 0;
+    char const *digit;
+    if (!record || csstrncmp(record, prefix, sizeof(prefix) - 1))
+        return NONE;
+    digit = record + sizeof(prefix) - 1;
+    if (!*digit)
+        return NONE;
+    for (; *digit; digit++)
+    {
+        if (*digit < '0' || *digit > '9')
+            return NONE;
+        index = index * 10 + (unsigned int)(*digit - '0');
+        if (index >= MATCH_RULES_NATIVE_TEMPLATE_COUNT)
+            return NONE;
+    }
+    return (short)index;
+}
+#endif
+
 short ui_widget_port_gametypes(
 	long *indices,
 	short maximum,
@@ -6014,12 +6078,30 @@ short ui_widget_port_gametypes(
 	char directory_path[256];
 	word count = (word)maximum;
 	short index;
+#ifdef HALO_GAME_BROWSER
+	short native_index;
+	if (maximum < MATCH_RULES_NATIVE_TEMPLATE_COUNT) return 0;
+	count = (word)(maximum - MATCH_RULES_NATIVE_TEMPLATE_COUNT);
+#endif
 
 	playlist_profiles_enumerate_available_to_local_player_index(0, &count, indices);
+#ifdef HALO_GAME_BROWSER
+	for (native_index = 0; native_index < MATCH_RULES_NATIVE_TEMPLATE_COUNT; native_index++)
+		indices[count++] = match_rules_native_template_profile_index(native_index);
+#endif
 	*last_used = 0;
 	if (saved_game_file_retrieve_last_used_multiplayer_variant_directory(directory_path))
 	{
-		long profile_index = saved_game_file_find_profile_index_for_directory_path(directory_path, 1);
+        long profile_index;
+#ifdef HALO_GAME_BROWSER
+        if (!csstrncmp(directory_path, "native-template:", 16))
+        {
+            short remembered = port_native_template_record_index(directory_path);
+            profile_index = remembered != NONE ? match_rules_native_template_profile_index(remembered) : NONE;
+        }
+        else
+#endif
+            profile_index = saved_game_file_find_profile_index_for_directory_path(directory_path, 1);
 
 		for (index = 0; profile_index != NONE && index < (short)count; index++)
 		{
@@ -6061,6 +6143,11 @@ boolean ui_widget_port_gametype_choose(
 {
 	struct game_variant profile;
 	char directory_path[256];
+#ifdef HALO_GAME_BROWSER
+	struct game_variant_options options;
+	short preset = MATCH_RULES_PRESET_STANDARD, matchup = MATCH_RULES_MATCHUP_COVENANT_USMC;
+	boolean explicit_mode = FALSE;
+#endif
 	void *server;
 
 	if (profile_index == NONE || !(profile_index & 0x80000000))
@@ -6070,16 +6157,68 @@ boolean ui_widget_port_gametype_choose(
 	}
 	if (!playlist_profile_get(profile_index, &profile))
 		return FALSE;
+#ifdef HALO_GAME_BROWSER
+	playlist_profile_get_options(profile_index, &options);
+	if (playlist_profile_get_native_mode(profile_index, &preset, &matchup) && preset != MATCH_RULES_PRESET_STANDARD)
+	{
+		/* A saved custom special mode already contains its edited rules. */
+		explicit_mode = TRUE;
+		match_rules_clear_ui_preset_selection();
+	}
+	else if (match_rules_take_ui_preset_selection(&preset, &matchup))
+	{
+		/* MODES is a one-shot intent applied to the selected ordinary profile. */
+		explicit_mode = TRUE;
+		if (!match_rules_apply_variant_preset_for_matchup(preset, matchup, &profile, &options))
+			return FALSE;
+	}
+	if (explicit_mode)
+	{
+		if (!match_rules_preset_set(preset) || !match_rules_matchup_set(matchup))
+			return FALSE;
+	}
+	else
+	{
+		match_rules_clear_ui_preset_selection();
+		match_rules_preset_set(MATCH_RULES_PRESET_STANDARD);
+	}
+#endif
 	server = global_network_game_server_get();
+	/* The mode picker owns the pending match preset. Confirming its selected
+	 * profile must not overwrite that choice; explicit Standard/base-type
+	 * actions clear it in the gametype editor. */
+#ifdef HALO_GAME_BROWSER
+    {
+        short native_index = match_rules_native_template_index_from_profile_index(profile_index);
+        if (native_index != NONE)
+        {
+            csmemset(directory_path, 0, sizeof(directory_path));
+            csprintf(directory_path, "native-template:%d", native_index);
+            saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
+        }
+        else if (saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
+            saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
+    }
+#else
 	if (saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
 		saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
+#endif
+#ifdef HALO_GAME_BROWSER
+	match_rules_label_runtime_variant(preset, matchup, &profile);
+	if (explicit_mode && preset != MATCH_RULES_PRESET_STANDARD)
+		match_rules_note_profile_preset_materialized();
+#endif
 	player_ui_set_game_variant(&profile);
 	/* (and its PC options: game_engine.h) */
 	{
-		struct game_variant_options options;
+		struct game_variant_options saved_options;
 
-		playlist_profile_get_options(profile_index, &options);
-		player_ui_set_game_variant_options(&options);
+#ifdef HALO_GAME_BROWSER
+		saved_options = options;
+#else
+		playlist_profile_get_options(profile_index, &saved_options);
+#endif
+		player_ui_set_game_variant_options(&saved_options);
 	}
 	if (server)
 		network_game_server_change_game_variant(server, &profile);

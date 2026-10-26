@@ -116,6 +116,7 @@ void object_type_handle_region_destroyed(long object_index, short region_index, 
 boolean object_type_handle_parent_destroyed(long object_index);
 
 void object_type_delete(long object_index);
+void object_type_profile_report(void);
 boolean object_type_update(long object_index);
 void object_type_export_function_values(long object_index);
 

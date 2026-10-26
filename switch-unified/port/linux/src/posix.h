@@ -50,6 +50,21 @@ int posix_stat(const char *path, struct posix_file_information *information);
 int posix_fstat(int descriptor, struct posix_file_information *information);
 int posix_file_is_regular(int descriptor);
 
+/* Directory identity has only 32-bit fields, independent of struct stat ABI.
+   fd/at reject non-directories; at also rejects symlinks. Path follows links
+   only for detecting whether an active selection aliases a managed pack. */
+struct posix_directory_identity
+{
+	posix_ulong device_low, device_high;
+	posix_ulong inode_low, inode_high;
+};
+int posix_directory_identity_fd(int descriptor, struct posix_directory_identity *identity);
+int posix_directory_identity_at(int directory, const char *name, struct posix_directory_identity *identity);
+int posix_directory_identity_path(const char *path, struct posix_directory_identity *identity);
+/* Create a single private relative directory with mode 0700. */
+int posix_make_private_directory_at(int directory, const char *name);
+
+
 /* set access and modification times; a zero seconds value leaves it alone */
 int posix_set_file_times(const char *path,
 	posix_ulong access_seconds, posix_ulong access_nanoseconds,
@@ -71,6 +86,10 @@ int posix_make_directory(const char *path);
 
 /* directory enumeration; the handle is opaque */
 void *posix_directory_open(const char *path);
+/* Enumerates a duplicated directory descriptor; caller keeps descriptor. */
+void *posix_directory_open_fd(int descriptor);
+/* Atomic publication, never replaces an existing destination. */
+int posix_rename_noreplace_at(int directory, const char *source, const char *destination);
 /* copies the next entry name (excluding . and ..); returns 0 at the end */
 int posix_directory_next(void *directory, char *name, posix_ulong name_size);
 void posix_directory_close(void *directory);

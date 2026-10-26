@@ -24,6 +24,11 @@ long hud_hires_asset_count(void);
 char const *hud_hires_asset_tag(long asset);
 long hud_hires_asset_bitmap(long asset);
 long hud_hires_asset_fits(long asset, long width, long height);
+#ifdef HALO_SWITCH_DEKO3D
+void hud_hires_map_loaded(const long *assets, long count);
+void hud_hires_map_unloaded(void);
+void halo_switch_renderer_idle(void);
+#endif
 
 void hud_hires_tags_loaded(void);
 void hud_hires_tags_unloaded(void);
@@ -53,6 +58,9 @@ void hud_hires_tags_loaded(
 	long asset_count = hud_hires_asset_count();
 	long asset;
 	long missing = 0;
+#ifdef HALO_SWITCH_DEKO3D
+	long matched_assets[MAXIMUM_HIRES_BITMAPS];
+#endif
 
 	hires_bitmap_count = 0;
 	for (asset = 0; asset < asset_count && hires_bitmap_count < MAXIMUM_HIRES_BITMAPS; asset++)
@@ -75,9 +83,15 @@ void hud_hires_tags_loaded(
 		{
 			hires_bitmaps[hires_bitmap_count].bitmap = bitmap;
 			hires_bitmaps[hires_bitmap_count].asset = asset;
+#ifdef HALO_SWITCH_DEKO3D
+			matched_assets[hires_bitmap_count] = asset;
+#endif
 			hires_bitmap_count++;
 		}
 	}
+#ifdef HALO_SWITCH_DEKO3D
+	hud_hires_map_loaded(matched_assets, hires_bitmap_count);
+#endif
 	platform_log("high-res hud: %ld of %ld bitmaps in this map (%ld not in it)",
 		hires_bitmap_count, asset_count, missing);
 
@@ -87,6 +101,10 @@ void hud_hires_tags_loaded(
 void hud_hires_tags_unloaded(
 	void)
 {
+#ifdef HALO_SWITCH_DEKO3D
+	hud_hires_map_unloaded();
+	halo_switch_renderer_idle();
+#endif
 	hires_bitmap_count = 0;
 
 	return;

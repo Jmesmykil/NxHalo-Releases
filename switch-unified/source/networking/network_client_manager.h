@@ -35,6 +35,10 @@ void network_game_client_keep_alive(
 short network_game_client_get_state(
 	struct network_game_client *client,
 	short *state_data);
+boolean network_game_client_is_connected(struct network_game_client *client);
+
+boolean network_game_client_is_playing(
+	struct network_game_client *client);
 boolean network_game_client_join_first_available_game(
 	void);
 boolean network_game_client_set_team(

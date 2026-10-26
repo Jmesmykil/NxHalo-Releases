@@ -1,0 +1,19 @@
+# Optional Build114 deko3d host ABI. Additive to Android imports.
+host_dk_submit
+host_dk_retired
+host_dk_idle
+host_dk_visibility
+host_dk_shader_find
+host_dk_shader_compile
+host_dk_shader_known
+host_dk_shader_pending
+host_dk_shader_pending_urgent
+host_dk_shader_priority_lower
+host_dk_shader_loading
+host_dk_shader_load_first
+host_dk_shader_preload_done
+host_dk_shader_loose_loads
+host_dk_output_height
+host_dk_gpu_frame_us
+host_dk_hud_ready
+host_clock_cpu

@@ -4191,12 +4191,44 @@ static boolean biped_check_discard(
 	return FALSE;
 }
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+#include "halo_phase_profile.h"
+extern void platform_log(char const *format, ...);
+static struct halo_phase_timing biped_sections[8];
+static void biped_section(short part, uint64_t *begin, boolean sampled)
+{
+    if(sampled) {
+        uint64_t end=halo_profile_now_us(), elapsed=end-*begin;
+        struct halo_phase_timing *t=&biped_sections[part];
+        t->calls++; t->total_us+=elapsed;
+        if(elapsed>t->max_us)t->max_us=elapsed;
+        *begin=end;
+    }
+}
+void biped_profile_report(void)
+{
+    static char const *names[]={"turning_setup","movement_physics","state_dead_air_land","animation","melee","footsteps","falling_danger","discard"};
+    short i;
+    for(i=0;i<8;i++) if(biped_sections[i].calls)
+        platform_log("[biped_pass] tick=%ld sampled=1/16 part=%s calls=%llu cpu_us=%llu max_us=%llu",game_time_get(),names[i],
+            (unsigned long long)biped_sections[i].calls,(unsigned long long)biped_sections[i].total_us,(unsigned long long)biped_sections[i].max_us);
+    memset(biped_sections,0,sizeof(biped_sections));
+}
+#define BIPED_SECTION(n) biped_section(n,&profile_begin,profile_sampled)
+#else
+#define BIPED_SECTION(n) ((void)0)
+#endif
+
 boolean biped_update(
 	long biped_index)
 {
 	struct biped_datum *biped = biped_get(biped_index);
 	struct biped_definition *definition = biped_definition_get(biped->definition_index);
 	struct unit_animation_update_data animation;
+#if defined(__linux__) || defined(HALO_ANDROID)
+    boolean profile_sampled=(biped_index & 15)==(game_time_get() & 15);
+    uint64_t profile_begin=profile_sampled?halo_profile_now_us():0;
+#endif
 
 	if (debug_biped_skip_update)
 		return TRUE;
@@ -4299,7 +4331,9 @@ boolean biped_update(
 			biped_verify_object_vectors(biped_index, "post-turning");
 		}
 
+        BIPED_SECTION(0);
 		biped_update_moving(biped_index, &animation);
+        BIPED_SECTION(1);
 		biped_verify_object_vectors(biped_index, "post-moving");
 
 		if (TEST_FLAG(biped->object.damage_flags, _object_dead_bit))
@@ -4319,6 +4353,7 @@ boolean biped_update(
 			biped_update_slipping(biped_index, &animation);
 		}
 
+        BIPED_SECTION(2);
 		biped_verify_object_vectors(biped_index, "post-dead/air/land/slip");
 
 		if (!biped->biped.player_melee_ticks)
@@ -4381,9 +4416,13 @@ boolean biped_update(
 			--biped->biped.player_melee_ticks;
 		}
 
+        BIPED_SECTION(4);
 		biped_try_to_make_footsteps(biped_index);
+        BIPED_SECTION(5);
 		biped_falling_danger(biped_index);
+        BIPED_SECTION(6);
 		biped_check_discard(biped_index);
+        BIPED_SECTION(7);
 	}
 
 	if (unit_update_animation(biped_index, &animation)==1)
@@ -4400,6 +4439,7 @@ boolean biped_update(
 	}
 
 	biped_verify_object_vectors(biped_index, "post-update");
+    BIPED_SECTION(3);
 	profile_exit(biped_update_section);
 
 	return TRUE;

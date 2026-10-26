@@ -1,0 +1,84 @@
+{
+  "repository": "https://github.com/thelinkin3000/halo-ce-universal",
+  "ref": "build-114",
+  "license": "AGPL-3.0; preserve upstream license and corresponding source when distributing",
+  "files": [
+    {
+      "path": "port/switch/guest/d3d8_dk.c",
+      "donor_sha256": "5c0be92711a579bfb18e2140d756a678f8ab86c5a2227cba64bcd0d0b498fdb1"
+    },
+    {
+      "path": "port/switch/guest/dk_commands.h",
+      "donor_sha256": "bf6af185400e75d6e5ee7cca3f0c6982078c23faa037439f6b4189aa62b67bd0"
+    },
+    {
+      "path": "port/switch/guest/dk_shaders.c",
+      "donor_sha256": "c267936136c48c0f6b928a3c4a6e125227bb8c034e8afff42dd64a7c84ef8a0c"
+    },
+    {
+      "path": "port/switch/guest/dk_shaders.h",
+      "donor_sha256": "d2fab01212366020f42f6cb85ba9ba71ceed671201367aa31a8418609c91c094"
+    },
+    {
+      "path": "port/switch/guest/dk_textures.h",
+      "donor_sha256": "b76358a7eaa638fac3e514e7297b68872e4f8986eb793e4c0521628171224e61"
+    },
+    {
+      "path": "port/switch/guest/nv2a_psh_dk.c",
+      "donor_sha256": "d42c168b555b5a10902cb0c737bbd636be6ce59ea6c17a5b79c99a9e2a8a5b28"
+    },
+    {
+      "path": "port/switch/guest/nv2a_vsh_dk.c",
+      "donor_sha256": "6c73e39b9a000117e6e54af66282da004e1b6549280d975bc4b69cc69f597d06"
+    },
+    {
+      "path": "port/switch/guest/xbox_textures_dk.c",
+      "donor_sha256": "e48a2937244c1a9d8fa8e52a2a7ee09e5d716bf5befea9af69abab834d7101f8"
+    }
+  ],
+  "local_changes": [
+    "Opt-in HALO_SWITCH_DEKO3D preserves baseline GL code",
+    "PC layout decode, cube face/mip reorder and resource channel swizzles preserved",
+    "Resource release waits for current and renamed GPU storage",
+    "Existing embedded HUD asset initializer ABI retained with appended optional fields",
+    "DK-only map/shader load hooks, config registry entries and menu raw PNG accessors"
+  ],
+  "additional_upstream_files": [
+    {
+      "path": "port/linux/src/d3d8_resources.c",
+      "sha256": "169de0d8e0765e4bc5b3b08a7ccadb26baed8df625bca3011ab87293fbe20732"
+    },
+    {
+      "path": "port/linux/src/hud_hires.c",
+      "sha256": "f3c6a368d4b8150cb6ccf8c4878a78284c7338bfdfd7aa85e57380be82bab189"
+    },
+    {
+      "path": "port/linux/src/hud_hires.h",
+      "sha256": "af8ae5a010963330ce757b4741adae586a574911eed835b5c954844e6aefdc4c"
+    },
+    {
+      "path": "port/linux/src/text_hires.c",
+      "sha256": "712c0bc003a6c7a54ff0e0b175a377138f8ca499404e14c6bf3e233d015a71b1"
+    },
+    {
+      "path": "port/linux/src/text_hires.h",
+      "sha256": "1d340e1c5003c7f226e07053cc4bf8e476d59cc63e3801a0cabf7d8011342c73"
+    },
+    {
+      "path": "port/linux/src/xgpu.h",
+      "sha256": "f7d338f889733cbdaac796ab93ced4917271f47562486bebb01e6510f6511730"
+    },
+    {
+      "path": "port/linux/src/menu_files.c",
+      "sha256": "731b5c873ef164b197db85ea73cfc319776b3d494b95930e6b70fb0172697ee8"
+    },
+    {
+      "path": "port/linux/src/port_config.c",
+      "sha256": "9b707ee1aac305362bfd1d309573225512445edc28bd92edc8443664124dff76"
+    },
+    {
+      "path": "port/linux/src/xbox_memory.c",
+      "sha256": "84c4b787eda4740e2aa3d107813a665176548c2b44cdaaa9fdec54dfcd1bb69e"
+    }
+  ]
+}

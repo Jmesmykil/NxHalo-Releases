@@ -401,6 +401,23 @@ static void slayer_engine_adjust_score(
 	return;
 }
 
+/* Native host-authoritative modes can align the ordinary Slayer scoreboard
+   with their own progression while keeping player statistics untouched. */
+void game_engine_slayer_set_player_score(long player_index, long score)
+{
+	struct player_datum *player;
+	long slot;
+	if (player_index == NONE || !player_try_and_get(player_index) ||
+		network_game_distributed_client() || game_engine_has_teams())
+		return;
+	player = player_get(player_index);
+	slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+	if (slot < 0 || slot >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS ||
+		player->team_index < 0 || player->team_index >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+		return;
+	slayer_engine_adjust_score(player_index, score - slayer_globals.individual_score[slot]);
+}
+
 static void find_next_target(
 	long player_index)
 {

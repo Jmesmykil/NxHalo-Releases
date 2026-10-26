@@ -14,9 +14,6 @@ same, so it imports the same names.
 extern int posix_browser_request(const char *, const char *, const char *, char *, int, char *, int);
 extern int posix_browser_private_key(const char *, unsigned char *, int);
 extern int posix_browser_replace_key(const char *, const unsigned char *, int);
-extern int host_browser_download(const char *, const char *, unsigned long long, char *, int);
-extern int posix_descriptor_is_stream(int);
-extern int posix_descriptors_same_file(int, int);
 
 /* Forward declarations of all host_* functions the guest can import */
 
@@ -50,6 +47,14 @@ extern uint32_t host_sdl_open_audio_stream(uint32_t device, const void *spec,
 extern int host_sdl_put_audio_stream_data(uint32_t stream, const void *data,
                                           int length);
 extern int host_sdl_resume_audio_stream_device(uint32_t stream);
+
+extern int host_sdl_pause_audio_stream_device(uint32_t stream);
+extern int host_sdl_clear_audio_stream(uint32_t stream);
+extern int host_sdl_get_audio_stream_available(uint32_t stream);
+extern int host_sdl_get_audio_stream_data(uint32_t stream, void *data, int length);
+extern void host_sdl_destroy_audio_stream(uint32_t stream);
+
+extern int host_content_fs(uint32_t packet_address);
 
 /* GL */
 extern void host_gl_get_string(uint32_t name, int index, char *buffer,
@@ -90,7 +95,6 @@ extern void host_log(int priority, const char *text);
 struct posix_file_information;
 extern int posix_stat(const char *path, struct posix_file_information *information);
 extern int posix_fstat(int descriptor, struct posix_file_information *information);
-extern int posix_file_is_regular(int descriptor);
 extern int posix_set_file_times(const char *path, uint32_t a_sec, uint32_t a_nsec, uint32_t m_sec, uint32_t m_nsec);
 extern int posix_seek(int descriptor, int32_t off_lo, int32_t off_hi, int whence, uint32_t *pos_lo, uint32_t *pos_hi);
 extern int posix_truncate(int descriptor, uint32_t size_lo, uint32_t size_hi);
@@ -129,6 +133,8 @@ extern void posix_random_bytes(void *buffer, uint32_t size);
 extern void host_sdl_scancode_name(int, char *, uint32_t);
 extern int host_sdl_scancode_from_name(const char *);
 extern int host_sdl_open_url(const char *);
+extern int host_download(uint32_t);
+extern int host_text_input(uint32_t, uint32_t, uint32_t);
 extern int host_sdl_show_message_box(uint32_t, const char *, const char *, int, const uint32_t *, const int *, const uint32_t *);
 extern int posix_user_secret(unsigned char *, int);
 extern void posix_describe_address(void *, char *, uint32_t);
@@ -165,6 +171,26 @@ static const struct import_entry imports[] =
 	{ "hostposix_discord_read", (void *)posix_discord_read },
 	{ "hostposix_discord_close", (void *)posix_discord_close },
 
+#ifdef HALO_SWITCH_DEKO3D
+    { "host_clock_cpu", (void *)host_clock_cpu },
+    { "host_dk_submit", (void *)host_dk_submit },
+    { "host_dk_retired", (void *)host_dk_retired },
+    { "host_dk_idle", (void *)host_dk_idle },
+    { "host_dk_visibility", (void *)host_dk_visibility },
+    { "host_dk_shader_find", (void *)host_dk_shader_find },
+    { "host_dk_shader_compile", (void *)host_dk_shader_compile },
+    { "host_dk_shader_known", (void *)host_dk_shader_known },
+    { "host_dk_shader_pending", (void *)host_dk_shader_pending },
+    { "host_dk_shader_pending_urgent", (void *)host_dk_shader_pending_urgent },
+    { "host_dk_shader_priority_lower", (void *)host_dk_shader_priority_lower },
+    { "host_dk_shader_loading", (void *)host_dk_shader_loading },
+    { "host_dk_shader_load_first", (void *)host_dk_shader_load_first },
+    { "host_dk_shader_preload_done", (void *)host_dk_shader_preload_done },
+    { "host_dk_shader_loose_loads", (void *)host_dk_shader_loose_loads },
+    { "host_dk_output_height", (void *)host_dk_output_height },
+    { "host_dk_gpu_frame_us", (void *)host_dk_gpu_frame_us },
+    { "host_dk_hud_ready", (void *)host_dk_hud_ready },
+#endif
 	/* SDL */
 	{ "host_sdl_init",                    host_sdl_init },
 	{ "host_sdl_set_hint",               host_sdl_set_hint },
@@ -190,6 +216,12 @@ static const struct import_entry imports[] =
 	{ "host_sdl_open_audio_stream",      host_sdl_open_audio_stream },
 	{ "host_sdl_put_audio_stream_data",  host_sdl_put_audio_stream_data },
 	{ "host_sdl_resume_audio_stream_device", host_sdl_resume_audio_stream_device },
+	{ "host_sdl_pause_audio_stream_device", host_sdl_pause_audio_stream_device },
+	{ "host_sdl_clear_audio_stream", host_sdl_clear_audio_stream },
+	{ "host_sdl_get_audio_stream_available", host_sdl_get_audio_stream_available },
+	{ "host_sdl_get_audio_stream_data", host_sdl_get_audio_stream_data },
+	{ "host_sdl_destroy_audio_stream", host_sdl_destroy_audio_stream },
+	{ "host_content_fs", host_content_fs },
 
 	/* GL */
 	{ "host_gl_get_string",              host_gl_get_string },
@@ -228,7 +260,6 @@ static const struct import_entry imports[] =
 	/* POSIX File helpers (posix_files) */
 	{ "hostposix_stat",                  posix_stat },
 	{ "hostposix_fstat",                 posix_fstat },
-	{ "hostposix_file_is_regular",       posix_file_is_regular },
 	{ "hostposix_set_file_times",        posix_set_file_times },
 	{ "hostposix_seek",                  posix_seek },
 	{ "hostposix_truncate",              posix_truncate },
@@ -266,10 +297,11 @@ static const struct import_entry imports[] =
 	{ "hostposix_browser_request", posix_browser_request },
 	{ "hostposix_browser_private_key", posix_browser_private_key },
 	{ "hostposix_browser_replace_key", posix_browser_replace_key },
-	{ "host_browser_download", host_browser_download },
 	{ "host_sdl_scancode_name", host_sdl_scancode_name },
 	{ "host_sdl_scancode_from_name", host_sdl_scancode_from_name },
 	{ "host_sdl_open_url", host_sdl_open_url },
+	{ "host_download", host_download },
+	{ "host_text_input", host_text_input },
 	{ "host_sdl_show_message_box", host_sdl_show_message_box },
 	{ "hostposix_user_secret", posix_user_secret },
 	{ "hostposix_describe_address", posix_describe_address },

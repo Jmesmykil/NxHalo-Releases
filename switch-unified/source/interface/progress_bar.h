@@ -27,6 +27,7 @@ void progress_bar_dispose(
 	void);
 void progress_bar_begin(
 	boolean skip_frame_capture);
+void progress_bar_native_stage(real progress, char const *stage);
 void progress_bar_end(
 	void);
 boolean progress_bar_is_active(

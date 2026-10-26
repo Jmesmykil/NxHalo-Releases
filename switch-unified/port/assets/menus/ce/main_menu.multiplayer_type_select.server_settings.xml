@@ -35,6 +35,7 @@
 	<widget name="main_menu/multiplayer_type_select/server_settings/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
 		
 		<child widget="main_menu/multiplayer_type_select/server_settings/button_ok" x="380" y="1"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/button_apply_lobby" x="380" y="1"/>
 		<child widget="common_button_cancel" x="510" y="1"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/op_server_name" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
@@ -215,6 +216,11 @@
 	<widget name="main_menu/multiplayer_type_select/server_settings/team_options_value" type="text" controller="1" width="280" height="22" font="ui\small_ui" color="#FF2896FF" align="center" text_y="5" text_flags="no_focus_test">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/button_apply_lobby" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="APPLY TO LOBBY" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port lobby apply settings" open="main_menu/multiplayer_type_select/lobby/lobby_screen"/>
+		<on event="start" run="port lobby apply settings" open="main_menu/multiplayer_type_select/lobby/lobby_screen"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="START GAME" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">

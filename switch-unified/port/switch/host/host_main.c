@@ -12,6 +12,14 @@ Based on the Android port's host_main.c, adapted for Switch/libnx:
 */
 
 #include "host.h"
+#ifdef HALO_SWITCH_DEKO3D
+#define NXHALO_BUILD_LABEL "native-unified37-deko-build114-protocol21-default-v24-experimental"
+#define NXHALO_LOG_PATH "sdmc:/switch/halo/halo-unified37-deko.log"
+#else
+#define NXHALO_BUILD_LABEL "native-unified36-deck2.9.9-protocol21-default-v24-experimental"
+#define NXHALO_LOG_PATH "sdmc:/switch/halo/halo-unified36.log"
+#endif
+
 #include "host_log_queue.h"
 
 #include <switch.h>
@@ -102,7 +110,7 @@ void userAppInit(void)
 	if (R_SUCCEEDED(rc))
 		s_sdmcMounted = true;
 	host_log_init();
-	host_logf(HOST_LOG_INFO, "build native-profile33-full-pipeline-protocol11: userAppInit");
+	host_logf(HOST_LOG_INFO, "build " NXHALO_BUILD_LABEL ": userAppInit");
 	host_logf(HOST_LOG_INFO, "startup SD mount result=0x%x existing=%d", rc, already_mounted);
 	bool capture_supported=false;
 	Result capture_rc=appletIsGamePlayRecordingSupported(&capture_supported);
@@ -176,10 +184,10 @@ void host_log_init(void)
 		return;
 	mkdir("sdmc:/switch", 0777);
 	mkdir("sdmc:/switch/halo", 0777);
-	s_logFile = fopen("sdmc:/switch/halo/halo-profile33.log", "w");
+	s_logFile = fopen("" NXHALO_LOG_PATH "", "w");
 	if (s_logFile)
 	{
-		fprintf(s_logFile, "=== Halo CE Nintendo Switch Log Started: native-profile33-full-pipeline-protocol11 ===\n");
+		fprintf(s_logFile, "=== Halo CE Nintendo Switch Log Started: " NXHALO_BUILD_LABEL " ===\n");
 		fflush(s_logFile);
 	}
 }
@@ -332,7 +340,7 @@ void host_fatal(const char *format, ...)
 	printf("\x1b[1;37m           HALO CE FATAL ERROR          \x1b[0m\n");
 	printf("\x1b[1;31m========================================\x1b[0m\n\n");
 	printf("%s\n\n", message);
-	printf("\x1b[1;33mLog saved to: sdmc:/switch/halo/halo-profile33.log\x1b[0m\n\n");
+	printf("\x1b[1;33mLog saved to: " NXHALO_LOG_PATH "\x1b[0m\n\n");
 	printf("\x1b[1;33mPress + or B to exit back to menu.\x1b[0m\n");
 
 	PadState pad;
@@ -502,6 +510,16 @@ static void *game_main(void *unused)
 	environment_set(&environment, "HOME", save_root);
 	environment_set(&environment, "HALO_DATA_ROOT", data_root);
 	environment_set(&environment, "HALO_SAVE_ROOT", save_root);
+	/* Unified features live in the native menus. Old configurations may
+	   still request the Xbox menu tags, which hide those controls. */
+	environment_set(&environment, "HALO_MENUS", "pc");
+	environment_set(&environment, "HALO_NET_BROKERS_FILE", "romfs:/brokers.txt");
+	/* Desktop updater cannot replace a Horizon application. Map downloads
+	   remain available through the bounded native HTTPS bridge. */
+	environment_set(&environment, "HALO_UPDATE_AUTO", "false");
+	/* Keep the new shared match/frame records alongside native Switch
+	   pipeline and hardware counters for this hardware candidate. */
+	environment_set(&environment, "HALO_PERFORMANCE", "true");
 
 	/* Switch display: 1280x720 docked, variable handheld.
 	   The game renders 480 lines; width = 480 * aspect. */
@@ -516,7 +534,7 @@ static void *game_main(void *unused)
 			display_width = 854; /* handheld is also 16:9 */
 
 		snprintf(width_str, sizeof(width_str), "%d", display_width);
-		environment_set(&environment, "HALO_DISPLAY_WIDTH", width_str);
+		environment_set(&environment, "HALO_SCREEN_WIDTH", width_str);
 		host_logf(HOST_LOG_INFO, "rendering %sx480", width_str);
 	}
 

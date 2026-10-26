@@ -357,6 +357,7 @@ static char const *const port_function_names[] =
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
 	"port lobby open", "port lobby add player", "port lobby join", "port lobby leave",
 	"port lobby player list initialize", "port lobby player choose",
+    "port lobby edit match", "port lobby apply settings",
 	"port lobby preview add", "port lobby preview leave",
 	/* (the gametype editor's: the Xbox's walk their rows by place, which the
 	PC version's screens changed) */

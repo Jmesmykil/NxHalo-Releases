@@ -4617,6 +4617,18 @@ void display_error_damaged_media(
 /* port: menu_tags.c's */
 char const *pc_menus_screen(char const *name);
 
+/* A completed native host round returns to its still-connected room. The
+   first hosting flow and stock Xbox menus retain their map-selection wizard. */
+static boolean network_game_native_host_round_returns_to_lobby(
+    struct network_game const *game)
+{
+    char const *pregame = "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen";
+    return game && game->number_of_games_played > 0 &&
+        game->variant.game_engine_index > game_engine_none &&
+        game->variant.game_engine_index <= game_engine_race &&
+        strcmp(pc_menus_screen(pregame), pregame) != 0;
+}
+
 void network_game_reset_to_pregame_ui(
 	void)
 {
@@ -4649,9 +4661,14 @@ void network_game_reset_to_pregame_ui(
 			struct network_game *game = network_game_get_game();
 			char const *screen = "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper";
 
-			/* Keep a network campaign's selected next mission in the connected lobby. */
+			/* The network campaign already selected its next mission. Keep
+			that map and the connected players in the lobby; the multiplayer
+			picker would show the previous campaign map. The host still
+			chooses when to start the next mission. */
 			if (game && !game->variant.game_engine_index && game->difficulty >= 0 && game->difficulty < 4)
 				screen = "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen";
+            else if (network_game_native_host_round_returns_to_lobby(game))
+                screen = "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen";
 
 			network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
 			/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */
@@ -5049,76 +5066,46 @@ static long search_and_replace(
 	wchar_t **string)
 {
 	long replacements = 0;
-
-	if (string && *string)
+	if (string && *string && search && *search && replace)
 	{
 		wchar_t *buffer = *string;
 		long search_length = ustrlen(search);
 		long replace_length = ustrlen(replace);
 		long length = ustrlen(buffer) + 1;
-		long delta;
+		long delta = replace_length - search_length;
 		wchar_t *match;
-
-		if (replace_length <= search_length)
+		wchar_t *cursor;
+		/* Count original, non-overlapping matches. Replacement text may itself
+		 * contain the token (including an identical replacement). Never rescan
+		 * inserted text: doing so can loop forever or exceed the allocation. */
+		for (match = ustrstr(buffer, search); match;
+			match = ustrstr(match + search_length, search))
+			replacements++;
+		if (!replacements)
+			return 0;
+		if (delta > 0)
 		{
-			delta = search_length - replace_length;
-			match = ustrstr(buffer, search);
-			if (match)
-			{
-				do
-				{
-					replacements++;
-					csmemcpy(match, replace, 2 * replace_length);
-					if (delta > 0)
-					{
-						csmemmove(
-							&match[replace_length],
-							&match[search_length],
-							2 * (length - (match - buffer) - replace_length));
-						length -= delta;
-					}
-					match = ustrstr(buffer, search);
-				}
-				while (match);
-			}
+			long maximum_characters = 0x7FFFFFFF / sizeof(*buffer);
+			if (length > maximum_characters ||
+				replacements > (maximum_characters - length) / delta)
+				return NONE;
+			buffer = pool_resize_pointer(widget_memory_pool, buffer,
+				sizeof(*buffer) * (length + delta * replacements),
+				"c:\\halo\\SOURCE\\interface\\ui_widget.c", 4994);
+			if (!buffer)
+				return NONE;
+			*string = buffer;
 		}
-		else
+		cursor = buffer;
+		while ((match = ustrstr(cursor, search)) != NULL)
 		{
-			delta = replace_length - search_length;
-			for (match = ustrstr(buffer, search);
-				match;
-				match = ustrstr(&match[search_length], search))
-			{
-				replacements++;
-			}
-			if (replacements > 0)
-			{
-				buffer = pool_resize_pointer(
-					widget_memory_pool,
-					buffer,
-					2 * (delta * replacements + length),
-					"c:\\halo\\SOURCE\\interface\\ui_widget.c",
-					4994);
-				if (!buffer)
-				{
-					replacements = NONE;
-				}
-				else
-				{
-					for (match = ustrstr(buffer, search);
-						match;
-						match = ustrstr(buffer, search))
-					{
-						csmemmove(
-							&match[replace_length],
-							&match[search_length],
-							2 * (length - (match - buffer) - search_length));
-						csmemcpy(match, replace, 2 * replace_length);
-						length += delta;
-					}
-					*string = buffer;
-				}
-			}
+			/* The suffix starts after the SEARCH token; using replace_length
+			 * here reads beyond the old allocation when the text shrinks. */
+			csmemmove(match + replace_length, match + search_length,
+				sizeof(*buffer) * (length - (match - buffer) - search_length));
+			csmemcpy(match, replace, sizeof(*buffer) * replace_length);
+			length += delta;
+			cursor = match + replace_length;
 		}
 	}
 
@@ -5742,6 +5729,43 @@ static void ui_mouse_note_target(
 #if defined(__linux__) && !defined(HALO_ANDROID)
     ui_widget_port_lobby_bounds(widget,&bounds);
 #endif
+	/* Spinner arrows are drawn from list_header_bounds/list_footer_bounds,
+	which may extend beyond the spinner widget's own bounds. Keep the mouse
+	target aligned with the visible controls. */
+	if (kind == _ui_mouse_target_value)
+	{
+		struct ui_widget_definition const *spinner_definition = definition;
+		rectangle2d arrow_bounds;
+		if (spinner_definition->list_header_bitmap.index != NONE)
+		{
+			arrow_bounds = spinner_definition->list_header_bounds;
+			if (spinner_string_list_extra_count(spinner_definition->text_label_string_list.index))
+			{
+				arrow_bounds.x0 -= SPINNER_EXTRA_WIDTH;
+				arrow_bounds.x1 -= SPINNER_EXTRA_WIDTH;
+			}
+			arrow_bounds.x0 += offset.x;
+			arrow_bounds.y0 += offset.y;
+			arrow_bounds.x1 += offset.x;
+			arrow_bounds.y1 += offset.y;
+			bounds.x0 = MIN(bounds.x0, arrow_bounds.x0);
+			bounds.y0 = MIN(bounds.y0, arrow_bounds.y0);
+			bounds.x1 = MAX(bounds.x1, arrow_bounds.x1);
+			bounds.y1 = MAX(bounds.y1, arrow_bounds.y1);
+		}
+		if (spinner_definition->list_footer_bitmap.index != NONE)
+		{
+			arrow_bounds = spinner_definition->list_footer_bounds;
+			arrow_bounds.x0 += offset.x;
+			arrow_bounds.y0 += offset.y;
+			arrow_bounds.x1 += offset.x;
+			arrow_bounds.y1 += offset.y;
+			bounds.x0 = MIN(bounds.x0, arrow_bounds.x0);
+			bounds.y0 = MIN(bounds.y0, arrow_bounds.y0);
+			bounds.x1 = MAX(bounds.x1, arrow_bounds.x1);
+			bounds.y1 = MAX(bounds.y1, arrow_bounds.y1);
+		}
+	}
 	target = &ui_mouse_targets[ui_mouse_target_count++];
 	target->widget = widget;
 	target->bounds = bounds;

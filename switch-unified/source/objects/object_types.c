@@ -772,21 +772,55 @@ void object_type_delete(
 	return;
 }
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+#include "halo_phase_profile.h"
+extern void platform_log(char const *format, ...);
+static struct halo_phase_timing object_type_timings[NUMBER_OF_OBJECT_TYPES][MAXIMUM_CHILDREN_PER_OBJECT_TYPE_DEFINITION];
+void object_type_profile_report(void)
+{
+    short type, part;
+    for (type=0; type<NUMBER_OF_OBJECT_TYPES; ++type) {
+        struct object_type_definition *definition=object_type_definition_get(type);
+        for (part=0; part<MAXIMUM_CHILDREN_PER_OBJECT_TYPE_DEFINITION && definition->part_definitions[part]; ++part) {
+            struct halo_phase_timing *t=&object_type_timings[type][part];
+            if (t->calls) platform_log("[object_type] tick=%ld sampled=1/16 type=%s part=%s calls=%llu cpu_us=%llu max_us=%llu",
+                game_time_get(), definition->name, definition->part_definitions[part]->name,
+                (unsigned long long)t->calls, (unsigned long long)t->total_us, (unsigned long long)t->max_us);
+        }
+    }
+    memset(object_type_timings,0,sizeof(object_type_timings));
+}
+#endif
+
 boolean object_type_update(
 	long object_index)
 {
 	short i;
 	boolean result;
-	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
-	result = FALSE;
+	short object_type = object_get(object_index)->object.type;
+    struct object_type_definition *definition = object_type_definition_get(object_type);
+#if defined(__linux__) || defined(HALO_ANDROID)
+    boolean sampled = (object_index & 15) == (game_time_get() & 15);
+#endif
+    result = FALSE;
 
 	for (i = 0; definition->part_definitions[i]; i++)
 	{
 		struct object_type_definition *current_definition = definition->part_definitions[i];
-		if (current_definition->datum_update && current_definition->datum_update(object_index))
-		{
-			result = TRUE;
-		}
+		if (current_definition->datum_update) {
+#if defined(__linux__) || defined(HALO_ANDROID)
+            uint64_t begin = sampled ? halo_profile_now_us() : 0;
+#endif
+            if (current_definition->datum_update(object_index)) result = TRUE;
+#if defined(__linux__) || defined(HALO_ANDROID)
+            if (sampled) {
+                uint64_t elapsed=halo_profile_now_us()-begin;
+                struct halo_phase_timing *t=&object_type_timings[object_type][i];
+                t->calls++; t->total_us+=elapsed;
+                if(elapsed>t->max_us) t->max_us=elapsed;
+            }
+#endif
+        }
 	}
 
 	return result;

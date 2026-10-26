@@ -46,6 +46,7 @@ enum handle_type
 	_handle_context,
 	_handle_gamepad,
 	_handle_audio,
+	_handle_capture,
 };
 
 struct handle
@@ -130,6 +131,10 @@ int host_sdl_init(uint32_t flags)
 	if (!sdl2_flags)
 		sdl2_flags = flags; /* pass through if no translation needed */
 
+	#ifdef HALO_SWITCH_DEKO3D
+    sdl2_flags &= ~SDL_INIT_VIDEO;
+    host_deko_prepare();
+#endif
 	return SDL_Init(sdl2_flags) == 0 ? 1 : 0;
 }
 
@@ -158,6 +163,9 @@ int64_t host_sdl_thread_id(void)
 uint32_t host_sdl_create_window(const char *title, int width, int height,
                                 int64_t flags)
 {
+#ifdef HALO_SWITCH_DEKO3D
+    return 0x7ffffffeu;
+#endif
 	host_logf(HOST_LOG_INFO, "host_sdl_create_window: '%s' %dx%d flags=0x%llx",
 		title, width, height, (unsigned long long)flags);
 
@@ -184,6 +192,9 @@ uint32_t host_sdl_create_window(const char *title, int width, int height,
 
 void host_sdl_window_size_in_pixels(uint32_t window, int *width, int *height)
 {
+#ifdef HALO_SWITCH_DEKO3D
+    *height = host_dk_output_height(); *width = *height == 1080 ? 1920 : 1280; return;
+#endif
 	SDL_Window *object = handle_get(window, _handle_window);
 
 	*width = 0;
@@ -200,12 +211,18 @@ int host_sdl_set_relative_mouse(uint32_t window, int enabled)
 
 int host_sdl_gl_set_attribute(int attribute, int value)
 {
+#ifdef HALO_SWITCH_DEKO3D
+    return 1;
+#endif
 	host_logf(HOST_LOG_INFO, "host_sdl_gl_set_attribute(%d, %d)", attribute, value);
 	return SDL_GL_SetAttribute((SDL_GLattr)attribute, value) == 0;
 }
 
 uint32_t host_sdl_gl_create_context(uint32_t window)
 {
+#ifdef HALO_SWITCH_DEKO3D
+    return 0x7ffffffdu;
+#endif
 	SDL_Window *object = handle_get(window, _handle_window);
 	if (!object)
 	{
@@ -248,6 +265,9 @@ uint32_t host_sdl_gl_create_context(uint32_t window)
 
 int host_sdl_gl_make_current(uint32_t window, uint32_t context)
 {
+#ifdef HALO_SWITCH_DEKO3D
+    return 1;
+#endif
 	static uint32_t reported_context;
 	SDL_GLContext object = handle_get(context, _handle_context);
 	int current = SDL_GL_MakeCurrent(
@@ -331,6 +351,9 @@ static void host_slow_log_stats(struct host_slow_frame_profile *p, uint32_t wind
 
 int host_sdl_gl_set_swap_interval(int interval)
 {
+#ifdef HALO_SWITCH_DEKO3D
+    return 1;
+#endif
 	int result = SDL_GL_SetSwapInterval(interval);
     int actual = SDL_GL_GetSwapInterval();
     host_logf(HOST_LOG_INFO, "swap_interval requested=%d result=%d actual=%d", interval, result, actual);
@@ -339,9 +362,14 @@ int host_sdl_gl_set_swap_interval(int interval)
 
 int host_sdl_gl_swap_window(uint32_t window)
 {
+
     SDL_Window *object = handle_get(window, _handle_window);
 
-    if (object)
+    if (object
+#ifdef HALO_SWITCH_DEKO3D
+        || host_renderer_deko3d
+#endif
+    )
     {
         static uint32_t frame_count;
         static uint64_t previous_diagnostic_ns;
@@ -352,11 +380,17 @@ int host_sdl_gl_swap_window(uint32_t window)
         struct host_frame_summary summary;
         uint64_t before_ns = armTicksToNs(armGetSystemTick());
         uint64_t after_ns;
+#ifdef HALO_SWITCH_DEKO3D
+        if (host_dk_presenting) host_dk_pace(); else svcSleepThread(16666667);
+#else
         host_gpu_time_end();
         SDL_GL_SwapWindow(object);
+#endif
         after_ns = armTicksToNs(armGetSystemTick());
         frame_count++;
+#ifndef HALO_SWITCH_DEKO3D
         host_gpu_time_begin(frame_count + 1);
+#endif
         memset(&record, 0, sizeof(record));
         record.frame = frame_count;
         record.guest_frame = host_frame_bridge_next();
@@ -368,7 +402,12 @@ int host_sdl_gl_swap_window(uint32_t window)
         record.frame_ns = after_ns - (previous_end_ns ? previous_end_ns : before_ns);
         record.swap_ns = after_ns - before_ns;
         previous_end_ns = after_ns;
+#ifdef HALO_SWITCH_DEKO3D
+        /* Legacy GL counters are unavailable; DK GPU timestamps are reported separately. */
+        record.flags |= HOST_SLOW_GPU_INCOMPLETE;
+#else
         if (!host_gl_frame_snapshot(&record.gpu)) record.flags |= HOST_SLOW_GPU_INCOMPLETE;
+#endif
         host_slow_frame_push(&slow, &record);
         if (host_frame_record(&profile, before_ns, after_ns, &summary))
         {
@@ -389,11 +428,20 @@ int host_sdl_gl_swap_window(uint32_t window)
                 frame_count - HOST_FRAME_PROFILE_WINDOW + 1 + summary.max_index,
                 (unsigned long long)(previous_diagnostic_ns / 1000),
                 (unsigned long long)host_log_dropped_batches());
+#ifdef HALO_SWITCH_DEKO3D
+            struct host_dk_frame_report dk;
+            host_dk_frame_report(&dk);
+            host_logf_buffered(HOST_LOG_INFO, "dk_frame frame=%u submit_wait_us=%u streams=%u acquire_max_us=%u fence_max_us=%u presents=%u gpu_last_us=%u gpu_average_us=%u",
+                frame_count, dk.submit_wait_us, dk.streams, dk.acquire_max_us, dk.fence_max_us, dk.presents, dk.gpu_last_us, dk.gpu_average_us);
+#else
             host_gl_log_stats(frame_count);
             host_gpu_time_report(frame_count);
+#endif
             host_hardware_profile_report(frame_count);
             host_network_profile_report(frame_count);
+#ifndef HALO_SWITCH_DEKO3D
             host_graphics_validation_report(frame_count);
+#endif
             host_frame_bridge_report(frame_count);
             host_audio_log_stats(frame_count);
             {
@@ -677,6 +725,39 @@ static void audio_failed_open(struct audio_binding *binding)
 	SDL_free(binding);
 }
 
+/* SDL3 default recording ID, kept explicit at the SDL2 ABI boundary. */
+#define GUEST_DEFAULT_RECORDING UINT32_C(0xFFFFFFFE)
+struct capture_binding { SDL_AudioDeviceID device; int frame_bytes; };
+static uint32_t open_capture(const int32_t *spec)
+{
+    SDL_AudioSpec desired = {0}, obtained;
+    struct capture_binding *binding;
+    uint32_t handle;
+    static int failure_logged;
+    desired.format = (SDL_AudioFormat)spec[0];
+    desired.channels = (Uint8)spec[1];
+    desired.freq = spec[2];
+    desired.samples = 512;
+    /* No callback: SDL queues captured PCM for the guest's main-thread drain.
+     * No format changes are allowed, so the voice codec sees exactly its spec. */
+    SDL_AudioDeviceID device = SDL_OpenAudioDevice(NULL, 1, &desired, &obtained, 0);
+    if (!device) {
+        if (!failure_logged) {
+            host_logf(HOST_LOG_ERROR, "voice capture unavailable: driver=%s error=%s",
+                SDL_GetCurrentAudioDriver() ? SDL_GetCurrentAudioDriver() : "none", SDL_GetError());
+            failure_logged = 1;
+        }
+        return 0;
+    }
+    binding = SDL_calloc(1, sizeof(*binding));
+    if (!binding) { SDL_CloseAudioDevice(device); return 0; }
+    binding->device = device;
+    binding->frame_bytes = SDL_AUDIO_BITSIZE(desired.format) / 8 * desired.channels;
+    handle = handle_new(_handle_capture, binding);
+    if (!handle) { SDL_CloseAudioDevice(device); SDL_free(binding); }
+    return handle;
+}
+
 uint32_t host_sdl_open_audio_stream(uint32_t device_id, const void *spec_ptr,
                                     uint32_t callback, uint32_t userdata)
 {
@@ -685,8 +766,7 @@ uint32_t host_sdl_open_audio_stream(uint32_t device_id, const void *spec_ptr,
 	int32_t guest_spec[3]; /* SDL3 3.4.16: format, channels, frequency */
 	SDL_AudioDeviceID dev;
 
-	(void)device_id;
-	if (!spec_ptr || !callback)
+	if (!spec_ptr || (!callback && device_id != GUEST_DEFAULT_RECORDING))
 		return 0;
 	memcpy(guest_spec, spec_ptr, sizeof(guest_spec));
 	if (guest_spec[1] <= 0 || guest_spec[1] > 255 || guest_spec[2] <= 0)
@@ -703,6 +783,8 @@ uint32_t host_sdl_open_audio_stream(uint32_t device_id, const void *spec_ptr,
 	default:
 		return 0;
 	}
+	if (device_id == GUEST_DEFAULT_RECORDING)
+		return callback ? 0 : open_capture(guest_spec);
 	memset(&desired, 0, sizeof(desired));
 	desired.format = (SDL_AudioFormat)guest_spec[0];
 	desired.channels = (Uint8)guest_spec[1];
@@ -772,6 +854,8 @@ int host_sdl_put_audio_stream_data(uint32_t stream, const void *data,
 
 int host_sdl_resume_audio_stream_device(uint32_t stream)
 {
+	struct capture_binding *capture = handle_get(stream, _handle_capture);
+	if (capture) { SDL_PauseAudioDevice(capture->device, 0); return 1; }
 	struct audio_binding *binding = handle_get(stream, _handle_audio);
 
 	if (!binding)
@@ -781,4 +865,47 @@ int host_sdl_resume_audio_stream_device(uint32_t stream)
 	mutexUnlock(&binding->lock);
 	SDL_PauseAudioDevice(binding->device, 0);
 	return 1;
+}
+
+int host_sdl_pause_audio_stream_device(uint32_t stream)
+{
+    struct capture_binding *capture = handle_get(stream, _handle_capture);
+    if (!capture) return 0;
+    SDL_PauseAudioDevice(capture->device, 1);
+    return 1;
+}
+int host_sdl_clear_audio_stream(uint32_t stream)
+{
+    struct capture_binding *capture = handle_get(stream, _handle_capture);
+    if (!capture) return 0;
+    SDL_ClearQueuedAudio(capture->device);
+    return 1;
+}
+int host_sdl_get_audio_stream_available(uint32_t stream)
+{
+    struct capture_binding *capture = handle_get(stream, _handle_capture);
+    if (!capture) return -1;
+    Uint32 size = SDL_GetQueuedAudioSize(capture->device);
+    /* Discard stale voice after a long frame instead of sending seconds late. */
+    if (size > 32000) { SDL_ClearQueuedAudio(capture->device); return 0; }
+    return (int)size;
+}
+int host_sdl_get_audio_stream_data(uint32_t stream, void *data, int length)
+{
+    struct capture_binding *capture = handle_get(stream, _handle_capture);
+    if (!capture || length < 0 || (!data && length) || length % capture->frame_bytes) return -1;
+    if (!length) return 0;
+    host_memory_watch_prepare_write((uint32_t)(uintptr_t)data, (uint32_t)length);
+    return (int)SDL_DequeueAudio(capture->device, data, (Uint32)length);
+}
+void host_sdl_destroy_audio_stream(uint32_t stream)
+{
+    struct capture_binding *capture = handle_get(stream, _handle_capture);
+    if (!capture) return; /* Playback worker lifetime remains process-owned. */
+    mutexLock(&handle_lock);
+    handles[stream].object = NULL;
+    handles[stream].type = _handle_free;
+    mutexUnlock(&handle_lock);
+    SDL_CloseAudioDevice(capture->device);
+    SDL_free(capture);
 }

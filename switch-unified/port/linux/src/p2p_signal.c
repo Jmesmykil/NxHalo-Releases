@@ -1526,7 +1526,11 @@ static void brokers_list(char *text, size_t size)
 	int comment = 0;
 
 	text[0] = 0;
-	if (name[0] == '/' || name[0] == '\\' || (name[0] && name[1] == ':'))
+	if (name[0] == '/' || name[0] == '\\' || (name[0] && name[1] == ':')
+#if defined(HALO_ANDROID)
+		|| !strncmp(name, "romfs:/", 7) || !strncmp(name, "sdmc:/", 6)
+#endif
+	)
 		snprintf(path, sizeof(path), "%s", name);
 	else
 	{

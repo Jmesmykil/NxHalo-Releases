@@ -52,6 +52,8 @@ static const char *const certificate_bundles[] =
 };
 
 static pthread_once_t certificates_once = PTHREAD_ONCE_INIT;
+/* Mbed TLS TLS 1.3 and PSA crypto are not built with threading support here. */
+static pthread_mutex_t update_download_mutex = PTHREAD_MUTEX_INITIALIZER;
 static mbedtls_x509_crt certificates;
 static int certificates_loaded;
 static int crypto_ready;
@@ -312,6 +314,7 @@ struct download
 	update_progress_proc progress;
 	void *context;
 	unsigned long long received, total, maximum_bytes;
+	int allow_text;
 };
 
 /* (a release is tens of megabytes: a body past this fills no disk) */
@@ -389,7 +392,7 @@ the status, or 0 on failure */
 static int https_get(const char *url, struct download *download, char *location, size_t location_size, char *error,
 	int error_size)
 {
-	static struct connection connection;
+	struct connection connection;
 	char host[256], port[16], path[2048];
 	char request[3072];
 	char line[MAXIMUM_HEADER_SIZE];
@@ -464,7 +467,7 @@ static int https_get(const char *url, struct download *download, char *location,
 	}
 	if (status == 200)
 	{
-		if (strcasestr(content_type, "text/html") || strcasestr(content_type, "application/json"))
+		if (!download->allow_text && (strcasestr(content_type, "text/html") || strcasestr(content_type, "application/json")))
 		{
 			snprintf(error, (size_t)error_size, "%s returned a non-file response (%s)", host,
 				content_type[0] ? content_type : "HTML or JSON");
@@ -491,8 +494,8 @@ static int https_get(const char *url, struct download *download, char *location,
 	return status;
 }
 
-int update_download_limited(const char *url, const char *path, unsigned long long maximum_bytes,
-	update_progress_proc progress, void *context, char *error, int error_size)
+static int update_download_limited_unlocked(const char *url, const char *path, unsigned long long maximum_bytes,
+	update_progress_proc progress, void *context, char *error, int error_size, int allow_text)
 {
 	char current[2048];
 	char location[2048];
@@ -512,6 +515,7 @@ int update_download_limited(const char *url, const char *path, unsigned long lon
 		return 0;
 	}
 	memset(&download, 0, sizeof(download));
+	download.allow_text = allow_text;
 	download.maximum_bytes = maximum_bytes < MAXIMUM_DOWNLOAD_SIZE ? maximum_bytes : MAXIMUM_DOWNLOAD_SIZE;
 	if (!download.maximum_bytes)
 	{
@@ -566,6 +570,32 @@ int update_download_limited(const char *url, const char *path, unsigned long lon
 	fclose(download.file);
 	unlink(path);
 	return 0;
+}
+
+int update_download_limited(const char *url, const char *path, unsigned long long maximum_bytes,
+	update_progress_proc progress, void *context, char *error, int error_size)
+{
+	int result;
+
+	/* This Mbed TLS build has TLS 1.3 and PSA enabled without MBEDTLS_THREADING_C.
+	Serialize the whole updater operation so PSA RNG/crypto state and TLS internals
+	are never entered concurrently, including across redirect handshakes. */
+	pthread_mutex_lock(&update_download_mutex);
+	result = update_download_limited_unlocked(url, path, maximum_bytes, progress, context, error, error_size, 0);
+	pthread_mutex_unlock(&update_download_mutex);
+	return result;
+}
+
+/* Catalog text is explicitly permitted here, with a much smaller hard cap. */
+int update_fetch_text_limited(const char *url, const char *path, unsigned long long maximum_bytes,
+	update_progress_proc progress, void *context, char *error, int error_size)
+{
+	int result;
+	if (maximum_bytes > 8ULL * 1024 * 1024) maximum_bytes = 8ULL * 1024 * 1024;
+	pthread_mutex_lock(&update_download_mutex);
+	result = update_download_limited_unlocked(url, path, maximum_bytes, progress, context, error, error_size, 1);
+	pthread_mutex_unlock(&update_download_mutex);
+	return result;
 }
 
 int update_download(const char *url, const char *path, update_progress_proc progress, void *context,

@@ -25,7 +25,8 @@ enum
 	NUMBER_OF_UI_MAP_LIST_STRINGS
 };
 
-/* the list anew: the game's thirteen Xbox map names, then those found */
+/* Refresh disk inventory and playable picker. xbox_maps retains the original
+thirteen string/picture indices even when some stock files are absent. */
 void ui_map_list_refresh(char *const *xbox_maps);
 long ui_map_list_count(void);
 /* the rows' map names, for the list widget's items */
@@ -55,5 +56,58 @@ void ui_map_list_family_name(short family, char const *file, wchar_t *name, long
 struct bitmap_data *ui_map_list_family_picture(short family, char const *file);
 boolean ui_map_list_preflight(char const *map_name);
 boolean ui_map_list_family_present(short family, char const *file);
+
+
+/* Installed files are independent of the online catalogue. Header compatibility
+and dependency checks are NOT evidence of successful native runtime loading. */
+#define UI_MAP_INVENTORY_LIMIT 4096
+#define UI_MAP_INVENTORY_PAGE_SIZE 9
+enum
+{
+    _ui_map_inventory_campaign = 0,
+    _ui_map_inventory_multiplayer = 1,
+    _ui_map_inventory_ui = 2,
+    _ui_map_inventory_resource = 3,
+    _ui_map_inventory_unknown = 4,
+    _ui_map_inventory_family_unknown = 3,
+    _ui_map_inventory_requirements_unchecked = 0,
+    _ui_map_inventory_requirements_present = 1,
+    _ui_map_inventory_requirements_failed = 2
+};
+struct ui_map_inventory_entry
+{
+    char map_name[64];       /* exact family-qualified engine name */
+    char basename[64];       /* filename without .map or family suffix */
+    char path[512];          /* actual enumerated file, including shadowed copies */
+    char requirements[192];  /* header/location/dependency detail */
+    unsigned long generation;
+    unsigned int version;
+    unsigned int file_size;
+    unsigned int header_crc;
+    short family;           /* halo_map_families, or family_unknown */
+    short map_type;         /* enum above; filters accept NONE for All */
+    short requirement_status;
+    boolean valid_header;
+    boolean routable;       /* this file is the engine resolver's exact copy */
+};
+long ui_map_inventory_count(void);
+long ui_map_inventory_overflow(void); /* omitted files; never silently truncated */
+long ui_map_inventory_filtered_count(void);
+long ui_map_inventory_page(void);     /* zero based */
+long ui_map_inventory_page_count(void); /* at least one, including empty view */
+void ui_map_inventory_set_query(char const *query);
+char const *ui_map_inventory_query(void);
+void ui_map_inventory_filter_set(short family, short map_type);
+short ui_map_inventory_family_filter(void);
+short ui_map_inventory_type_filter(void);
+boolean ui_map_inventory_page_move(int direction);
+boolean ui_map_inventory_result(int page_row, struct ui_map_inventory_entry *entry);
+char const *ui_map_inventory_status(void);
+/* Snapshot-safe selection: NONE for stale/changed/non-MP/non-routable entries. */
+long ui_map_inventory_resolve(struct ui_map_inventory_entry const *snapshot);
+/* Snapshot-safe lazy dependency check; FALSE means stale/changed snapshot.
+On TRUE inspect requirement_status/details; never enables campaign launch. */
+boolean ui_map_inventory_check(struct ui_map_inventory_entry const *snapshot,
+    struct ui_map_inventory_entry *details);
 
 #endif

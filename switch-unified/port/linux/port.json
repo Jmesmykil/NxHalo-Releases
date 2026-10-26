@@ -18,8 +18,7 @@
     ],
     "defines": [
       "DEBUG",
-      "xbox",
-      "HALO_CUSTOM_EDITION"
+      "xbox"
     ],
     "include_dirs": [
       "source",

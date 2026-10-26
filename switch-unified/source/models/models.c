@@ -960,6 +960,11 @@ void render_model(
 		{
 			geometry_detail_level_index--;
 		}
+#if defined(__linux__) && !defined(HALO_ANDROID) && defined(HALO_PRIVATE_BENCHMARK)
+        extern void crowd_benchmark_model(long model, int lod, int shadow, int nodes);
+        crowd_benchmark_model(model_index, geometry_detail_level_index,
+            TEST_FLAG(flags, _render_model_shadow_bit), model->nodes.count);
+#endif
 		if (rasterizer_debug_options.debug_model_lod!=NONE)
 		{
 			geometry_detail_level_index = PIN(rasterizer_debug_options.debug_model_lod, 0, NUMBER_OF_DETAIL_LEVELS_PER_MODEL-1);

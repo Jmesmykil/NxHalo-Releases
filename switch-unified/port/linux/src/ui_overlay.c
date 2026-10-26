@@ -18,6 +18,7 @@ atlas texture as they are first drawn at a size, and drawn as quads too.
 #include "xgpu.h"
 #include "ui_font.h"
 #include "ui_overlay.h"
+#include "port_config.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -623,9 +624,19 @@ void ui_overlay_present(int x, int y, int width, int height, int window_width, i
 {
 	float scale, origin_x, origin_y;
 	int shape_count, index, count = 0, atlas_full = 0;
-
+	static unsigned int diagnostic_calls;
 	if (!overlay.quad_count && !overlay.text_count)
 		return;
+	unsigned int diagnostic_call = ++diagnostic_calls;
+	int diagnostic = config_boolean("debug.screenshot_composed") &&
+		(diagnostic_call == 1 || diagnostic_call == 30 || diagnostic_call == 120);
+	unsigned char diagnostic_before[4] = {0}, diagnostic_after[4] = {0};
+	int diagnostic_x = 0, diagnostic_y = 0;
+	if (diagnostic)
+		platform_log("overlay_diag call=%u quads=%d texts=%d picture=%d,%d,%d,%d window=%d,%d ready=%d failed=%d",
+			diagnostic_call, overlay.quad_count, overlay.text_count, x, y, width, height,
+			window_width, window_height, overlay.ready, overlay.failed);
+
 	if (!set_up() || width <= 0 || height <= 0)
 	{
 		overlay.quad_count = overlay.text_count = overlay.text_used = 0;
@@ -672,7 +683,7 @@ void ui_overlay_present(int x, int y, int width, int height, int window_width, i
 	glGetIntegerv(GL_BLEND_SRC_ALPHA, &saved_blend_alpha_source);
 	glGetIntegerv(GL_BLEND_DST_ALPHA, &saved_blend_alpha_destination);
 	glGetIntegerv(GL_BLEND_EQUATION_RGB, &saved_blend_equation);
-#if !defined(HALO_GL_NO_CLIP_CONTROL) && !defined(HALO_ANDROID)
+#if !defined(HALO_ANDROID) && !defined(HALO_GL_NO_CLIP_CONTROL)
 	/* (the renderer's clip space is D3D's, y down (d3d8_gl.c's
 	glClipControl); the overlay's is GL's, as on macOS and Android, which have
 	no glClipControl) */
@@ -764,7 +775,80 @@ void ui_overlay_present(int x, int y, int width, int height, int window_width, i
 	glBindBuffer(GL_ARRAY_BUFFER, overlay.vertex_buffer);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(overlay.vertices), NULL, GL_STREAM_DRAW);
 	glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)count * (GLsizeiptr)sizeof(struct vertex), overlay.vertices);
+	if (diagnostic && count && window_width > 0 && window_height > 0)
+	{
+		int chosen = 0;
+		GLint read_framebuffer = 0, viewport[4] = {0};
+		for (index = 0; index < count; index += 6)
+		{
+			const struct vertex *v = &overlay.vertices[index];
+			float cx = (v[0].x + v[4].x) * 0.5f, cy = (v[0].y + v[4].y) * 0.5f;
+			if (v->u < 0 && v->color[3] && (v->color[0] || v->color[1] || v->color[2]) &&
+				cx >= 0 && cx < window_width && cy >= 0 && cy < window_height) { chosen = index; break; }
+		}
+		const struct vertex *v = &overlay.vertices[chosen];
+		diagnostic_x = (int)((v[0].x + v[4].x) * 0.5f);
+		diagnostic_y = window_height - 1 - (int)((v[0].y + v[4].y) * 0.5f);
+		if (diagnostic_x < 0 || diagnostic_x >= window_width) diagnostic_x = window_width / 2;
+		if (diagnostic_y < 0 || diagnostic_y >= window_height) diagnostic_y = window_height / 2;
+		glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_framebuffer);
+		glGetIntegerv(GL_VIEWPORT, viewport);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+		glReadPixels(diagnostic_x, diagnostic_y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, diagnostic_before);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, read_framebuffer);
+		platform_log("overlay_diag call=%u vertices=%d shapes=%d program=%u vao=%u vbo=%u uniforms=%d,%d,%d,%d viewport=%d,%d,%d,%d fbo_status=%x sample=%d,%d vertex=%f,%f uv=%f,%f color=%u,%u,%u,%u",
+			diagnostic_call,count,shape_count,overlay.program,overlay.vertex_array,overlay.vertex_buffer,
+			overlay.scale_location,overlay.atlas_location,overlay.cutouts_location,overlay.window_height_location,
+			viewport[0],viewport[1],viewport[2],viewport[3],glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER),
+			diagnostic_x,diagnostic_y,v->x,v->y,v->u,v->v,v->color[0],v->color[1],v->color[2],v->color[3]);
+	}
 	glDrawArrays(GL_TRIANGLES, 0, count);
+	if (diagnostic && count && window_width > 0 && window_height > 0)
+	{
+		GLint read_framebuffer = 0;
+		glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_framebuffer);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+		glReadPixels(diagnostic_x, diagnostic_y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, diagnostic_after);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, read_framebuffer);
+		platform_log("overlay_diag call=%u before=%u,%u,%u,%u after=%u,%u,%u,%u", diagnostic_call,
+			diagnostic_before[0],diagnostic_before[1],diagnostic_before[2],diagnostic_before[3],
+			diagnostic_after[0],diagnostic_after[1],diagnostic_after[2],diagnostic_after[3]);
+#ifdef HALO_ANDROID
+		if (diagnostic_call == 1)
+		{
+			GLfloat actual_scale[2] = {0}, clear_color[4] = {0};
+			GLint draw_fbo = 0, read_fbo = 0, texture = 0;
+			GLuint probe_fbo = 0, probe_texture = 0;
+			unsigned char pixel[4] = {0};
+			GLenum prior_error = glGetError();
+			glGetUniformfv(overlay.program, overlay.scale_location, actual_scale);
+			glGetFloatv(GL_COLOR_CLEAR_VALUE, clear_color);
+			glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fbo);
+			glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_fbo);
+			glGetIntegerv(GL_TEXTURE_BINDING_2D, &texture);
+			glGenTextures(1, &probe_texture);
+			glBindTexture(GL_TEXTURE_2D, probe_texture);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+			glGenFramebuffers(1, &probe_fbo);
+			glBindFramebuffer(GL_FRAMEBUFFER, probe_fbo);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, probe_texture, 0);
+			GLenum probe_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+			glClearColor(0.25f, 0.5f, 0.75f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
+			glReadPixels(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+			GLenum probe_error = glGetError();
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw_fbo);
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, read_fbo);
+			glBindTexture(GL_TEXTURE_2D, texture);
+			glClearColor(clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
+			glDeleteFramebuffers(1, &probe_fbo);
+			glDeleteTextures(1, &probe_texture);
+			platform_log("overlay_probe error_before=%x scale=%f,%f expected=%f,%f fbo_status=%x rgba=%u,%u,%u,%u error_probe=%x",
+				prior_error, actual_scale[0], actual_scale[1], 2.0f/(float)window_width, -2.0f/(float)window_height,
+				probe_status,pixel[0],pixel[1],pixel[2],pixel[3],probe_error);
+		}
+#endif
+	}
 
 	glBindVertexArray((GLuint)saved_vertex_array);
 	glBindBuffer(GL_ARRAY_BUFFER, (GLuint)saved_array_buffer);
@@ -773,7 +857,7 @@ void ui_overlay_present(int x, int y, int width, int height, int window_width, i
 	glBindSampler(0, (GLuint)saved_sampler);
 	glActiveTexture((GLenum)saved_active);
 	glViewport(saved_viewport[0], saved_viewport[1], saved_viewport[2], saved_viewport[3]);
-#if !defined(HALO_GL_NO_CLIP_CONTROL) && !defined(HALO_ANDROID)
+#if !defined(HALO_ANDROID) && !defined(HALO_GL_NO_CLIP_CONTROL)
 	if (glClipControl)
 		glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
 #endif

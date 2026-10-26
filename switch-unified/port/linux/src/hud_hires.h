@@ -1,3 +1,6 @@
+#ifdef HALO_SWITCH_DEKO3D
+#include "../../switch/guest/hud_hires_dk.h.inc"
+#else
 /*
 HUD_HIRES.H
 
@@ -53,5 +56,7 @@ all its mip levels, and their number; 0 if it could not be */
 unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned long *levels);
 /* whether its green is its coverage (d3d8_gl.c, nv2a_psh.c: coverage_alpha) */
 int hud_hires_override_coverage(long asset);
+
+#endif
 
 #endif

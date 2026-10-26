@@ -73,9 +73,9 @@ void host_sdl_scancode_name(int scancode, char *buffer, unsigned int size);
 int host_sdl_scancode_from_name(const char *name);
 int host_sdl_show_toast(const char *message, int duration, int gravity, int x, int y);
 int host_sdl_show_simple_message_box(unsigned int flags, const char *title, const char *message);
+int host_sdl_show_message_box(unsigned int flags, const char *title, const char *message, int count,
+    const unsigned int *button_flags, const int *button_ids, const unsigned int *button_texts);
 int host_sdl_open_url(const char *url);
-int host_sdl_show_message_box(unsigned int flags, const char *title, const char *message,
-	int count, const unsigned int *button_flags, const int *ids, const unsigned int *texts);
 int host_sdl_get_gamepads(unsigned int *ids, int capacity);
 unsigned int host_sdl_open_gamepad(unsigned int id);
 unsigned int host_sdl_gamepad_from_id(unsigned int id);
@@ -108,7 +108,12 @@ void host_gl_wait_frame(unsigned int slot);
 
 /* the storage directories the port uses, copied into buffer */
 void host_android_path(int which, char *buffer, unsigned int size);
-int host_browser_download(const char *url, const char *path, unsigned long long maximum_bytes,
-	char *error, int error_size);
+
+int host_sdl_pause_audio_stream_device(unsigned int stream);
+int host_sdl_clear_audio_stream(unsigned int stream);
+int host_sdl_get_audio_stream_available(unsigned int stream);
+int host_sdl_get_audio_stream_data(unsigned int stream, void *data, int length);
+void host_sdl_destroy_audio_stream(unsigned int stream);
+int host_content_fs(unsigned int packet_address);
 
 #endif

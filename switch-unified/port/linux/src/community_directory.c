@@ -1,16 +1,22 @@
 #include "platform.h"
 #include "update.h"
 #include "community_directory.h"
+#include "directory_cache_state.h"
+#include "directory_snapshot_id.h"
 #include "p2p_internal.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <SDL3/SDL.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "posix.h"
+#include <strings.h>
 #define URL "https://halo.milenko.org/v1/games"
 #define LIMIT (1024 * 1024)
+#define TEST_WINSOCK_SO_ERROR 0x1007 /* translated to host SO_ERROR by posix_socket_getsockopt */
 #define MAX_GAMES 512
 #define POLL_MS 10000
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -19,11 +25,11 @@ static int game_count, done = 1;
 static SDL_Thread *thread;
 static Uint64 next_poll;
 static char status[96] = "Community directory has not been checked";
+static struct directory_cache_state cache_state;
 static char path[256];
 static struct community_directory_game classic_games[2][MAX_GAMES];
-static int classic_count[2], classic_loaded[2];
+static int classic_count[2], classic_loaded[2], classic_total[2], classic_failed[2];
 static time_t classic_mtime[2];
-static long classic_size[2];
 static Uint64 classic_next_check;
 struct cursor { const char *p, *end; int depth; };
 static int hd(char c) { if(c>='0'&&c<='9')return c-'0'; if(c>='a'&&c<='f')return c-'a'+10; if(c>='A'&&c<='F')return c-'A'+10; return -1; }
@@ -62,7 +68,11 @@ static int parse_game(struct cursor *c,struct community_directory_game *g) {
   if(!str(c,key,sizeof(key)))return 0;ws(c);if(c->p>=c->end||*c->p++!=':')return 0;ws(c);
   if(!strcmp(key,"invite")){if(c->p<c->end&&*c->p=='"'){if(!str(c,inv,sizeof(inv)))return 0;hi=1;}else if(!skip(c))return 0;}
   else if(!strcmp(key,"name")){if(!str(c,g->listing.name,sizeof(g->listing.name)))return 0;hn=1;}
-  else if(!strcmp(key,"map")){if(!str(c,g->listing.map,sizeof(g->listing.map)))return 0;hm=1;}
+  else if(!strcmp(key,"map")){
+   char full[128];if(!str(c,full,sizeof(full)))return 0;
+   snprintf(g->listing.map,sizeof(g->listing.map),"%.*s",P2P_LISTING_MAP_SIZE,
+       strlen(full)>P2P_LISTING_MAP_SIZE?"Unknown":full);hm=1;
+  }
   else if(!strcmp(key,"gametype")){if(!str(c,g->listing.gametype,sizeof(g->listing.gametype)))return 0;}
   else if(!strcmp(key,"mode")){if(!str(c,g->mode,sizeof(g->mode)))return 0;}
   else if(!strcmp(key,"source")){if(!str(c,src,sizeof(src)))return 0;}
@@ -79,14 +89,14 @@ static int parse_game(struct cursor *c,struct community_directory_game *g) {
  /* Missing or malformed invite leaves the row visible and unjoinable. */ if(!hi||!invite_id(inv,g))g->listing.invite[0]=0;
  return 1;
 }
-static int parse_feed(const char *data,size_t size,struct community_directory_game *out) {
- struct cursor c={data,data+size,0};char key[32];int first=1,n=0;ws(&c);if(c.p>=c.end||*c.p++!='{')return -1;
+static int parse_feed(const char *data,size_t size,struct community_directory_game *out,int *total) {
+ struct cursor c={data,data+size,0};char key[32];int first=1,n=0,seen_games=0,all=0;*total=0;ws(&c);if(c.p>=c.end||*c.p++!='{')return -1;
  for(;;){ws(&c);if(c.p<c.end&&*c.p=='}'){c.p++;break;}if(!first){if(c.p>=c.end||*c.p++!=',')return -1;ws(&c);}first=0;
   if(!str(&c,key,sizeof(key)))return -1;ws(&c);if(c.p>=c.end||*c.p++!=':')return -1;ws(&c);
-  if(!strcmp(key,"games")){int f=1;if(c.p>=c.end||*c.p++!='[')return -1;for(;;){ws(&c);if(c.p<c.end&&*c.p==']'){c.p++;break;}if(!f){if(c.p>=c.end||*c.p++!=',')return -1;ws(&c);}f=0;if(n<MAX_GAMES){if(!parse_game(&c,&out[n]))return -1;n++;}else if(!skip(&c))return -1;}}
+  if(!strcmp(key,"games")){int f=1;if(seen_games++)return -1;if(c.p>=c.end||*c.p++!='[')return -1;for(;;){ws(&c);if(c.p<c.end&&*c.p==']'){c.p++;break;}if(!f){if(c.p>=c.end||*c.p++!=',')return -1;ws(&c);}f=0;if(n<MAX_GAMES){if(!parse_game(&c,&out[n]))return -1;n++;}else if(!skip(&c))return -1;all++;}}
   else if(!skip(&c))return -1;
  }
- ws(&c);return c.p==c.end?n:-1;
+ ws(&c);if(c.p!=c.end||!seen_games)return -1;*total=all;return n;
 }
 static int parse_classic_row(struct cursor *c,struct community_directory_game *g,int pc) {
  char key[32],address[80],game[32];int port=0,have_address=0,have_port=0,first=1,i;
@@ -100,47 +110,267 @@ static int parse_classic_row(struct cursor *c,struct community_directory_game *g
  }
  if(!have_address||!have_port||port<1||port>65535||!address[0]||strlen(address)>=26)return 0;
  for(i=0;address[i];i++)if(!((address[i]>='0'&&address[i]<='9')||(address[i]>='a'&&address[i]<='f')||(address[i]>='A'&&address[i]<='F')||address[i]=='.'||address[i]==':'))return 0;
- snprintf(g->listing.name,sizeof(g->listing.name),"%s:%d",address,port);
+ snprintf(g->listing.name,sizeof(g->listing.name),"%.25s:%d",address,port);
+ directory_snapshot_identifier(g->listing.name,pc,g->listing.identifier);
  snprintf(g->listing.map,sizeof(g->listing.map),"Unknown");
  g->listing.engine_type=1;g->listing.open=0;g->listing.ping=-1;
  g->version=pc?-3:-2;g->source=3;snprintf(g->mode,sizeof(g->mode),pc?"classic_pc":"classic_ce");
  return 1;
 }
-static int parse_classic_feed(const char *data,size_t size,struct community_directory_game *out,int pc) {
- struct cursor c={data,data+size,0};int first=1,n=0;ws(&c);if(c.p>=c.end||*c.p++!='[')return -1;
- for(;;){ws(&c);if(c.p<c.end&&*c.p==']'){c.p++;break;}if(!first){if(c.p>=c.end||*c.p++!=',')return -1;ws(&c);}first=0;if(n>=MAX_GAMES||!parse_classic_row(&c,&out[n],pc))return -1;n++;}
- ws(&c);return c.p==c.end?n:-1;
+static int parse_classic_feed(const char *data,size_t size,struct community_directory_game *out,int pc,int *total) {
+ struct cursor c={data,data+size,0};int first=1,n=0,all=0;*total=0;ws(&c);if(c.p>=c.end||*c.p++!='[')return -1;
+ for(;;){ws(&c);if(c.p<c.end&&*c.p==']'){c.p++;break;}if(!first){if(c.p>=c.end||*c.p++!=',')return -1;ws(&c);}first=0;
+  if(n<MAX_GAMES){if(!parse_classic_row(&c,&out[n],pc))return -1;n++;}
+  else if(!skip(&c))return -1;all++;
+ }
+ ws(&c);if(c.p!=c.end)return -1;*total=all;return n;
 }
 static void refresh_classic(void) {
  char executable[1024],directory[1024],file[2][1100];char *slash;int i;
  Uint64 now=SDL_GetTicks();if(now<classic_next_check)return;classic_next_check=now+2000;
+#ifdef HALO_ANDROID
+ const char *data_root=getenv("HALO_DATA_ROOT");
+ if(!data_root||!*data_root||snprintf(directory,sizeof(directory),"%s",data_root)>=(int)sizeof(directory))return;
+#else
  if(!update_executable_path(executable,sizeof(executable)))return;
  slash=strrchr(executable,'/');if(!slash)return;*slash=0;if(snprintf(directory,sizeof(directory),"%s",executable)>=(int)sizeof(directory))return;
+#endif
  if(snprintf(file[0],sizeof(file[0]),"%s/halo-ce-master.json",directory)>=(int)sizeof(file[0])||snprintf(file[1],sizeof(file[1]),"%s/halo-pc-master.json",directory)>=(int)sizeof(file[1]))return;
  for(i=0;i<2;i++){
-  struct _stat st;FILE *f;char *data;size_t size;int n;
-  if(_stat(file[i],&st)!=0){classic_count[i]=0;classic_loaded[i]=1;classic_mtime[i]=0;classic_size[i]=-1;continue;}
-  if(classic_loaded[i]&&classic_mtime[i]==st.st_mtime&&classic_size[i]==st.st_size)continue;
-  if(st.st_size<0||st.st_size>LIMIT){classic_loaded[i]=1;classic_mtime[i]=st.st_mtime;classic_size[i]=st.st_size;classic_count[i]=0;continue;}
-  f=fopen(file[i],"rb");if(!f)continue;size=(size_t)st.st_size;data=(char*)malloc(size+1);
-  if(!data){fclose(f);continue;}
-  if(fread(data,1,size,f)!=size){free(data);fclose(f);continue;}fclose(f);data[size]=0;
-  n=parse_classic_feed(data,size,classic_games[i],i==1);free(data);
-  classic_loaded[i]=1;classic_mtime[i]=st.st_mtime;classic_size[i]=st.st_size;
-  if(n>=0)classic_count[i]=n;
+  struct posix_file_information st;FILE *f;char *data;size_t size;int fd,n,total;
+  struct community_directory_game parsed[MAX_GAMES];
+  /* Snapshot names are host paths. _stat translates Xbox paths and cannot be
+     used here. Inspect the held host descriptor through the ABI-safe bridge. */
+  fd=open(file[i],O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
+  if(fd<0){classic_failed[i]=1;continue;}
+  if(posix_fstat(fd,&st)||!posix_file_is_regular(fd)||st.size_high||st.size_low>LIMIT){
+   close(fd);classic_failed[i]=1;continue;
+  }
+  /* Poll complete snapshots every 2s; same-size same-second rewrites must be seen. */
+  f=fdopen(fd,"rb");if(!f){close(fd);classic_failed[i]=1;continue;}
+  size=(size_t)st.size_low;data=(char*)malloc(size+1);
+  if(!data){fclose(f);classic_failed[i]=1;continue;}
+  if(fread(data,1,size,f)!=size){free(data);fclose(f);classic_failed[i]=1;continue;}fclose(f);data[size]=0;
+  n=parse_classic_feed(data,size,parsed,i==1,&total);free(data);
+  if(n<0){classic_failed[i]=1;continue;}
+  memcpy(classic_games[i],parsed,(size_t)n*sizeof(parsed[0]));
+  classic_count[i]=n;classic_total[i]=total;classic_loaded[i]=1;classic_failed[i]=0;
+  classic_mtime[i]=(time_t)st.modification_seconds;
  }
 }
 
-static int fetch_thread(void *unused) {
- char err[160]="";FILE *f=NULL;char *buf=NULL;long length=-1;int n=-1,ok=0;struct community_directory_game parsed[MAX_GAMES];(void)unused;
- if(update_download(URL,path,NULL,NULL,err,sizeof(err))){f=fopen(path,"rb");if(f&&fseek(f,0,SEEK_END)==0&&(length=ftell(f))>=0&&length<=LIMIT&&fseek(f,0,SEEK_SET)==0){size_t z=(size_t)length;buf=(char*)malloc(z+1);if(buf&&fread(buf,1,z,f)==z){buf[z]=0;n=parse_feed(buf,z,parsed);ok=n>=0;}}if(f)fclose(f);}
- free(buf);unlink(path);pthread_mutex_lock(&lock);if(ok){memcpy(games,parsed,(size_t)n*sizeof(parsed[0]));game_count=n;snprintf(status,sizeof(status),"Community directory updated (%d games)",n);}else snprintf(status,sizeof(status),"Community directory unavailable");done=1;pthread_mutex_unlock(&lock);return 0;
+
+/* Test-only directory transport. The regular directory uses the verified HTTPS updater. */
+static int test_loopback_url(const char *url, unsigned short *port, char *path_part, size_t path_size)
+{
+ static const char prefix[] = "http://127.0.0.1:";
+ const char *number, *slash, *part;
+ unsigned long value = 0;
+ size_t length;
+ if (!url || strncmp(url, prefix, sizeof(prefix) - 1)) return 0;
+ number = url + sizeof(prefix) - 1;
+ slash = strchr(number, '/');
+ if (!slash || slash == number) return 0;
+ while (number < slash) {
+  if (*number < '0' || *number > '9') return 0;
+  value = value * 10 + (unsigned long)(*number++ - '0');
+  if (value > 65535) return 0;
+ }
+ if (!value) return 0;
+ length = strlen(slash);
+ if (!length || length >= path_size) return 0;
+ for (part = slash; *part; part++)
+  if ((unsigned char)*part <= 32 || *part == 127) return 0;
+ memcpy(path_part, slash, length + 1);
+ *port = (unsigned short)value;
+ return 1;
 }
+
+/* One bounded HTTP/1.1 response, no redirects or chunked bodies. */
+
+static int test_wait_socket(int socket, int writing, Uint64 deadline)
+{
+ while (SDL_GetTicks() < deadline) {
+  int readable = socket, writable = socket, read_count = 1, write_count = 1;
+  Uint64 remaining = deadline - SDL_GetTicks();
+  int result = posix_socket_select(writing ? NULL : &readable, writing ? NULL : &read_count,
+   writing ? &writable : NULL, writing ? &write_count : NULL, NULL, NULL,
+   0, (posix_long)(remaining * 1000), 0);
+  if (result > 0) return 1;
+  return 0;
+ }
+ return 0;
+}
+
+/* One bounded HTTP/1.1 response, no redirects or chunked bodies. */
+static int test_loopback_get(const char *url, char **body, size_t *body_size)
+{
+ char request[3072], path_part[2048];
+ unsigned short port;
+ struct sockaddr_in address;
+ char *response = NULL, *separator, *line, *line_end;
+ size_t used = 0, capacity = LIMIT + 8193, header_size, body_offset, expected = 0;
+ int socket = -1, status = 0, have_length = 0, result = 0, request_size;
+ int socket_error = 0, socket_error_size = sizeof(socket_error);
+ Uint64 deadline;
+ *body = NULL;
+ *body_size = 0;
+ if (!test_loopback_url(url, &port, path_part, sizeof(path_part))) return 0;
+ socket = posix_socket(AF_INET, SOCK_STREAM, 0);
+ if (socket < 0) goto done;
+ posix_socket_set_nonblocking(socket, 1);
+ memset(&address, 0, sizeof(address));
+ address.sin_family = AF_INET;
+ address.sin_port = SDL_Swap16(port);
+ address.sin_addr.s_addr = SDL_Swap32(0x7f000001U);
+ if (posix_socket_connect(socket, &address, sizeof(address)) < 0) {
+  int error = posix_socket_last_error();
+  if (error != WSAEWOULDBLOCK && error != WSAEINPROGRESS) goto done;
+  deadline = SDL_GetTicks() + 5000;
+  if (!test_wait_socket(socket, 1, deadline) ||
+      posix_socket_getsockopt(socket, SOL_SOCKET, TEST_WINSOCK_SO_ERROR, &socket_error, &socket_error_size) < 0 ||
+      socket_error) goto done;
+ }
+ request_size = snprintf(request, sizeof(request),
+  "GET %s HTTP/1.1\r\nHost: 127.0.0.1:%u\r\nAccept: application/json\r\nConnection: close\r\n\r\n",
+  path_part, (unsigned int)port);
+ if (request_size < 0 || (size_t)request_size >= sizeof(request)) goto done;
+ deadline = SDL_GetTicks() + 5000;
+ {
+  size_t sent = 0;
+  while (sent < (size_t)request_size) {
+   int amount = posix_socket_send(socket, request + sent, request_size - (int)sent, 0);
+   if (amount > 0) sent += (size_t)amount;
+   else if (posix_socket_last_error() == WSAEWOULDBLOCK) {
+    if (!test_wait_socket(socket, 1, deadline)) goto done;
+   } else goto done;
+  }
+ }
+ response = (char *)malloc(capacity + 1);
+ if (!response) goto done;
+ deadline = SDL_GetTicks() + 5000;
+ while (used < capacity) {
+  int amount;
+  if (!test_wait_socket(socket, 0, deadline)) goto done;
+  amount = posix_socket_recv(socket, response + used, (int)(capacity - used), 0);
+  if (amount < 0 && posix_socket_last_error() == WSAEWOULDBLOCK) continue;
+  if (amount < 0) goto done;
+  if (!amount) break;
+  used += (size_t)amount;
+ }
+ if (used == capacity) goto done;
+ response[used] = 0;
+ separator = strstr(response, "\r\n\r\n");
+ if (!separator || (size_t)(separator - response) > 8192 ||
+     sscanf(response, "HTTP/1.%*d %d", &status) != 1 || status != 200) goto done;
+ header_size = (size_t)(separator - response);
+ body_offset = header_size + 4;
+ line = strstr(response, "\r\n");
+ if (!line || (size_t)(line - response) >= header_size) goto done;
+ line += 2;
+ while (line < separator) {
+  unsigned long parsed_length = 0;
+  char *value;
+  line_end = strstr(line, "\r\n");
+  if (!line_end || line_end > separator) goto done;
+  if ((size_t)(line_end - line) >= 15 && !strncasecmp(line, "Content-Length:", 15)) {
+   if (have_length) goto done;
+   value = line + 15;
+   while (value < line_end && (*value == ' ' || *value == '\t')) value++;
+   if (value == line_end) goto done;
+   while (value < line_end) {
+    if (*value < '0' || *value > '9') goto done;
+    {
+     unsigned long digit = (unsigned long)(*value++ - '0');
+     if (parsed_length > (LIMIT - digit) / 10) goto done;
+     parsed_length = parsed_length * 10 + digit;
+    }
+   }
+   expected = (size_t)parsed_length;
+   have_length = 1;
+  } else if ((size_t)(line_end - line) >= 18 && !strncasecmp(line, "Transfer-Encoding:", 18)) goto done;
+  line = line_end + 2;
+ }
+ if (!have_length || used < body_offset || used - body_offset != expected) goto done;
+ memmove(response, response + body_offset, expected);
+ response[expected] = 0;
+ *body = response;
+ *body_size = expected;
+ response = NULL;
+ result = 1;
+done:
+ if (socket >= 0) posix_socket_close(socket);
+ free(response);
+ return result;
+}
+
+static int fetch_https_feed(struct community_directory_game *parsed, int *count, int *total)
+{
+ char err[160] = ""; FILE *f = NULL; char *buf = NULL; long length = -1; int ok = 0;
+ if (update_download(URL, path, NULL, NULL, err, sizeof(err))) {
+  f = fopen(path, "rb");
+  if (f && fseek(f, 0, SEEK_END) == 0 && (length = ftell(f)) >= 0 &&
+      length <= LIMIT && fseek(f, 0, SEEK_SET) == 0) {
+   size_t size = (size_t)length;
+   buf = (char *)malloc(size + 1);
+   if (buf && fread(buf, 1, size, f) == size) {
+    buf[size] = 0;
+    *count = parse_feed(buf, size, parsed, total);
+    ok = *count >= 0;
+   }
+  }
+  if (f) fclose(f);
+ }
+ free(buf);
+ return ok;
+}
+
+static int fetch_thread(void *unused)
+{
+ const char *test_url = getenv("HALO_COMMUNITY_DIRECTORY_TEST_URL");
+ char *buf = NULL;
+ size_t size = 0;
+ int count = -1, total = 0, ok = 0;
+ struct community_directory_game parsed[MAX_GAMES];
+ (void)unused;
+ if (test_url && *test_url) {
+  if (test_loopback_get(test_url, &buf, &size)) {
+   count = parse_feed(buf, size, parsed, &total);
+   ok = count >= 0;
+  }
+ } else ok = fetch_https_feed(parsed, &count, &total);
+ free(buf);
+ unlink(path);
+ pthread_mutex_lock(&lock);
+ if (ok) {
+  memcpy(games, parsed, (size_t)count * sizeof(parsed[0]));
+  game_count = count;
+  cache_state.count = count; cache_state.total = total;
+  cache_state.updated_ms = SDL_GetTicks(); cache_state.have_snapshot = 1; cache_state.failed = 0;
+  snprintf(status, sizeof(status), "Community directory updated (%d games)", count);
+ } else { cache_state.failed = 1; snprintf(status, sizeof(status), "Community directory unavailable"); }
+ cache_state.fetching = 0; done = 1;
+ pthread_mutex_unlock(&lock);
+ return 0;
+}
+
 void community_directory_poll(void) {
- Uint64 now=SDL_GetTicks();pthread_mutex_lock(&lock);if(done&&now>=next_poll){char *pref;int length;if(thread){SDL_WaitThread(thread,NULL);thread=NULL;}next_poll=now+POLL_MS;pref=SDL_GetPrefPath("OpenCE","CommunityDirectory");if(!pref){snprintf(status,sizeof(status),"Could not prepare community directory cache");pthread_mutex_unlock(&lock);return;}length=snprintf(path,sizeof(path),"%scommunity-feed-%ld.json",pref,(long)getpid());SDL_free(pref);if(length<0||(size_t)length>=sizeof(path)){snprintf(status,sizeof(status),"Community directory cache path is too long");pthread_mutex_unlock(&lock);return;}done=0;thread=SDL_CreateThread(fetch_thread,"community directory",NULL);if(!thread){done=1;snprintf(status,sizeof(status),"Could not start community directory request");}}pthread_mutex_unlock(&lock);
+ Uint64 now=SDL_GetTicks();pthread_mutex_lock(&lock);if(done&&now>=next_poll){char *pref;int length;if(thread){SDL_WaitThread(thread,NULL);thread=NULL;}next_poll=now+POLL_MS;pref=SDL_GetPrefPath("OpenCE","CommunityDirectory");if(!pref){cache_state.failed=1;snprintf(status,sizeof(status),"Could not prepare community directory cache");pthread_mutex_unlock(&lock);return;}length=snprintf(path,sizeof(path),"%scommunity-feed-%ld.json",pref,(long)getpid());SDL_free(pref);if(length<0||(size_t)length>=sizeof(path)){cache_state.failed=1;snprintf(status,sizeof(status),"Community directory cache path is too long");pthread_mutex_unlock(&lock);return;}done=0;cache_state.fetching=1;thread=SDL_CreateThread(fetch_thread,"community directory",NULL);if(!thread){done=1;cache_state.fetching=0;cache_state.failed=1;snprintf(status,sizeof(status),"Could not start community directory request");}}pthread_mutex_unlock(&lock);
 }
 int community_directory_games(struct community_directory_game *out,int cap) {int n;if(!out||cap<=0)return 0;pthread_mutex_lock(&lock);n=game_count<cap?game_count:cap;memcpy(out,games,(size_t)n*sizeof(games[0]));pthread_mutex_unlock(&lock);return n;}
-const char *community_directory_status(void) {static _Thread_local char copy[96];pthread_mutex_lock(&lock);snprintf(copy,sizeof(copy),"%s",status);pthread_mutex_unlock(&lock);return copy;}
+const char *community_directory_status(void) {static _Thread_local char copy[128];pthread_mutex_lock(&lock);directory_cache_status(&cache_state,SDL_GetTicks(),copy,sizeof(copy));pthread_mutex_unlock(&lock);return copy;}
+
+const char *community_directory_browser_status(int classic_only) {
+ static _Thread_local char out[192];char ce[64],pc[64];time_t now=time(NULL);
+ pthread_mutex_lock(&lock);refresh_classic();
+ directory_snapshot_status("CE",classic_loaded[0],classic_failed[0],classic_count[0],classic_total[0],
+  now>=classic_mtime[0]?(unsigned long long)(now-classic_mtime[0]):0,ce,sizeof(ce));
+ directory_snapshot_status("PC",classic_loaded[1],classic_failed[1],classic_count[1],classic_total[1],
+  now>=classic_mtime[1]?(unsigned long long)(now-classic_mtime[1]):0,pc,sizeof(pc));
+ if(classic_only>=0)snprintf(out,sizeof(out),"%s",classic_only?pc:ce);
+ else snprintf(out,sizeof(out),"%s | %s",ce,pc);
+ pthread_mutex_unlock(&lock);return out;
+}
 
 int community_directory_classic_games(struct community_directory_game *out,int capacity) {
  int copied=0,i,j;if(!out||capacity<=0)return 0;pthread_mutex_lock(&lock);refresh_classic();

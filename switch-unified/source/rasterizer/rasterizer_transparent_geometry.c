@@ -158,6 +158,12 @@ static unsigned long transparent_geometry_group_pending_flags[
 	BIT_VECTOR_SIZE_IN_LONGS(RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS)] = { 0 };
 static struct transparent_geometry_group *transparent_geometry_groups = NULL;
 static struct transparent_geometry_group *transparent_geometry_groups2 = NULL;
+#if defined(__linux__) || defined(HALO_ANDROID)
+#include "halo_phase_profile.h"
+extern void platform_log(char const *format, ...);
+static unsigned long transparent_peak, transparent_peak2, transparent_dropped, transparent_dropped2;
+static uint64_t transparent_last_report;
+#endif
 static long transparent_geometry_group_count = 0;
 static long transparent_geometry_group_count2 = 0;
 static short *transparent_geometry_group_sorted_indices = NULL;
@@ -200,6 +206,16 @@ boolean rasterizer_transparent_geometry_initialize(
 void rasterizer_transparent_geometry_begin(
 	void)
 {
+#if defined(__linux__) || defined(HALO_ANDROID)
+    if (halo_guest_phases.frame >= transparent_last_report + 300) {
+        platform_log("[geometry] frame=%llu primary_peak=%lu/%d secondary_peak=%lu/%d dropped=%lu/%lu",
+            (unsigned long long)halo_guest_phases.frame, transparent_peak,
+            RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS, transparent_peak2,
+            RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS2, transparent_dropped, transparent_dropped2);
+        transparent_last_report = halo_guest_phases.frame;
+        transparent_peak = transparent_peak2 = transparent_dropped = transparent_dropped2 = 0;
+    }
+#endif
 	transparent_geometry_group_count = 0;
 	transparent_geometry_next_group_sorted_index = 0;
 	memset(transparent_geometry_group_pending_flags, 0,
@@ -348,7 +364,13 @@ struct transparent_geometry_group *rasterizer_transparent_geometry_new_group(
 		group = transparent_geometry_groups + group_index;
 		group->sorted_index = group_index;
 		transparent_geometry_group_count = group_index + 1;
+#if defined(__linux__) || defined(HALO_ANDROID)
+        if ((unsigned long)(group_index + 1) > transparent_peak) transparent_peak = group_index + 1;
+#endif
 	}
+#if defined(__linux__) || defined(HALO_ANDROID)
+    else transparent_dropped++;
+#endif
 
 	return group;
 }
@@ -364,7 +386,13 @@ struct transparent_geometry_group *rasterizer_transparent_geometry_new_group2(
 		group = transparent_geometry_groups2 + group_index;
 		group->sorted_index = group_index;
 		transparent_geometry_group_count2 = group_index + 1;
+#if defined(__linux__) || defined(HALO_ANDROID)
+        if ((unsigned long)(group_index + 1) > transparent_peak2) transparent_peak2 = group_index + 1;
+#endif
 	}
+#if defined(__linux__) || defined(HALO_ANDROID)
+    else transparent_dropped2++;
+#endif
 
 	return group;
 }

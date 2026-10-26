@@ -17,6 +17,15 @@ import sys
 
 def main():
     header, output, imports = sys.argv[1:4]
+    content_bridge = {
+        "posix_file_is_regular": "content_regular",
+        "posix_directory_identity_fd": "content_identity_fd",
+        "posix_directory_identity_at": "content_identity_at",
+        "posix_directory_identity_path": "content_identity_path",
+        "posix_make_private_directory_at": "content_mkdirat",
+        "posix_directory_open_fd": "content_diropenfd",
+        "posix_rename_noreplace_at": "content_rename_noreplace",
+    } if "--content-bridge" in sys.argv[4:] else {}
     text = open(header, encoding="utf-8").read()
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
     prototypes = re.findall(r"^([A-Za-z_][\w \*]*?)\b(posix_\w+)\s*\(([^;]*?)\);", text, re.M | re.S)
@@ -37,19 +46,22 @@ def main():
             for param in params.split(","):
                 m = re.search(r"(\w+)\s*$", param.strip())
                 args.append(m.group(1))
-        host_name = "hostposix_" + name[len("posix_"):]
-        names.append(host_name)
+        host_name = content_bridge.get(name, "hostposix_" + name[len("posix_"):])
+        if name not in content_bridge:
+            names.append(host_name)
         out.append(f"{ret} {host_name}({params});")
         out.append(f"{ret} {name}({params})")
         out.append("{")
         call = f"{host_name}({', '.join(args)})"
         if ret == "void":
             out.append(f"\t{call};")
-            out.append("\terrno = host_errno();")
+            if name not in content_bridge:
+                out.append("\terrno = host_errno();")
         else:
             out.append(f"\t{ret} host_result = {call};")
             out.append("")
-            out.append("\terrno = host_errno();")
+            if name not in content_bridge:
+                out.append("\terrno = host_errno();")
             out.append("\treturn host_result;")
         out.append("}")
         out.append("")

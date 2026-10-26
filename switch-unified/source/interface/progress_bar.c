@@ -182,10 +182,11 @@ symbols in this file:
  * ABI and code shape.
  */
 #include <xtl.h>
-#include "rasterizer/xbox/rasterizer_xbox.h"
-#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 
 #include "interface/progress_bar_internal.h"
+#ifdef HALO_GAME_BROWSER
+#include "../../port/linux/src/ui_overlay.h"
+#endif
 
 /* ---------- constants */
 
@@ -221,6 +222,28 @@ struct progress_bar_mode
 	IDirect3DTexture8 *texture1;
 	boolean active;
 	unsigned char padding1[3];
+};
+
+struct pixel_shader_definition
+{
+	unsigned long alpha_inputs[8];
+	unsigned long final_combiner_inputs_abcd;
+	unsigned long final_combiner_inputs_efg;
+	unsigned long constant_0[8];
+	unsigned long constant_1[8];
+	unsigned long alpha_outputs[8];
+	unsigned long rgb_inputs[8];
+	unsigned long compare_mode;
+	unsigned long final_combiner_constant_0;
+	unsigned long final_combiner_constant_1;
+	unsigned long rgb_outputs[8];
+	unsigned long combiner_count;
+	unsigned long texture_modes;
+	unsigned long dot_mapping;
+	unsigned long input_texture;
+	unsigned long c0_mapping;
+	unsigned long c1_mapping;
+	unsigned long final_combiner_constants;
 };
 
 struct gravy_layer
@@ -265,7 +288,7 @@ static void draw_layer_int(
 	real alpha,
 	real progress);
 
-static void draw_layer(
+void draw_layer(
 	real distance,
 	real alpha,
 	real_rgb_color const *color,
@@ -275,11 +298,11 @@ static void draw_initial_layer(
 	real_rgb_color const *color,
 	real progress);
 
-static void do_convoluation_coords(
+void do_convoluation_coords(
 	real x,
 	real y);
 
-static void draw_fade_layer(
+void draw_fade_layer(
 	real x_offset,
 	real y_offset,
 	real alpha);
@@ -313,11 +336,12 @@ void tgaLoadImageData(
 
 /* ---------- globals */
 
+extern void *global_d3d_device;
 extern struct pixel_shader_definition blur_shader;
 extern struct pixel_shader_definition regular_shader;
 extern unsigned long current_time;
 
-static boolean progress_bar_rendering_enabled= TRUE;
+boolean progress_bar_rendering_enabled= TRUE;
 
 /* the compressed monk chant played behind the loading screen */
 byte compressed_monk_tone[18396]=
@@ -1483,6 +1507,13 @@ struct progress_bar_mode progress_bar_mode= {0};
 real last_t= 0.f;
 static real wobble_phase= 0.f;
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+#include "../../port/linux/src/nxhalo_loading_progress.h"
+extern void platform_log(const char *format, ...);
+static unsigned nxhalo_loading_logs;
+static char const *nxhalo_loading_stage="READING MAP";
+#endif
+
 /* ---------- public code */
 
 void tgaLoadHeader(
@@ -1546,6 +1577,10 @@ void tgaLoad(
 	if (file)
 	{
 		tgaLoadHeader(file, &image);
+#if defined(__linux__) || defined(HALO_ANDROID)
+        platform_log("[loading] image width=%d height=%d depth=%d",
+            image.width,image.height,image.pixel_depth);
+#endif
 		image.pixels= pixels;
 		tgaLoadImageData(file, &image);
 		fclose(file);
@@ -1582,11 +1617,36 @@ void progress_bar_dispose(
 void progress_bar_begin(
 	boolean skip_frame_capture)
 {
+#if defined(__linux__) || defined(HALO_ANDROID)
+    { extern void nxhalo_shader_flush(void); nxhalo_shader_flush(); }
+#endif
 	progress_bar_mode.capture_frame= !skip_frame_capture;
 	progress_bar_mode.active= TRUE;
+#if defined(HALO_GAME_BROWSER) && (defined(__linux__) || defined(HALO_ANDROID))
+    if (progress_bar_rendering_enabled && ui_overlay_available()) {
+        platform_log("[loading] native overlay begin capture=%d", !skip_frame_capture);
+        nxhalo_loading_stage="READING MAP";
+        progress_bar_render(0.f);
+        IDirect3DDevice8_Present(global_d3d_device,NULL,NULL,NULL,NULL);
+    }
+#endif
 	SetThreadPriority((void *)-2, 2);
 
 	return;
+}
+
+void progress_bar_native_stage(real progress, char const *stage)
+{
+#if defined(HALO_GAME_BROWSER) && (defined(__linux__) || defined(HALO_ANDROID))
+    if (progress_bar_rendering_enabled && ui_overlay_available()) {
+        nxhalo_loading_stage=stage;
+        progress_bar_render(progress);
+        IDirect3DDevice8_Present(global_d3d_device,NULL,NULL,NULL,NULL);
+        platform_log("[loading] completed stage=%s progress=%f",stage,(double)progress);
+    }
+#else
+    (void)progress; (void)stage;
+#endif
 }
 
 void progress_bar_end(
@@ -1818,6 +1878,19 @@ void progress_bar_eachframe(
 void progress_bar_display(
 	real progress)
 {
+#if defined(__linux__) || defined(HALO_ANDROID)
+    if (nxhalo_loading_logs++ < 8)
+        platform_log("[loading] display active=%d enabled=%d progress=%f initial=%f texture=%d",
+            progress_bar_mode.active,progress_bar_rendering_enabled,(double)progress,
+            (double)progress_bar_globals.initial_progress,progress_bar_mode.texture0 != NULL);
+#endif
+#if defined(HALO_GAME_BROWSER) && (defined(__linux__) || defined(HALO_ANDROID))
+    if (progress_bar_rendering_enabled && ui_overlay_available()) {
+        /* Do not start the Xbox texture/noise/sound loader for the native UI. */
+        progress_bar_render(progress);
+        return;
+    }
+#endif
 #line 827 "c:\\halo\\SOURCE\\interface\\progress_bar.c"
 	match_assert(__FILE__, __LINE__, (progress>=0.f) && (progress<=1.f));
 
@@ -1831,8 +1904,12 @@ void progress_bar_display(
 
 		if (progress_bar_rendering_enabled)
 		{
-			progress_bar_render((progress - progress_bar_globals.initial_progress) /
+			#if defined(__linux__) || defined(HALO_ANDROID)
+            progress_bar_render(nxhalo_loading_progress(progress, progress_bar_globals.initial_progress));
+#else
+            progress_bar_render((progress - progress_bar_globals.initial_progress) /
 				(1.f - progress_bar_globals.initial_progress));
+#endif
 		}
 	}
 
@@ -1894,7 +1971,7 @@ static void draw_layer_int(
 	return;
 }
 
-static void draw_layer(
+void draw_layer(
 	real distance,
 	real alpha,
 	real_rgb_color const *color,
@@ -1918,12 +1995,21 @@ static void draw_initial_layer(
 	real_rgb_color const *color,
 	real progress)
 {
-	draw_layer(0.f, 1.f, color, progress);
+	struct gravy_layer layer;
+
+	layer.texture_width= 640.f;
+	layer.texture_height= 480.f;
+	layer.x= 0.f;
+	layer.y= 0.f;
+	layer.half_width= (real)fabs(640.0/2.0);
+	layer.half_height= (real)fabs(480.0/2.0);
+	layer.distance= 0.f;
+	draw_layer_int(&layer, color, 1.f, progress);
 
 	return;
 }
 
-static void do_convoluation_coords(
+void do_convoluation_coords(
 	real x,
 	real y)
 {
@@ -1935,7 +2021,7 @@ static void do_convoluation_coords(
 	return;
 }
 
-static void draw_fade_layer(
+void draw_fade_layer(
 	real x_offset,
 	real y_offset,
 	real alpha)
@@ -1993,6 +2079,23 @@ static void this_is_awful(
 static void progress_bar_render(
 	real progress)
 {
+#if defined(HALO_GAME_BROWSER) && (defined(__linux__) || defined(HALO_ANDROID))
+    /* Draw without map textures or widgets: both may be unavailable while
+     * the next map is being loaded. Present is required by native backends. */
+    if (ui_overlay_available()) {
+        char percent[32];
+        progress= (progress >= 0.f && progress <= 1.f) ? progress : 0.f;
+        csprintf(percent, "%d%%", (int)(progress * 100.f));
+        ui_overlay_gradient(0,0,640,480,0,0x101f35ff,0x02060dff);
+        ui_overlay_outline(62,130,516,220,8,1,0x48759bff);
+        ui_overlay_text(UI_FONT_BOLD,42,320,178,UI_ALIGN_CENTER,0xd5ebffff,"HALO");
+        ui_overlay_text(UI_FONT_REGULAR,18,320,237,UI_ALIGN_CENTER,0xa9cceaff,nxhalo_loading_stage);
+        ui_overlay_rect(102,287,436,8,4,0x1c354dff);
+        ui_overlay_rect(102,287,436*progress,8,4,0x77c7ffff);
+        ui_overlay_text(UI_FONT_REGULAR,14,320,311,UI_ALIGN_CENTER,0xa9cceaff,percent);
+        return;
+    }
+#endif
 	real ranges[NUMBER_OF_PROGRESS_BAR_SOUNDS][2]= {{0.f, 1.f}, {0.4f, 1.f}, {0.5f, 1.f}, {0.55f, 1.f}};
 	real volumes[NUMBER_OF_PROGRESS_BAR_SOUNDS]= {3500.f, 4500.f, 3500.f, 4500.f};
 	D3DBaseTexture back_buffer_texture;
@@ -2083,7 +2186,13 @@ static void progress_bar_render(
 	IDirect3DDevice8_SetTransform(global_d3d_device, D3DTS_WORLD, &progress_bar_globals.saved_world);
 	IDirect3DDevice8_SetTransform(global_d3d_device, D3DTS_VIEW, &progress_bar_globals.saved_view);
 	IDirect3DDevice8_SetTransform(global_d3d_device, D3DTS_PROJECTION, &progress_bar_globals.saved_projection);
+#if defined(__linux__) || defined(HALO_ANDROID)
+	/* Native back buffers reach the display only through Present. The Xbox
+	 * vertical-blank wait alone does not swap our offscreen render target. */
+	IDirect3DDevice8_Present(global_d3d_device, NULL, NULL, NULL, NULL);
+#else
 	IDirect3DDevice8_BlockUntilVerticalBlank(global_d3d_device);
+#endif
 
 	return;
 }
@@ -2244,6 +2353,15 @@ static void progress_bar_load_loading_texture(
 	csstrcpy(map_directory, cache_files_map_directory());
 	sprintf(source_path, "z%sloading.tga", map_directory + 1);
 	file= fopen(source_path, "rb");
+#if defined(__linux__) || defined(HALO_ANDROID)
+	/* The native data importer supplies the image on D:. A missing cache
+	 * copy must not hide that supplied image. Keep Z: preferred for Xbox. */
+	if (!file)
+	{
+		sprintf(source_path, "d%sloading.tga", map_directory + 1);
+		file= fopen(source_path, "rb");
+	}
+#endif
 	if (file)
 	{
 		image.width= 0;

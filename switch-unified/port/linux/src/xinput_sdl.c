@@ -41,6 +41,7 @@ drive the controller.
 #include "port_config.h"
 #include "halo_keyboard.h"
 #include "gamepad_routes.h"
+#include "native_voice_runtime.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -332,7 +333,7 @@ static const char *const binding_settings[NUMBER_OF_HALO_KEYBOARD_ACTIONS] =
 	"controls.move_forward", "controls.move_backward", "controls.strafe_left", "controls.strafe_right",
 	"controls.jump", "controls.crouch", "controls.fire", "controls.throw_grenade", "controls.melee",
 	"controls.reload", "controls.zoom", "controls.switch_weapon", "controls.switch_grenade", "controls.action",
-	"controls.flashlight", "controls.scoreboard", "controls.pause",
+	"controls.flashlight", "controls.scoreboard", "controls.pause", "controls.vehicle_boost",
 };
 
 static const struct
@@ -504,7 +505,7 @@ network tests (port/linux/game/network_test.c), different for each seed:
 it walks and strafes in circles, turns, fires every few seconds, jumps now
 and then and throws a grenade every seven seconds; "look:<seed>" stands
 still, only turning and looking up and down (where remote players aim and
-whether they stand) */
+whether they stand); "melee" emits only a periodic B/melee pulse in gameplay. */
 static int test_input_holding_action;
 static Uint64 test_input_holding_action_since;
 
@@ -518,11 +519,12 @@ void test_input_hold_action(int hold)
 	test_input_holding_action = hold;
 }
 
-static void test_input_gamepad(XINPUT_GAMEPAD *pad)
+static void test_input_gamepad(XINPUT_GAMEPAD *pad, int menus)
 {
 	static int checked;
 	static int seed = -1;
 	static int looking;
+	static int melee;
 	double t;
 
 	if (!checked)
@@ -534,11 +536,24 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 			seed = atoi(setting + 4);
 		else if (!strcmp(setting, "bot"))
 			seed = 0;
+		else if (!strcmp(setting, "melee"))
+			melee = 1;
 		else if (!strncmp(setting, "look:", 5))
 		{
 			seed = atoi(setting + 5);
 			looking = 1;
 		}
+	}
+	if (melee)
+	{
+		if (menus)
+			return;
+		/* Explicit test mode: clean synthetic melee-only state, one 100 ms
+		   B pulse every two seconds. */
+		memset(pad, 0, sizeof(*pad));
+		if (SDL_GetTicks() % 2000 < 100)
+			pad->bAnalogButtons[XINPUT_GAMEPAD_B] = 255;
+		return;
 	}
 	if (seed < 0)
 		return;
@@ -877,7 +892,12 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		}
 		if (port_gamepad(gamepads, count, 0))
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
-		test_input_gamepad(&state->Gamepad);
+		{
+			int ptt_input = halo_input_from_name(config_string("controls.voice_ptt"));
+			int ptt = ptt_input >= 0 && ptt_input < SDL_SCANCODE_COUNT && input.keys[ptt_input];
+			native_voice_runtime_update(ptt, input.menus || console_is_active());
+		}
+		test_input_gamepad(&state->Gamepad, input.menus || console_is_active());
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
 			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)
 		{

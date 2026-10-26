@@ -26,6 +26,7 @@ enum handle_type
 	_handle_context,
 	_handle_gamepad,
 	_handle_audio,
+	_handle_capture,
 };
 
 struct handle
@@ -339,8 +340,16 @@ static int audio_keep(struct audio_binding *binding, const void *data, int lengt
 
 uint32_t host_sdl_open_audio_stream(uint32_t device, const void *spec, uint32_t callback, uint32_t userdata)
 {
-	struct audio_binding *binding = SDL_calloc(1, sizeof(*binding));
-	SDL_AudioStream *stream;
+    if (!callback) {
+        if (device != SDL_AUDIO_DEVICE_DEFAULT_RECORDING) return 0;
+        SDL_AudioStream *capture = SDL_OpenAudioDeviceStream(device, spec, NULL, NULL);
+        uint32_t handle = handle_new(_handle_capture, capture);
+        if (!handle && capture) SDL_DestroyAudioStream(capture);
+        return handle;
+    }
+    struct audio_binding *binding = SDL_calloc(1, sizeof(*binding));
+    SDL_AudioStream *stream;
+    if (!binding) return 0;
 
 	binding->callback = callback;
 	binding->userdata = userdata;
@@ -375,6 +384,7 @@ int host_sdl_put_audio_stream_data(uint32_t stream, const void *data, int length
 int host_sdl_resume_audio_stream_device(uint32_t stream)
 {
 	SDL_AudioStream *object = handle_get(stream, _handle_audio);
+	if (!object) object = handle_get(stream, _handle_capture);
 
 	return object ? SDL_ResumeAudioStreamDevice(object) : 0;
 }
@@ -406,39 +416,33 @@ int host_sdl_show_simple_message_box(uint32_t flags, const char *title, const ch
 	return SDL_ShowSimpleMessageBox((SDL_MessageBoxFlags)flags, title, message, NULL) ? 1 : 0;
 }
 
-int host_sdl_open_url(const char *url)
+int host_sdl_pause_audio_stream_device(uint32_t stream)
 {
-	return url && SDL_OpenURL(url);
+    SDL_AudioStream *object = handle_get(stream, _handle_capture);
+    return object ? SDL_PauseAudioStreamDevice(object) : 0;
 }
-
-int host_sdl_show_message_box(uint32_t flags, const char *title, const char *message,
-	int count, const uint32_t *button_flags, const int *ids, const uint32_t *texts)
+int host_sdl_clear_audio_stream(uint32_t stream)
 {
-	SDL_MessageBoxButtonData buttons[8];
-	SDL_MessageBoxData data;
-	int choice = -1, i;
-	if (count < 0 || count > 8) return -1;
-	for (i = 0; i < count; i++) {
-		buttons[i].flags = button_flags[i];
-		buttons[i].buttonID = ids[i];
-		buttons[i].text = (const char *)(uintptr_t)texts[i];
-	}
-	data.flags = (SDL_MessageBoxFlags)flags;
-	data.window = NULL;
-	data.title = title;
-	data.message = message;
-	data.numbuttons = count;
-	data.buttons = buttons;
-	data.colorScheme = NULL;
-	return SDL_ShowMessageBox(&data, &choice) == 0 ? choice : -1;
+    SDL_AudioStream *object = handle_get(stream, _handle_capture);
+    return object ? SDL_ClearAudioStream(object) : 0;
 }
-
-/* Android owns app updates in Java. This guest helper is only for the
- * Switch community browser; fail visibly if it is called by another host. */
-int host_browser_download(const char *url, const char *path, unsigned long long maximum_bytes,
-	char *error, int error_size)
+int host_sdl_get_audio_stream_available(uint32_t stream)
 {
-	(void)url; (void)path; (void)maximum_bytes;
-	if (error && error_size > 0) SDL_snprintf(error, (size_t)error_size, "Host download bridge is unavailable on Android");
-	return 0;
+    SDL_AudioStream *object = handle_get(stream, _handle_capture);
+    return object ? SDL_GetAudioStreamAvailable(object) : -1;
+}
+int host_sdl_get_audio_stream_data(uint32_t stream, void *data, int length)
+{
+    SDL_AudioStream *object = handle_get(stream, _handle_capture);
+    return object && length >= 0 && (data || !length) ? SDL_GetAudioStreamData(object, data, length) : -1;
+}
+void host_sdl_destroy_audio_stream(uint32_t stream)
+{
+    SDL_AudioStream *object = handle_get(stream, _handle_capture);
+    if (!object) return;
+    pthread_mutex_lock(&handle_lock);
+    handles[stream].object = NULL;
+    handles[stream].type = _handle_free;
+    pthread_mutex_unlock(&handle_lock);
+    SDL_DestroyAudioStream(object);
 }

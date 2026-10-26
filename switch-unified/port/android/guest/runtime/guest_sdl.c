@@ -12,150 +12,14 @@ type that carries no pointer, which covers all the platform layer reads.
 
 /* before SDL: musl's alloca.h must come first */
 #include <stdlib.h>
-#include <pthread.h>
-#include <sched.h>
 #include <string.h>
-#include <strings.h>
 #include <time.h>
 #include <errno.h>
-#include <stdio.h>
 #include <sys/stat.h>
+#include <stdio.h>
 #include <SDL3/SDL.h>
 
 #include "guest_host.h"
-
-/* SDL's Linux host normally supplies these primitives. In the guest, keep
-their state in guest memory and back them with the guest musl runtime: its
-pthread implementation gives each worker a guest-addressable stack and
-thread-local state through the host thread bridge. */
-struct guest_sdl_thread
-{
-	pthread_t native;
-	SDL_ThreadFunction function;
-	void *userdata;
-	int status;
-};
-
-struct guest_sdl_mutex
-{
-	pthread_mutex_t native;
-};
-
-static void *guest_sdl_thread_start(void *opaque)
-{
-	struct guest_sdl_thread *thread = opaque;
-	thread->status = thread->function(thread->userdata);
-	return NULL;
-}
-
-SDL_Thread *SDL_CreateThreadRuntime(SDL_ThreadFunction function, const char *name, void *userdata,
-	SDL_FunctionPointer begin_thread, SDL_FunctionPointer end_thread)
-{
-	struct guest_sdl_thread *thread;
-	(void)name;
-	/* The guest build's SDL_BeginThreadFunction/SDL_EndThreadFunction are
-	NULL; callbacks from another ABI cannot safely be invoked by this shim. */
-	if (!function || begin_thread || end_thread)
-		return NULL;
-	thread = calloc(1, sizeof(*thread));
-	if (!thread)
-		return NULL;
-	thread->function = function;
-	thread->userdata = userdata;
-	thread->status = -1;
-	if (pthread_create(&thread->native, NULL, guest_sdl_thread_start, thread) != 0)
-	{
-		free(thread);
-		return NULL;
-	}
-	return (SDL_Thread *)thread;
-}
-
-void SDL_WaitThread(SDL_Thread *opaque, int *status)
-{
-	struct guest_sdl_thread *thread = (struct guest_sdl_thread *)opaque;
-	if (!thread)
-		return;
-	if (pthread_join(thread->native, NULL) == 0 && status)
-		*status = thread->status;
-	free(thread);
-}
-
-SDL_Mutex *SDL_CreateMutex(void)
-{
-	struct guest_sdl_mutex *mutex = calloc(1, sizeof(*mutex));
-	pthread_mutexattr_t attributes;
-	if (!mutex)
-		return NULL;
-	if (pthread_mutexattr_init(&attributes) != 0)
-	{
-		free(mutex);
-		return NULL;
-	}
-	if (pthread_mutexattr_settype(&attributes, PTHREAD_MUTEX_RECURSIVE) != 0 ||
-		pthread_mutex_init(&mutex->native, &attributes) != 0)
-	{
-		pthread_mutexattr_destroy(&attributes);
-		free(mutex);
-		return NULL;
-	}
-	pthread_mutexattr_destroy(&attributes);
-	return (SDL_Mutex *)mutex;
-}
-
-void SDL_LockMutex(SDL_Mutex *opaque)
-{
-	if (opaque)
-		(void)pthread_mutex_lock(&((struct guest_sdl_mutex *)opaque)->native);
-}
-
-bool SDL_TryLockMutex(SDL_Mutex *opaque)
-{
-	return !opaque || pthread_mutex_trylock(&((struct guest_sdl_mutex *)opaque)->native) == 0;
-}
-
-void SDL_UnlockMutex(SDL_Mutex *opaque)
-{
-	if (opaque)
-		(void)pthread_mutex_unlock(&((struct guest_sdl_mutex *)opaque)->native);
-}
-
-void SDL_DestroyMutex(SDL_Mutex *opaque)
-{
-	struct guest_sdl_mutex *mutex = (struct guest_sdl_mutex *)opaque;
-	if (mutex)
-	{
-		(void)pthread_mutex_destroy(&mutex->native);
-		free(mutex);
-	}
-}
-
-bool SDL_TryLockSpinlock(SDL_SpinLock *lock)
-{
-	return lock && __atomic_exchange_n(lock, 1, __ATOMIC_ACQUIRE) == 0;
-}
-
-void SDL_LockSpinlock(SDL_SpinLock *lock)
-{
-	while (lock && !SDL_TryLockSpinlock(lock))
-		(void)sched_yield();
-}
-
-void SDL_UnlockSpinlock(SDL_SpinLock *lock)
-{
-	if (lock)
-		__atomic_store_n(lock, 0, __ATOMIC_RELEASE);
-}
-
-int SDL_strcasecmp(const char *left, const char *right)
-{
-	return strcasecmp(left, right);
-}
-
-int SDL_strncasecmp(const char *left, const char *right, size_t count)
-{
-	return strncasecmp(left, right, count);
-}
 
 /* guest/runtime/guest_gl.c (generated) */
 SDL_FunctionPointer guest_gl_get_proc_address(const char *name);
@@ -211,66 +75,6 @@ void *SDL_calloc(size_t count, size_t size)
 	return calloc(count, size);
 }
 
-char *SDL_GetPrefPath(const char *org, const char *app)
-{
-	char root[512];
-	size_t used;
-	char *result;
-	if (!app || !*app)
-		return NULL;
-	host_android_path(1, root, sizeof(root));
-	root[sizeof(root) - 1] = 0;
-	used = strlen(root);
-	if (used + strlen(app) + (org && *org ? strlen(org) + 2 : 1) >= sizeof(root))
-		return NULL;
-	if (org && *org)
-		used += (size_t)snprintf(root + used, sizeof(root) - used, "/%s", org);
-	(void)mkdir(root, 0777);
-	used += (size_t)snprintf(root + used, sizeof(root) - used, "/%s", app);
-	(void)mkdir(root, 0777);
-	used = strlen(root);
-	result = malloc(used + 2);
-	if (!result)
-		return NULL;
-	memcpy(result, root, used);
-	if (!used || root[used - 1] != '/') result[used++] = '/';
-	result[used] = 0;
-	return result;
-}
-
-bool SDL_CreateDirectory(const char *path)
-{
-	struct stat info;
-	if (!path || !*path)
-		return false;
-	if (mkdir(path, 0777) == 0 || errno == EEXIST)
-		return stat(path, &info) == 0 && S_ISDIR(info.st_mode);
-	return false;
-}
-
-bool SDL_OpenURL(const char *url)
-{
-	return host_sdl_open_url(url) != 0;
-}
-
-bool SDL_ShowMessageBox(const SDL_MessageBoxData *data, int *buttonid)
-{
-	Uint32 flags[8], texts[8];
-	int ids[8], choice, i;
-	if (!data || data->numbuttons < 0 || data->numbuttons > 8 || (data->numbuttons && !data->buttons))
-		return false;
-	for (i = 0; i < data->numbuttons; i++) {
-		flags[i] = data->buttons[i].flags;
-		ids[i] = data->buttons[i].buttonID;
-		texts[i] = (Uint32)(uintptr_t)data->buttons[i].text;
-	}
-	choice = host_sdl_show_message_box((unsigned int)data->flags, data->title, data->message,
-		data->numbuttons, flags, ids, texts);
-	if (choice < 0) return false;
-	if (buttonid) *buttonid = choice;
-	return true;
-}
-
 /* ---------- the clipboard (internet play's invite links, sdl_platform.c) */
 
 bool SDL_SetClipboardText(const char *text)
@@ -297,6 +101,104 @@ bool SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags flags, const char *title, cons
 {
 	(void)window;
 	return host_sdl_show_simple_message_box((unsigned int)flags, title, message) != 0;
+}
+
+bool SDL_ShowMessageBox(const SDL_MessageBoxData *data, int *answer)
+{
+	unsigned int flags[8], texts[8];
+	int ids[8];
+	int index, chosen;
+
+	if (!data || data->numbuttons < 0 || data->numbuttons > 8)
+		return false;
+	for (index = 0; index < data->numbuttons; index++)
+	{
+		flags[index] = (unsigned int)data->buttons[index].flags;
+		ids[index] = data->buttons[index].buttonID;
+		texts[index] = (unsigned int)(uintptr_t)data->buttons[index].text;
+	}
+	chosen = host_sdl_show_message_box((unsigned int)data->flags, data->title, data->message, data->numbuttons,
+		flags, ids, texts);
+	if (answer)
+		*answer = chosen;
+	return chosen != -1;
+}
+
+/* ---------- the web browser (the game list's profile) */
+
+bool SDL_OpenURL(const char *url)
+{
+	return host_sdl_open_url(url) != 0;
+}
+
+int SDL_strncasecmp(const char *first, const char *second, size_t length)
+{
+	for (; length; length--, first++, second++)
+	{
+		int a = (unsigned char)*first, b = (unsigned char)*second;
+
+		if (a >= 'A' && a <= 'Z')
+			a += 'a' - 'A';
+		if (b >= 'A' && b <= 'Z')
+			b += 'a' - 'A';
+		if (a != b || !a)
+			return a - b;
+	}
+	return 0;
+}
+
+int SDL_strcasecmp(const char *first, const char *second)
+{
+    return SDL_strncasecmp(first, second, (size_t)-1);
+}
+
+bool SDL_CreateDirectory(const char *path)
+{
+    char *copy, *p;
+    struct stat status;
+    bool okay = true;
+    if (!path || !*path || !(copy = strdup(path)))
+        return false;
+    for (p = copy + 1; ; p++) {
+        if ((*p == '/' && p[-1] != ':') || !*p) {
+            char separator = *p;
+            *p = 0;
+            if (mkdir(copy, 0777) &&
+                (errno != EEXIST || stat(copy, &status) || !S_ISDIR(status.st_mode))) {
+                okay = false;
+                break;
+            }
+            *p = separator;
+            if (!separator)
+                break;
+        }
+    }
+    free(copy);
+    return okay;
+}
+
+char *SDL_GetPrefPath(const char *organization, const char *application)
+{
+    const char *root = getenv("HALO_SAVE_ROOT");
+    char *path;
+    size_t length;
+    (void)organization;
+    /* SDL's result is owned by its caller. Keep downloads in the same save
+     * root selected by the host, independent of the current directory. */
+    if (!root || !*root || !application || !*application ||
+        strchr(application, '/') || strchr(application, '\\') ||
+        !strcmp(application, ".") || !strcmp(application, ".."))
+        return NULL;
+    length = strlen(root) + strlen(application) + 3;
+    path = malloc(length);
+    if (!path)
+        return NULL;
+    snprintf(path, length, "%s/%s/", root, application);
+    if (!SDL_CreateDirectory(path)) {
+        free(path);
+        return NULL;
+    }
+    return path;
 }
 
 void SDL_Delay(Uint32 milliseconds)
@@ -371,7 +273,30 @@ bool SDL_PollEvent(SDL_Event *event)
 	return host_sdl_poll_event(event ? event : &scratch) != 0;
 }
 
+/* (the dedicated server's, which has no window and never runs on Android:
+SDL_PollEvent pumps the host's events itself) */
+void SDL_PumpEvents(void)
+{
+}
+
+int SDL_PeepEvents(SDL_Event *events, int count, SDL_EventAction action, Uint32 first, Uint32 last)
+{
+	(void)events;
+	(void)count;
+	(void)action;
+	(void)first;
+	(void)last;
+	return 0;
+}
+
 /* ---------- gamepads */
+
+bool SDL_HasGamepad(void)
+{
+	unsigned int ids[16];
+
+	return host_sdl_get_gamepads(ids, 16) > 0;
+}
 
 SDL_JoystickID *SDL_GetGamepads(int *count)
 {
@@ -438,3 +363,8 @@ bool SDL_ResumeAudioStreamDevice(SDL_AudioStream *stream)
 {
 	return host_sdl_resume_audio_stream_device((unsigned int)stream) != 0;
 }
+bool SDL_PauseAudioStreamDevice(SDL_AudioStream *stream) { return host_sdl_pause_audio_stream_device((unsigned int)stream) != 0; }
+bool SDL_ClearAudioStream(SDL_AudioStream *stream) { return host_sdl_clear_audio_stream((unsigned int)stream) != 0; }
+int SDL_GetAudioStreamAvailable(SDL_AudioStream *stream) { return host_sdl_get_audio_stream_available((unsigned int)stream); }
+int SDL_GetAudioStreamData(SDL_AudioStream *stream, void *data, int length) { return host_sdl_get_audio_stream_data((unsigned int)stream, data, length); }
+void SDL_DestroyAudioStream(SDL_AudioStream *stream) { host_sdl_destroy_audio_stream((unsigned int)stream); }

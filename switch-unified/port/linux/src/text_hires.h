@@ -1,3 +1,6 @@
+#ifdef HALO_SWITCH_DEKO3D
+#include "../../switch/guest/text_hires_dk.h.inc"
+#else
 /*
 TEXT_HIRES.H
 
@@ -56,5 +59,7 @@ unsigned int text_hires_atlas_texture(unsigned long data);
 
 /* d3d8_gl.c: the display's pixels for each of the 480 lines */
 float halo_screen_pixel_scale(void);
+
+#endif
 
 #endif

@@ -544,6 +544,7 @@ symbols in this file:
 #include "game_engine_list.h"
 #include "game_engine_place.h"
 #include "match_rules.h" /* port: native host match rules */
+#include "halo_network_profile.h"
 
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmap_group_lookup.h"
@@ -4539,6 +4540,9 @@ void game_engine_player_killed(
 
 	/* Infection is authoritative after stock team balancing. */
 	match_rules_host_player_killed(dead_player_index);
+	/* Gun Game progression follows the same authoritative, credited-kill
+	   predicate used by stock Slayer; suicides and friendly fire do not advance. */
+	match_rules_host_player_scored_kill(killing_player_index, dead_player_index, player_kill);
 
 	/* port: the gametype's friendly fire penalty: the team killer's next
 	respawn later (the dead's own, if he has one waiting) */
@@ -7089,13 +7093,21 @@ boolean game_engine_vehicle_placement_allowed(
 	struct tag_block *palette)
 {
 	struct game_variant_options const *options = game_variant_options_get();
-	short side, type;
+	short side, type, mode_vehicle_policy;
 	byte set;
 
 	if (!game_engine || placement->palette_entry_index == NONE)
 		return TRUE;
+	mode_vehicle_policy = match_rules_vehicle_policy(TAG_BLOCK_GET_ELEMENT(palette, placement->palette_entry_index,
+		struct scenario_object_palette_entry)->reference.index);
+	if (mode_vehicle_policy >= 0)
+		return mode_vehicle_policy != 0;
 	side = global_variant.universal_variant.teams ? game_engine_nearest_team(&placement->position) : 0;
 	set = options->vehicle_set[side];
+	/* OpenCE 24's PC set leaves every map-eligible vehicle placement intact.
+	   Older profiles retain the old enum interpretation below. */
+	if (set == VARIANT_VEHICLE_SET_PC && network_profile_active_version() == 24)
+		return TRUE;
 	type = game_engine_variant_vehicle_type(TAG_BLOCK_GET_ELEMENT(palette, placement->palette_entry_index,
 		struct scenario_object_palette_entry)->reference.index);
 	/* (the map's own: the multiplayer ones of the globals, as the Xbox
@@ -7189,6 +7201,14 @@ long game_engine_remap_vehicle(
 	long vehicle_definition_index)
 {
 	long result = vehicle_definition_index;
+	short mode_vehicle_policy = game_engine ? match_rules_vehicle_policy(vehicle_definition_index) : -1;
+	if (mode_vehicle_policy >= 0)
+		return mode_vehicle_policy ? vehicle_definition_index : NONE;
+
+	if (game_engine && network_profile_active_version() == 24 &&
+		(game_variant_options_get()->vehicle_set[0] == VARIANT_VEHICLE_SET_PC ||
+		 game_variant_options_get()->vehicle_set[1] == VARIANT_VEHICLE_SET_PC))
+		return result;
 
 	if (game_engine)
 	{

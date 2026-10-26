@@ -46,6 +46,7 @@ static Mutex pool_lock;
 /* Fixed ranges (Xbox memory window + guest image) */
 static uintptr_t window_base, window_end;
 static uintptr_t image_base, image_end;
+static uintptr_t ce_base, ce_end;
 
 static uintptr_t round_up(uintptr_t size)
 {
@@ -128,6 +129,8 @@ int host_memory_initialize(uint32_t img_base, uint32_t img_size, uint32_t code_s
 	window_end = HALO_GUEST_WINDOW_BASE + HALO_GUEST_WINDOW_SIZE;
 	image_base = img_base;
 	image_end = (uintptr_t)img_base + img_size;
+	ce_base = HOST_CE_TAG_BASE;
+	ce_end = HOST_CE_TAG_BASE + HOST_CE_TAG_SIZE;
 	pools[0].base = HOST_GUEST_IMAGE_LIMIT;
 	pools[0].size = HOST_GUEST_POOL_SIZE;
 	pools[0].used = 0;
@@ -138,9 +141,10 @@ int host_memory_initialize(uint32_t img_base, uint32_t img_size, uint32_t code_s
 		return -1;
 	}
 	pool_count = 1;
-	host_logf(HOST_LOG_INFO, "guest pool block 0: %08lx-%08lx (96 MB)",
+	host_logf(HOST_LOG_INFO, "guest pool block 0: %08lx-%08lx (%lu MiB)",
 		(unsigned long)pools[0].base,
-		(unsigned long)(pools[0].base + pools[0].size));
+		(unsigned long)(pools[0].base + pools[0].size),
+		(unsigned long)(pools[0].size / (1024 * 1024)));
 	return 0;
 }
 
@@ -257,6 +261,8 @@ int host_low_owns(uintptr_t address, size_t size)
 		return 1;
 	if (in_range(address, size, image_base, image_end))
 		return 1;
+	if (in_range(address, size, ce_base, ce_end))
+		return 1;
 
 	mutexLock(&pool_lock);
 	for (i = 0; i < pool_count; i++)
@@ -312,8 +318,9 @@ long host_guest_munmap(uint64_t address, uint64_t size)
 	    length > LOW_LIMIT - address)
 		return -EINVAL;
 
-	/* Don't unmap the Xbox window or guest image */
-	if (in_range(address, length, window_base, window_end))
+	/* Fixed data aliases remain backed for subsequent map loads. */
+	if (in_range(address, length, window_base, window_end) ||
+	    in_range(address, length, ce_base, ce_end))
 	{
 		memset((void *)(uintptr_t)address, 0, length);
 		return 0;

@@ -377,7 +377,7 @@ build_absolute_url(const char * baseurl, const char * descURL,
 	char * s;
 	const char * base;
 	char * p;
-		#if defined(IF_NAMESIZE) && !defined(_WIN32) && !defined(__SWITCH__)
+#if defined(IF_NAMESIZE) && !defined(_WIN32)
 	char ifname[IF_NAMESIZE];
 #else /* defined(IF_NAMESIZE) && !defined(_WIN32) */
 	char scope_str[8];
@@ -402,7 +402,7 @@ build_absolute_url(const char * baseurl, const char * descURL,
 	if(url[0] != '/')
 		l++;
 	if(scope_id != 0) {
-#if defined(IF_NAMESIZE) && !defined(_WIN32) && !defined(__SWITCH__)
+#if defined(IF_NAMESIZE) && !defined(_WIN32)
 		if(if_indextoname(scope_id, ifname)) {
 			l += 3 + strlen(ifname);	/* 3 == strlen(%25) */
 		}
@@ -421,7 +421,7 @@ build_absolute_url(const char * baseurl, const char * descURL,
 			p = strchr(s, ']');
 			if(p) {
 				/* insert %25<scope> into URL */
-#if defined(IF_NAMESIZE) && !defined(_WIN32) && !defined(__SWITCH__)
+#if defined(IF_NAMESIZE) && !defined(_WIN32)
 				memmove(p + 3 + strlen(ifname), p, strlen(p) + 1);
 				memcpy(p, "%25", 3);
 				memcpy(p + 3, ifname, strlen(ifname));

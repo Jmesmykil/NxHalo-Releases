@@ -10,14 +10,6 @@ byte-for-byte identical to what the matching MSVC build compiles.
 #ifndef __HALO_LINUX_PREFIX_H
 #define __HALO_LINUX_PREFIX_H
 
-/* Unified guest and host builds include the Custom Edition loader and map UI. */
-#ifndef HALO_CUSTOM_EDITION
-#define HALO_CUSTOM_EDITION 1
-#endif
-#ifndef HALO_GAME_BROWSER
-#define HALO_GAME_BROWSER 1
-#endif
-
 #if !defined(__i386__) && !defined(HALO_ANDROID)
 #error the Linux port targets 32-bit x86: game data structures assume 32-bit pointers
 #endif

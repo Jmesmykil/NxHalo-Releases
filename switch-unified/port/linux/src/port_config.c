@@ -67,6 +67,65 @@ struct config_setting
 
 static const struct config_setting config_settings[] =
 {
+	
+#ifdef HALO_SWITCH_DEKO3D
+	{ "display.dynamic_resolution", _config_boolean, "false", "HALO_DYNAMIC_RESOLUTION", _environment_value,
+		_platform_all,
+		"While the GPU would hold the game under 55 frames a second (for half a\n"
+		"second), draw one step lower (1080 to 900, 900 to 720, 720 to 480: never\n"
+		"more), and go back once the frame would fit in 90% of a 60 Hz frame for\n"
+		"a second. Video Setup, or here. debug.show_resolution shows it. Changes\n"
+		"at once." },
+	{ "display.resolution_limit", _config_string, "\"480\"", "HALO_RESOLUTION_LIMIT", _environment_value,
+		_platform_all,
+		"Maximum internal lines: 480 preserves NxHalo's baseline render resolution; 720, 900 or 1080 are optional." },
+	{ "debug.resolution_uncapped", _config_boolean, "false", "HALO_RESOLUTION_UNCAPPED", _environment_value,
+		_platform_all,
+		"Draw at display.resolution_limit's lines even past what the console\n"
+		"shows, scaled down to it: a Switch Lite (720p) drawing 1080p, to test\n"
+		"a docked console's GPU load. Changes at once." },
+	{ "display.model_detail", _config_string, "\"stock\"", "HALO_MODEL_DETAIL", _environment_value, _platform_all,
+		"Which of their levels of detail models are drawn at: \"stock\" chooses by\n"
+		"their size on the Xbox's 480 lines, at any resolution; \"native\" by their\n"
+		"size on the display's, so that more detail is kept at a distance at high\n"
+		"resolutions; \"highest\" draws the models \"native\" does, each at its most\n"
+		"detailed level." },
+	{ "debug.gpu_texture_clip", _config_string, "\"on\"", "HALO_GPU_TEXTURE_CLIP", _environment_value,
+		_platform_all,
+		"Shadows cast on the level drawn only over their map: \"on\", \"off\", or\n"
+		"\"wide\" (clipped by limits nothing reaches, to tell the clip's own effect).\n"
+		"Takes effect the next start." },
+	{ "debug.gpu_draw_scissor", _config_boolean, "true", "HALO_GPU_DRAW_SCISSOR", _environment_value,
+		_platform_all,
+		"Rasterize an object's shadow and a dynamic light's pass only inside the\n"
+		"rectangle of the screen they can change; false rasterizes their whole\n"
+		"triangles, as before, to compare. Takes effect the next start." },
+	{ "debug.original_zoom", _config_boolean, "false", "HALO_ORIGINAL_ZOOM", _environment_value, _platform_all,
+		"Draw the zoom's blur as the game does, in passes over the whole screen,\n"
+		"rather than on a small copy blended over it once (about 3.7 ms less of\n"
+		"the GPU's frame at 720p). Takes effect the next start." },
+	{ "debug.original_blur", _config_boolean, "false", "HALO_ORIGINAL_BLUR", _environment_value, _platform_all,
+		"Draw a blur screen effect (cutscenes) as the game does, in passes over the\n"
+		"whole screen, rather than its passes on a small copy of it. Takes effect\n"
+		"the next start." },
+	{ "performance.cpu_clock", _config_string, "\"stock\"", "HALO_CPU_CLOCK", _environment_value, _platform_all,
+		"The CPU's clock: \"1785\" (1.7 GHz, the most Nintendo's own games use),\n"
+		"\"1020\" (1 GHz, the console's handheld rate: cooler, and the battery\n"
+		"lasts longer) or \"stock\" (left as the console has it). Changes at once." },
+	{ "debug.gpu_blend_discard", _config_boolean, "true", "HALO_GPU_BLEND_DISCARD", _environment_value,
+		_platform_all,
+		"Let a blended draw's pixels go where they would leave the screen as it was\n"
+		"(the empty parts of particles and glows); false blends them all in, as\n"
+		"before, to compare. Takes effect the next start." },
+	{ "debug.gpu_shader_ranges", _config_boolean, "true", "HALO_GPU_SHADER_RANGES", _environment_value,
+		_platform_all,
+		"Leave out of the pixel shaders the clamps their values cannot need\n"
+		"(port/switch/guest/nv2a_psh_dk.c); false writes them all, as before, to\n"
+		"compare the two. Takes effect the next start." },
+	{ "debug.gpu_glsl_folder", _config_string, "\"\"", "HALO_GPU_GLSL_FOLDER", _environment_value, _platform_all,
+		"A folder to write each shader the game draws with to, as GLSL named by its\n"
+		"hash (the names gpu_capture logs); the folder must exist. Empty for none." },
+#endif
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
 		"Where display.mode is empty: start borderless over the whole display;\n"
 		"false starts in a window. F11 switches." },
@@ -160,6 +219,17 @@ static const struct config_setting config_settings[] =
 		"of each vertex shows across curved surfaces; false lights each vertex,\n"
 		"as the Xbox does." },
 
+	{ "audio.voice_enabled", _config_boolean, "false", "HALO_VOICE_ENABLED", _environment_value, _platform_desktop,
+		"Enable optional voice, which requires compatible clients. The microphone\n"
+		"is used only as audio.voice_mode says, and never while this is false." },
+	{ "audio.voice_mode", _config_string, "\"ptt\"", "HALO_VOICE_MODE", _environment_value, _platform_desktop,
+		"How voice transmits once audio.voice_enabled is true: \"ptt\" only while\n"
+		"the push-to-talk key (controls.voice_ptt) is held; \"open\" continuously\n"
+		"transmits the microphone during gameplay, with no key. Anything else is\n"
+		"\"ptt\"." },
+	{ "audio.voice_in_menus", _config_boolean, "false", "HALO_VOICE_IN_MENUS", _environment_value, _platform_desktop,
+		"Allow voice in connected lobbies and menus. Uses audio.voice_mode;\n"
+		"never captures outside a joined session or when voice is disabled." },
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
 	{ "audio.volume", _config_real, "1.0", "HALO_VOLUME", _environment_value, _platform_all,
@@ -189,6 +259,10 @@ static const struct config_setting config_settings[] =
 		"same as input.mouse_sensitivity." },
 
 	/* the keyboard and mouse's own controls (port/linux/src/xinput_sdl.c) */
+	{ "controls.vehicle_boost", _config_string, "\"L\"", "HALO_KEY_VEHICLE_BOOST", _environment_value, _platform_all,
+		"Hold to boost while driving a Ghost. Controller L/LB/L1 also boosts." },
+	{ "controls.voice_ptt", _config_string, "\"V\"", "HALO_KEY_VOICE_PTT", _environment_value, _platform_desktop,
+		"Keyboard push-to-talk key for optional compatible-client voice." },
 	{ "controls.move_forward", _config_string, "\"W\"", "HALO_KEY_MOVE_FORWARD", _environment_value, _platform_all,
 		"The keyboard and mouse's controls, which Settings > Controls Setup\n"
 		"changes: up to two keys or buttons each, separated by a comma. Keys by\n"
@@ -243,6 +317,12 @@ static const struct config_setting config_settings[] =
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
 		"empty for English. The game data decides what is translated." },
 
+	{ "display.stream_reuse", _config_boolean, "true", "HALO_STREAM_REUSE", _environment_value, _platform_all,
+		"Reuse byte-identical vertex and index submissions within each frame." },
+	{ "display.shader_warmup", _config_boolean, "true", "HALO_SHADER_WARMUP", _environment_value, _platform_all,
+		"Precompile learned shader programs before gameplay." },
+	{ "display.light_partition_reuse", _config_boolean, "true", "HALO_LIGHT_PARTITION_REUSE", _environment_value, _platform_all,
+		"Reuse unchanged attached-light bounds while updating transforms and shading." },
 	{ "mods.character", _config_integer, "0", "HALO_CHARACTER", _environment_value, _platform_all,
 		"Campaign biped preset: 0 is the level's normal character; other choices use a biped tag loaded by the current campaign map." },
 	{ "mods.third_person", _config_boolean, "false", "HALO_THIRD_PERSON", _environment_value, _platform_all,
@@ -251,7 +331,7 @@ static const struct config_setting config_settings[] =
 		"Host multiplayer biped preset: 0 is the map's normal multiplayer character. The selected biped must be loaded by the current multiplayer map; clients follow the host." },
 
 	{ "mods.match_preset", _config_integer, "0", "HALO_MATCH_PRESET", _environment_value, _platform_all,
-		"Host match preset: Standard, faction teams, SWAT, Tower of Power, grenade Dodgeball, Zombies or native Race." },
+		"Host match preset: Standard, faction teams, SWAT, Tower of Power, grenade Dodgeball, Zombies, native Race or seven-weapon Gun Game." },
 	{ "mods.faction_matchup", _config_integer, "0", "HALO_FACTION_MATCHUP", _environment_value, _platform_all,
 		"Faction pairing: 0 Covenant/USMC, 1 USMC/Flood, 2 Flood/Covenant. Models must be loaded by the map." },
 
@@ -271,7 +351,7 @@ static const struct config_setting config_settings[] =
 		"instead of the local network's broadcast address (for VPNs); empty for\n"
 		"the local network." },
 	{ "network.compatibility_version", _config_integer, "21", "HALO_NET_COMPATIBILITY_VERSION", _environment_value, _platform_all,
-		"Native network profile to advertise while hosting: 11, 20 or 21. Version 11 is the legacy native wire; 20 keeps additive versions 12-20; 21 enables current OpenCE behavior." },
+		"Native network profile to advertise while hosting: 11, 20, 21 or 24. Version 11 is the legacy native wire; 20 keeps additive versions 12-20; 21 is the current compatible default; 24 is a separate exact-match OpenCE profile." },
 	{ "network.online", _config_boolean, "true", "HALO_NET_ONLINE", _environment_value, _platform_all,
 		"Internet play: hosting makes an invite link (logged, and put on the\n"
 		"clipboard) that lets whoever has it join over the internet; opening a\n"
@@ -425,6 +505,8 @@ static const struct config_setting config_settings[] =
 	{ "debug.gpu_flush_draws", _config_integer, "-1", "HALO_GPU_FLUSH_DRAWS", _environment_value, _platform_desktop,
 		"Flush the GPU's pipeline every this many draws: -1 for every 3 on Intel\n"
 		"graphics with Mesa's driver (which can hang without), 0 never." },
+	{ "debug.performance", _config_boolean, "false", "HALO_PERFORMANCE", _environment_value, _platform_all,
+		"Record bounded frame percentiles, process resources, network counters and multiplayer scores every 5-10 seconds." },
 	{ "debug.gpu_stats", _config_boolean, "false", "HALO_GPU_STATS", _environment_set_is_true, _platform_all,
 		"Log the renderer's draw counts once a second." },
 	{ "debug.gpu_trace_frame", _config_integer, "-1", "HALO_GPU_TRACE", _environment_value, _platform_all,
@@ -441,6 +523,8 @@ static const struct config_setting config_settings[] =
 		"Pixel shaders show their first texture." },
 	{ "debug.gpu_debug_flat", _config_boolean, "false", "HALO_GPU_DEBUG_FLAT", _environment_set_is_true, _platform_all,
 		"Pixel shaders show their vertex colour." },
+	{ "debug.screenshot_composed", _config_boolean, "false", "HALO_SCREENSHOT_COMPOSED", _environment_value, _platform_all,
+		"Capture the final display including native menus when saving diagnostic frames." },
 	{ "debug.screenshot_directory", _config_string, "\"\"", "HALO_SCREENSHOT_DIR", _environment_value, _platform_all,
 		"A folder to save frames to (with screenshot_every); empty none." },
 	{ "debug.screenshot_composed", _config_boolean, "false", "HALO_SCREENSHOT_COMPOSED", _environment_value, _platform_all,
@@ -881,6 +965,21 @@ static void config_report_unknown_keys(toml_datum_t table)
 	}
 }
 
+/* audio.voice_mode is "ptt" or "open": anything else (misspelt, or of some
+other build) is push-to-talk, so that the microphone is never open by
+mistake */
+static void config_check_voice_mode(size_t index)
+{
+	const char *mode = config_values[index].string;
+
+	if (strcmp(config_settings[index].name, "audio.voice_mode") != 0 || !mode || !strcmp(mode, "ptt") ||
+		!strcmp(mode, "open"))
+		return;
+	platform_log("settings: audio.voice_mode \"%s\" is neither \"ptt\" nor \"open\"; using \"ptt\"", mode);
+	/* (the old string is kept, as config_set_from_text keeps it) */
+	config_values[index].string = strdup("ptt");
+}
+
 static void config_load(void)
 {
 	char path[1024];
@@ -962,6 +1061,8 @@ static void config_load(void)
 			break;
 		}
 	}
+	for (index = 0; index < NUMBER_OF_CONFIG_SETTINGS; index++)
+		config_check_voice_mode(index);
 }
 
 static const struct config_value *config_value(const char *name, enum config_type type)
@@ -1039,6 +1140,7 @@ int config_write(const char *name, const char *value)
 	config_value(name, config_settings[index].type);
 	pthread_mutex_lock(&config_lock);
 	config_set_from_text(&config_values[index], config_settings[index].type, value);
+	config_check_voice_mode((size_t)index);
 	snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
 	snprintf(key, sizeof(key), "%s", dot + 1);
 	switch (config_settings[index].type)

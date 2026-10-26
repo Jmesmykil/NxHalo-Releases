@@ -130,6 +130,9 @@ extern int platform_ce_tag_cache_ready;
 void *platform_contiguous_alloc(unsigned long size, unsigned long alignment,
 	unsigned long physical_address, DWORD protect);
 void platform_contiguous_free(void *address);
+#ifdef HALO_SWITCH_DEKO3D
+unsigned long platform_contiguous_block_size(const void *address);
+#endif
 BOOL platform_is_contiguous(const void *address);
 #define PLATFORM_PHYSICAL_TO_VIRTUAL(physical) ((void *)((unsigned long)(physical) | PLATFORM_CONTIGUOUS_BASE))
 #define PLATFORM_VIRTUAL_TO_PHYSICAL(address) ((unsigned long)(address) & ~PLATFORM_CONTIGUOUS_BASE)

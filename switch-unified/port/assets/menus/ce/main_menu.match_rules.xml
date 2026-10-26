@@ -47,6 +47,11 @@
   <on event="start" run="port match preset" />
   <on event="left_mouse" run="mouse emit accept event" />
  </widget>
+ <widget name="main_menu/match_rules/presets_7" type="text" controller="1" left="45" width="550" height="30" bitmap="bitmaps/list_item_bkd" text="GUN GAME (ROCKET FINALE)" font="ui\small_ui" color="#FFFFFFFF" text_x="12" text_y="3">
+  <on event="a" run="port match preset" />
+  <on event="start" run="port match preset" />
+  <on event="left_mouse" run="mouse emit accept event" />
+ </widget>
  <widget name="main_menu/match_rules/presets_factions" type="text" controller="1" left="45" width="550" height="32" bitmap="bitmaps/list_item_bkd" text="FACTION MATCHES" font="ui\large_ui" color="#FFFFFFFF" text_x="12" text_y="3">
   <on event="a" open="main_menu/match_rules/factions" />
   <on event="start" open="main_menu/match_rules/factions" />
@@ -107,6 +112,7 @@
   <child widget="main_menu/match_rules/presets_3" y="149" />
   <child widget="main_menu/match_rules/presets_4" y="193" />
   <child widget="main_menu/match_rules/presets_5" y="237" />
+  <child widget="main_menu/match_rules/presets_7" y="281" />
  </widget>
  <widget name="main_menu/match_rules/combat_help" type="text" controller="1" left="50" top="414" width="540" height="65" font="ui\small_ui" color="#FFFFFFFF">
   <data input="port match status" />

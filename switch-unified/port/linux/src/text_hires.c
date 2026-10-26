@@ -1,3 +1,6 @@
+#ifdef HALO_SWITCH_DEKO3D
+#include "../../switch/guest/text_hires_dk.c.inc"
+#else
 /*
 TEXT_HIRES.C
 
@@ -295,3 +298,5 @@ unsigned int text_hires_atlas_texture(unsigned long data)
 	}
 	return atlas_texture;
 }
+
+#endif

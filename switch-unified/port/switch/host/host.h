@@ -20,11 +20,16 @@ here without change) and port/switch/README.md for Switch specifics.
 extern FILE *s_logFile;
 
 #include "halo_switch_abi.h"
+#ifdef HALO_SWITCH_DEKO3D
+#include "host_deko.h"
+#endif
 
 /* Community core requires 32 MiB for its image, including BSS. */
-#define HOST_GUEST_IMAGE_LIMIT 0x8A000000ULL
+#define HOST_GUEST_IMAGE_LIMIT 0x8B000000ULL
 #define HOST_GUEST_POOL_BASE HOST_GUEST_IMAGE_LIMIT
 #define HOST_GUEST_POOL_SIZE (0x90000000ULL - HOST_GUEST_POOL_BASE)
+#define HOST_CE_TAG_BASE 0x40440000ULL
+#define HOST_CE_TAG_SIZE 0x01700000ULL
 
 /* ---------- logging (nxlink stdio) */
 

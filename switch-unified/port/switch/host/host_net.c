@@ -17,6 +17,7 @@
 #include "host_socket_poll.h"
 #include "host_connected_sendto.h"
 #include "host_lan_discovery.h"
+#include "host_datagram_batch.h"
 
 /* select consumes native SO_ERROR; retain it until the guest reads it. */
 static _Atomic int pending_socket_errors[FD_SETSIZE];
@@ -131,7 +132,11 @@ static int guest_accept(int fd,void *raw,socklen_t *length)
 static ssize_t guest_recvfrom(int fd,void *buffer,size_t length,int flags,void *raw,socklen_t *size)
 {
     struct sockaddr_in a; socklen_t count=sizeof(a);
-    ssize_t result=recvfrom(fd,buffer,length,flags,raw?(struct sockaddr *)&a:NULL,raw?&count:NULL);
+    pthread_mutex_lock(&halo_rx_lock);
+    ssize_t result=halo_rx_receive(fd,buffer,length,flags,raw?(struct sockaddr *)&a:NULL,raw?&count:NULL);
+    int saved_errno=errno;
+    pthread_mutex_unlock(&halo_rx_lock);
+    errno=saved_errno;
     if (result>=0 && raw) returned_address(raw,size,&a);
     return result;
 }
@@ -305,7 +310,13 @@ int posix_socket(int family, int type, int protocol)
 int posix_socket_close(int socket)
 {
 	if (socket >= 0 && socket < FD_SETSIZE) atomic_store(&pending_socket_errors[socket], 0);
-    return net_result("close", socket, close(socket),0,0);
+    pthread_mutex_lock(&halo_rx_lock);
+    int result=close(socket);
+    int saved_errno=errno;
+    if (!result) halo_rx_forget(socket);
+    pthread_mutex_unlock(&halo_rx_lock);
+    errno=saved_errno;
+    return net_result("close", socket, result,0,0);
 }
 
 int posix_socket_bind(int socket, const void *address, int address_length)
@@ -393,7 +404,11 @@ int posix_socket_recv(int socket, void *buffer, int length, int flags)
     if (length < 0) return invalid_argument(0);
     if (length && !buffer) return invalid_argument(1);
     uint64_t begin=armGetSystemTick();
-    int result=(int)recv(socket, buffer, (size_t)length, flags);
+    pthread_mutex_lock(&halo_rx_lock);
+    int result=(int)halo_rx_receive(socket,buffer,(size_t)length,flags,NULL,NULL);
+    int saved_errno=errno;
+    pthread_mutex_unlock(&halo_rx_lock);
+    errno=saved_errno;
     net_profile_record(2,begin,result,length);
 	return succeed(result);
 }
@@ -429,14 +444,29 @@ int posix_socket_set_nonblocking(int socket, int nonblocking)
 	if (flags < 0)
 		return fail();
 	flags = nonblocking ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK);
-	return net_result("nonblocking", socket, fcntl(socket, F_SETFL, flags), flags, nonblocking);
+	pthread_mutex_lock(&halo_rx_lock);
+    int result=fcntl(socket,F_SETFL,flags);
+    int saved_errno=errno;
+    if (!result && !nonblocking && halo_rx_find(socket)) halo_rx_find(socket)->enabled=0;
+    if (!result && nonblocking) {
+        int type=0; socklen_t size=sizeof(type);
+        if (!getsockopt(socket,SOL_SOCKET,SO_TYPE,&type,&size) && type==SOCK_DGRAM)
+            halo_rx_enable(socket);
+    }
+    pthread_mutex_unlock(&halo_rx_lock);
+    errno=saved_errno;
+    return net_result("nonblocking",socket,result,flags,nonblocking);
 }
 
 int posix_socket_bytes_available(int socket, posix_ulong *count)
 {
     if (!count) return invalid_argument(1);
 	int available = 0;
-	int result = ioctl(socket, FIONREAD, &available);
+	pthread_mutex_lock(&halo_rx_lock);
+    int result=halo_rx_held(socket,&available)?0:ioctl(socket,FIONREAD,&available);
+    int saved_errno=errno;
+    pthread_mutex_unlock(&halo_rx_lock);
+    errno=saved_errno;
 
 	if (result >= 0)
 		*count = (posix_ulong)available;
@@ -588,8 +618,39 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
     requested_errors = error_set;
 	timeout.tv_sec = timeout_seconds;
 	timeout.tv_usec = timeout_microseconds;
-	result = halo_socket_poll_select(maximum + 1, read ? &read_set : NULL, write ? &write_set : NULL,
-		error ? &error_set : NULL, infinite ? NULL : &timeout);
+/* A different receiver may move kernel packets into our queue while
+ * poll waits. Recheck every requested read after bounded poll slices,
+ * continuing until actual readiness or the caller deadline. */
+fd_set requested_read=read_set, requested_write=write_set;
+uint64_t wait_begin=armTicksToNs(armGetSystemTick());
+uint64_t wait_us=timeout_seconds<0 ? 0 : (uint64_t)timeout_seconds*1000000ULL+(uint64_t)timeout_microseconds;
+for (;;) {
+    int tracked=0,held=0;
+    read_set=requested_read; write_set=requested_write; error_set=requested_errors;
+    pthread_mutex_lock(&halo_rx_lock);
+    for (int fd=0;read && fd<=maximum;fd++) if (FD_ISSET(fd,&requested_read)) {
+        if (halo_rx_find(fd)) tracked=1;
+        if (halo_rx_held(fd,NULL)) held=1;
+    }
+    pthread_mutex_unlock(&halo_rx_lock);
+    struct timeval slice=timeout;
+    const struct timeval *chosen=infinite?NULL:&timeout;
+    if (tracked && (infinite || (timeout_seconds>=0 && timeout_microseconds>=0 && timeout_microseconds<1000000))) {
+        uint64_t elapsed=(armTicksToNs(armGetSystemTick())-wait_begin)/1000;
+        uint64_t remaining=infinite?5000:elapsed<wait_us?wait_us-elapsed:0;
+        if (remaining>5000) remaining=5000;
+        if (held) remaining=0;
+        slice.tv_sec=0; slice.tv_usec=(suseconds_t)remaining; chosen=&slice;
+    }
+    result=halo_socket_poll_select(maximum+1,read?&read_set:NULL,write?&write_set:NULL,error?&error_set:NULL,chosen);
+    if (result<0) break;
+    pthread_mutex_lock(&halo_rx_lock);
+    for (int fd=0;read && fd<=maximum;fd++) if (FD_ISSET(fd,&requested_read) && halo_rx_held(fd,NULL) && !FD_ISSET(fd,&read_set)) {
+        FD_SET(fd,&read_set); result++;
+    }
+    pthread_mutex_unlock(&halo_rx_lock);
+    if (result || !tracked || (!infinite && (armTicksToNs(armGetSystemTick())-wait_begin)/1000>=wait_us)) break;
+}
     {
         static unsigned diagnostic_calls;
         if (diagnostic_calls++ < 24)

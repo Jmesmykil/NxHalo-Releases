@@ -90,6 +90,7 @@ symbols in this file:
 #include "network_game_manager.h"
 #include "network_game_ui.h"
 #include "networking/network_server_manager.h"
+#include "networking/network_client_manager.h"
 #include "objects/objects.h"
 #include "units/units.h"
 #include "text/unicode.h"
@@ -299,6 +300,81 @@ void network_game_generate_local_machine_name(
 
 	machine_name[31] = 0;
 	return;
+}
+
+/* Audio receives a scalar snapshot; object reads stay on the game thread. */
+int network_game_port_voice_spatial(int speaker_slot, float listener[3], float right[3], float speaker[3])
+{
+    struct player_datum *speaker_player;
+    struct player_datum *listener_player;
+    struct object_datum *speaker_object;
+    struct object_datum *listener_object;
+    long local_index;
+    if (!listener || !right || !speaker || speaker_slot < 0 ||
+        speaker_slot >= NETWORK_GAME_PLAYER_SLOTS || !player_data || !players_globals ||
+        players_globals->local_player_count <= 0) return 0;
+    local_index = players_globals->local_players[0];
+    if (local_index == NONE) return 0;
+    listener_player = player_try_and_get(local_index);
+    speaker_player = player_try_and_get(speaker_slot);
+    if (!listener_player || !speaker_player || listener_player->unit_index == NONE ||
+        speaker_player->unit_index == NONE) return 0;
+    listener_object = object_try_and_get(listener_player->unit_index);
+    speaker_object = object_try_and_get(speaker_player->unit_index);
+    if (!listener_object || !speaker_object) return 0;
+    listener[0] = listener_object->object.position.x;
+    listener[1] = listener_object->object.position.y;
+    listener[2] = listener_object->object.position.z;
+    speaker[0] = speaker_object->object.position.x;
+    speaker[1] = speaker_object->object.position.y;
+    speaker[2] = speaker_object->object.position.z;
+    right[0] = listener_object->object.up.j * listener_object->object.forward.k - listener_object->object.up.k * listener_object->object.forward.j;
+    right[1] = listener_object->object.up.k * listener_object->object.forward.i - listener_object->object.up.i * listener_object->object.forward.k;
+    right[2] = listener_object->object.up.i * listener_object->object.forward.j - listener_object->object.up.j * listener_object->object.forward.i;
+    return 1;
+}
+
+int network_game_port_voice_session_connected(void)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	unsigned long address; int slot;
+	if (server) return network_game_server_port_voice_roster(&address, &slot, 1) > 0;
+	return network_game_client_is_connected(global_network_game_client_get());
+}
+
+int network_game_port_voice_session_active(void)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	struct network_game_client *client = global_network_game_client_get();
+	struct player_datum *local_player;
+	struct object_datum *local_unit;
+	long local_index;
+	int playing = server ? network_game_server_playing(server) : network_game_client_is_playing(client);
+	if (!playing || !players_globals || players_globals->local_player_count <= 0)
+		return 0;
+	local_index = players_globals->local_players[0];
+	if (local_index == NONE || !(local_player = player_try_and_get(local_index)) || local_player->unit_index == NONE)
+		return 0;
+	local_unit = object_try_and_get(local_player->unit_index);
+	return local_unit != NULL;
+}
+
+unsigned long network_game_port_voice_map_token(void)
+{
+    struct network_game *game = network_game_get_game();
+    unsigned long hash = 2166136261UL;
+    unsigned long value;
+    const unsigned char *name;
+    int index;
+    if (!game) return 0;
+    name = (const unsigned char *)game->map.name;
+    for (index = 0; index < sizeof(game->map.name) && name[index]; index++)
+        hash = (hash ^ name[index]) * 16777619UL;
+    value = game->random_seed;
+    for (index = 0; index < 4; index++) hash = (hash ^ (unsigned char)(value >> (index * 8))) * 16777619UL;
+    value = (unsigned long)game->number_of_games_played;
+    for (index = 0; index < 4; index++) hash = (hash ^ (unsigned char)(value >> (index * 8))) * 16777619UL;
+    return hash;
 }
 
 void network_game_invalidate_player(

@@ -118,6 +118,9 @@ struct game_options;
 
 /* ---------- headers */
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+#include "halo_phase_profile.h"
+#endif
 #include "cseries/cseries.h"
 #include "game/game.h"
 #include "ai/ai.h"
@@ -144,6 +147,7 @@ struct game_options;
 #include "game/player_queues_new.h"
 #include "game/player_rumble.h"
 #include "game/players.h"
+#include "match_rules.h" /* port: map requirement notices */
 #include "nxhalo_custom_content.h" /* port: campaign character updates */
 #include "hs/hs.h"
 #include "input/input_abstraction.h"
@@ -305,11 +309,49 @@ void game_initialize(
 	return;
 }
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+/* Nonoverlapping tick sections. Dump by elapsed time so a crowded frame
+ * cannot postpone the next diagnostic window for minutes. */
+extern void platform_log(char const *format, ...);
+static struct halo_phase_timing tick_sections[9];
+static uint64_t tick_sections_since;
+static void tick_section(unsigned slot, uint64_t *begin)
+{
+    uint64_t now = halo_profile_now_us(), elapsed = now - *begin;
+    struct halo_phase_timing *t = &tick_sections[slot];
+    t->calls++; t->total_us += elapsed;
+    if (elapsed > t->max_us) t->max_us = elapsed;
+    *begin = now;
+}
+static void tick_sections_report(uint64_t now)
+{
+    static char const *names[] = { "setup", "players_before", "effects", "first_person",
+        "game_engine", "scripts", "objects", "players_after", "hud" };
+    if (!tick_sections_since) tick_sections_since = now;
+    if (now - tick_sections_since < 5000000) return;
+    for (unsigned i = 0; i < 9; i++)
+        platform_log("[tick_pass] frame=%llu tick=%ld span_us=%llu part=%s calls=%llu cpu_us=%llu max_us=%llu",
+            (unsigned long long)halo_guest_phases.frame, game_time_get(),
+            (unsigned long long)(now-tick_sections_since), names[i],
+            (unsigned long long)tick_sections[i].calls, (unsigned long long)tick_sections[i].total_us,
+            (unsigned long long)tick_sections[i].max_us);
+    memset(tick_sections, 0, sizeof(tick_sections));
+    tick_sections_since = now;
+}
+#define TICK_SECTION(n) tick_section(n, &section_begin)
+#else
+#define TICK_SECTION(n) ((void)0)
+#endif
+
 void game_tick(
 	void)
 {
 	real seconds_per_tick;
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+    uint64_t profile_begin = halo_profile_now_us(), profile_frame = halo_guest_phases.frame;
+    uint64_t section_begin = profile_begin;
+#endif
 	profile_tick_start();
 	collision_log_begin_period(0);
 	real_math_reset_precision();
@@ -340,25 +382,36 @@ void game_tick(
 		ai_update();
 	else
 		network_actors_drive();
+	TICK_SECTION(0);
 	players_update_before_game();
 	/* port: campaign character swaps run only in local non-game-engine play */
 	nxhalo_custom_update();
+	TICK_SECTION(1);
 
 	seconds_per_tick = game_globals->players_are_double_speed
 		? 1.0f / (2 * TICKS_PER_SECOND)
 		: 1.0f / TICKS_PER_SECOND;
+#if defined(__linux__) || defined(HALO_ANDROID)
+    { uint64_t begin = halo_profile_now_us();
+      effects_update(seconds_per_tick);
+      halo_frame_phase_add(&halo_guest_frame_phases, HALO_FRAME_EFFECTS, begin, halo_profile_now_us(), profile_frame); }
+#else
 	effects_update(seconds_per_tick);
+#endif
 	/* An antenna's chain is a simulation of the Xbox's own step, an update a
 	tick: stepped a frame at a time, its springs, its carry and its points'
 	physics act against the frames' own movement of it, and a vehicle at
 	speed swings it far wider than a tick's step does. The frames between the
 	ticks are drawn from what each tick leaves (antenna.c). */
 	antennas_update(seconds_per_tick);
+	TICK_SECTION(2);
 	lock_global_random_seed();
 	rumble_update();
 	first_person_weapons_update();
 	unlock_global_random_seed();
+	TICK_SECTION(3);
 	game_engine_update();
+	TICK_SECTION(4);
 	editor_update();
 	/* port: in network co-op only the host runs the scripts. A client running
 	them would place the map's actors and objects a second time and make
@@ -366,17 +419,26 @@ void game_tick(
 	if (!(network_game_distributed_client() && network_coop_active()))
 		hs_update();
 	recorded_animations_update();
+	TICK_SECTION(5);
 	objects_update();
+	TICK_SECTION(6);
 	players_update_after_game();
+	TICK_SECTION(7);
 	hud_update();
+	match_rules_update_map_notice();
 	player_effect_update();
 	/* port: and at its end, before the frame draws the lights */
 	game_state_check_data_arrays();
 	lights_port_recover();
+	TICK_SECTION(8);
 
 	profile_exit(game_update_section);
 	collision_log_end_period();
 	profile_tick_end();
+#if defined(__linux__) || defined(HALO_ANDROID)
+    halo_phase_add(&halo_guest_phases, HALO_PHASE_GAME, profile_begin, halo_profile_now_us(), profile_frame);
+    tick_sections_report(halo_profile_now_us());
+#endif
 
 	return;
 }
@@ -584,6 +646,13 @@ boolean game_is_cooperative(
 	return player_spawn_count > 1;
 }
 
+
+#ifdef HALO_SWITCH_DEKO3D
+extern void d3d8_gl_map_loading(const char *name);
+extern void d3d8_gl_map_loaded(const char *name);
+extern int d3d8_gl_map_waiting(void);
+extern float d3d8_gl_map_progress(void);
+#endif
 boolean game_load(
 	struct game_options *options)
 {
@@ -600,13 +669,37 @@ boolean game_load(
 		0x194,
 		game_options_verify(options));
 
+#if defined(HALO_GAME_BROWSER) && (defined(__linux__) || defined(HALO_ANDROID))
+    /* Native maps are read directly; the Xbox copy/precache loop may never
+     * run. Put a loading frame on screen before synchronous scenario IO. */
+    progress_bar_begin(TRUE);
+#endif
 	random_seed_debug_log(TRUE);
 	csmemcpy(&game_globals->options, options, sizeof(*options));
+
+#ifdef HALO_SWITCH_DEKO3D
+	d3d8_gl_map_loading(options->map_name);
+#endif
 	if (scenario_load(options->map_name))
 	{
 		game_globals->map_loaded = TRUE;
+#ifdef HALO_SWITCH_DEKO3D
+		d3d8_gl_map_loaded(options->map_name);
+		while (d3d8_gl_map_waiting())
+		{
+			float progress = d3d8_gl_map_progress();
+			progress_bar_native_stage(0.35f * (progress < 0 ? 0 : progress), "PREPARING SHADERS");
+			main_pregame_render();
+			main_rasterizer_throttle();
+			main_present_frame();
+		}
+#endif
 	}
 
+#if defined(HALO_GAME_BROWSER) && (defined(__linux__) || defined(HALO_ANDROID))
+    if(game_globals->map_loaded) progress_bar_native_stage(0.35f,"MAP READY");
+    else progress_bar_end();
+#endif
 	return game_globals->map_loaded;
 }
 
@@ -631,6 +724,7 @@ void game_initialize_for_new_map(
 	real_math_reset_precision();
 	rasterizer_initialize_for_new_map();
 	game_state_initialize_for_new_map();
+	progress_bar_native_stage(0.50f,"GAME STATE READY");
 	game_time_initialize_for_new_map();
 	interface_initialize_for_new_map();
 	game_allegiance_initialize_for_new_map();
@@ -646,6 +740,7 @@ void game_initialize_for_new_map(
 	render_interpolation_reset();
 	render_initialize_for_new_map();
 	structures_initialize_for_new_map();
+	progress_bar_native_stage(0.65f,"WORLD READY");
 	breakable_surfaces_initialize_for_new_map();
 	decals_initialize_for_new_map();
 	director_initialize_for_new_map();
@@ -657,6 +752,7 @@ void game_initialize_for_new_map(
 	sound_initialize_for_new_map();
 	sound_classes_initialize_for_new_map();
 	game_sound_initialize_for_new_map();
+	progress_bar_native_stage(0.80f,"EFFECTS AND SOUND READY");
 	weather_particle_systems_initialize_for_new_map();
 	point_physics_initialize_for_new_map();
 	game_engine_initialize_for_new_map();
@@ -672,6 +768,7 @@ void game_initialize_for_new_map(
 	hs_initialize_for_new_map();
 	recorded_animations_initialize_for_new_map();
 	cheats_initialize_for_new_map();
+	progress_bar_native_stage(0.90f,"SPAWNING OBJECTS");
 
 	game_globals->active = TRUE;
 	objects_place();
@@ -680,6 +777,8 @@ void game_initialize_for_new_map(
 	/* (the map's objects, placed as on the host: a distributed client's own
 	from now on go elsewhere, port/linux/game/network_objects.c) */
 	network_objects_placed();
+	progress_bar_native_stage(1.f,"READY");
+	progress_bar_end();
 	ui_widgets_safe_to_load(TRUE);
 
 	return;
@@ -834,6 +933,9 @@ void game_precache_new_map(
 					cache_files_precache_is_copying_map(map_name));
 			ui_widget_load_progress_widget();
 			progress_bar_begin(global_scenario_index != NONE);
+#ifdef HALO_SWITCH_DEKO3D
+			d3d8_gl_map_loading(map_name);
+#endif
 			do
 			{
 				map_status = cache_files_precache_map_status(
@@ -842,7 +944,12 @@ void game_precache_new_map(
 				main_rasterizer_throttle();
 				main_present_frame();
 			}
+
+#ifdef HALO_SWITCH_DEKO3D
+			while (!map_status || (map_status == _cached_map_file_success && d3d8_gl_map_waiting()));
+#else
 			while (!map_status);
+#endif
 
 			progress_bar_end();
 			ui_widgets_close_all();
@@ -879,6 +986,11 @@ void game_precache_new_map(
 void game_dispose_from_old_map(
 	void)
 {
+#ifdef HALO_SWITCH_DEKO3D
+	/* Pending GPU draws own map buffers until the renderer retires them. */
+	extern void halo_switch_renderer_idle(void);
+	halo_switch_renderer_idle();
+#endif
 	rasterizer_dispose_from_old_map();
 	game_state_dispose_from_old_map();
 	cheats_dispose_from_old_map();

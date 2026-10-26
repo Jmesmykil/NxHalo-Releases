@@ -1,0 +1,22 @@
+{
+  "upstream_commit": "5a5afc2bae8b55409ab36ba45be63fcb73f68993",
+  "patch_sha256": "bfe440c518940603400661f07ac2ccc119b1fb65b867788462f7486b86233c30",
+  "flags": [
+    "-std=c++11",
+    "-DNDEBUG",
+    "-DDESKTOP",
+    "-D_USE_MATH_DEFINES",
+    "-D_GNU_SOURCE",
+    "-DHAVE_POSIX_MEMALIGN",
+    "-D__SWITCH__",
+    "-march=armv8-a",
+    "-mtune=cortex-a57",
+    "-mtp=soft",
+    "-fPIE"
+  ],
+  "b_staticpic": false,
+  "archive_sha256": "44c9c4c6795d7bb6b141dc0b26b9ea710245dae3c5f19cfae18075e05806edbb",
+  "object_sha256": "e1c2fd0a66197c6554858bec26e65e8486da585a89ff332b37a2dc9b819d8dce",
+  "exports": "0000000000000000 T host_dk_compile_glsl\n",
+  "acceptance": "AArch64 cross compile and relocatable link verified; no runtime shader compile on hardware tested"
+}

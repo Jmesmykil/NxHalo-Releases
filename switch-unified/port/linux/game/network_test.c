@@ -13,6 +13,9 @@ Automated system link sessions for testing the netcode without the menus
 - "join" searches for games and joins the first it finds, as picking it in
   the system link list does.
 
+HALO_NETWORK_TEST_TRACE=1 enables read-only player/tick diagnostics in natural
+campaign or multiplayer sessions without hosting, joining, moving or changing rules.
+
 Once the game runs, every second each machine logs where every player's
 unit is, so the machines' views of the game can be compared.
 
@@ -32,6 +35,8 @@ Called from the main loop every frame (main.c).
 */
 
 #include "cseries.h"
+#include "match_rules.h"
+#include "networking/network_game_manager.h"
 #include "halo_map_families.h"
 #include "main/main.h"
 #include "interface/player_ui.h"
@@ -57,6 +62,7 @@ Called from the main loop every frame (main.c).
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* the platform layer's (port/linux/src/port_config.c) */
@@ -83,6 +89,7 @@ enum
 static struct
 {
 	boolean checked;
+	boolean native_lobby_loaded;
 	short mode;
 	char map_name[64];
 	char variant_name[64];
@@ -93,6 +100,7 @@ static struct
 	boolean game_over;
 	real start_delay;
 	real menu_seconds;
+	real lobby_log_seconds;
 	boolean set_up;
 	real setup_seconds;
 	boolean started;
@@ -246,6 +254,14 @@ static void network_test_log_players(
 				object->object.shield_vitality, placed != object ? " riding" : "",
 				TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit) ? " camo" : "",
 				unit->unit.grenade_counts[0], unit->unit.grenade_counts[1]);
+			if (unit->unit.current_weapon_index >= 0 && unit->unit.current_weapon_index < MAXIMUM_WEAPONS_PER_UNIT)
+			{
+				long held = unit->unit.weapon_object_indices[unit->unit.current_weapon_index];
+				if (held != NONE)
+					network_test_append(line, (int)sizeof(line), &length, " held=%s slot%d melee_only=%d",
+						tag_get_name(object_get(held)->definition_index), unit->unit.current_weapon_index,
+						match_rules_player_melee_only(iterator.datum_index));
+			}
 			/* where it aims (yaw and pitch, degrees), its animation state and
 			how hard it is moving */
 			network_test_append(line, (int)sizeof(line), &length, " a%.0f/%.0f f%.0f l%.0f/%.0f as%d/%d st%d thr%.2f",
@@ -316,7 +332,7 @@ static void network_test_log_players(
 		platform_log("network test: tick %ld%s | items %ld (+%ld -%ld !%ld x%ld) | %s to %ld | sent %ld received %ld corrected %ld"
 			" | hits %ld dealt %ld rejected %ld replayed %ld | local %ld camera (%.1f %.1f %.1f) respawn %ld",
 			game_time_get(), line, ground_items, creates, deletes, failures, removed,
-			game_engine_can_score() ? "playing" : "game over",
+			!game_engine_running() ? "campaign" : game_engine_can_score() ? "playing" : "game over",
 			game_engine_running() ? (long)game_engine_get_variant()->universal_variant.score_to_win : 0L,
 			sent, received, corrections,
 			sent_reports, dealt_reports, rejected_reports, replayed_events,
@@ -480,12 +496,17 @@ static void network_test_gather(
 		dx = unit->object.position.x - center->object.position.x;
 		dy = unit->object.position.y - center->object.position.y;
 		dz = unit->object.position.z - center->object.position.z;
-		if (dx * dx + dy * dy + dz * dz <= 20.0f * 20.0f)
+		/* A stock Ball melee fixture needs hand reach, not the projectile gather radius. */
+		if (dx * dx + dy * dy + dz * dz <=
+			(((getenv("HALO_NETWORK_TEST_POSITION_ONLY") &&
+			   !strcmp(getenv("HALO_NETWORK_TEST_POSITION_ONLY"), "1")) ||
+			  (getenv("HALO_NETWORK_TEST_CLOSE_MELEE") &&
+			   !strcmp(getenv("HALO_NETWORK_TEST_CLOSE_MELEE"), "1"))) ? 1.25f * 1.25f : 20.0f * 20.0f))
 			continue;
 		/* (beside it, where the map is open: at its feet and its head) */
 		{
-			static real const offsets[][2] = { { 1.5f, 0.0f }, { -1.5f, 0.0f }, { 0.0f, 1.5f }, { 0.0f, -1.5f },
-				{ 1.5f, 1.5f }, { -1.5f, -1.5f }, { 1.5f, -1.5f }, { -1.5f, 1.5f } };
+			static real const offsets[][2] = { { 0.75f, 0.0f }, { -0.75f, 0.0f }, { 0.0f, 0.75f }, { 0.0f, -0.75f },
+				{ 0.75f, 0.75f }, { -0.75f, -0.75f }, { 0.75f, -0.75f }, { -0.75f, 0.75f } };
 			short try_index;
 
 			for (try_index = 0; try_index < (short)NUMBEROF(offsets); try_index++)
@@ -728,7 +749,29 @@ void network_test_update(
 	if (!network_test.checked)
 		network_test_read_settings();
 	if (network_test.mode == _network_test_off)
+	{
+		static boolean trace_checked, trace_enabled;
+		static unsigned long trace_last;
+		if (!trace_checked)
+		{
+			char const *trace = getenv("HALO_NETWORK_TEST_TRACE");
+			trace_checked = TRUE;
+			trace_enabled = trace && !strcmp(trace, "1");
+		}
+		/* Pure observation: bypass every setup, mutation and scripted-play
+		   branch below. Wall cadence also exposes a paused or slow clock. */
+		if (trace_enabled && !main_menu_loaded && game_in_progress() && player_data)
+		{
+			unsigned long now = system_milliseconds();
+			if (now - trace_last >= 1000)
+			{
+				trace_last = now;
+				platform_log("network trace: wall_ms=%lu tick=%ld readonly=1", now, game_time_get());
+				network_test_log_players();
+			}
+		}
 		return;
+	}
 
 	/* the game running: report (from the start of each game: the next
 	game's time starts over) */
@@ -738,7 +781,10 @@ void network_test_update(
 	{
 		network_test.logged_time = game_time_get();
 		network_test_log_players();
+		/* Private acceptance hosts may position clients without ending infection before late join. */
 		if (network_test.shoot_interval > 0.0f &&
+			!(getenv("HALO_NETWORK_TEST_POSITION_ONLY") &&
+			  !strcmp(getenv("HALO_NETWORK_TEST_POSITION_ONLY"), "1")) &&
 			game_time_get() % MAX(1, (long)(network_test.shoot_interval * TICKS_PER_SECOND)) < TICKS_PER_SECOND)
 		{
 			network_test_shoot();
@@ -914,6 +960,42 @@ void network_test_update(
 	if (network_test.menu_seconds < 2.0f)
 		return;
 
+	network_test.lobby_log_seconds += seconds;
+	if (network_test.lobby_log_seconds >= 1.0f)
+	{
+		struct network_game *game = network_game_get_game();
+		network_test.lobby_log_seconds = 0.0f;
+		if (game && game->machine_count >= 2 && game->player_count >= 2 && !network_test.native_lobby_loaded)
+		{
+			char const *request = getenv("HALO_NETWORK_TEST_LOBBY");
+			if (request && !strcmp(request, "1"))
+			{
+				network_test.native_lobby_loaded = TRUE;
+				ui_widgets_close_all();
+				ui_widget_load_by_name_or_tag(
+					"pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen",
+					NONE, NULL, NONE, NONE, NONE, NONE);
+				platform_log("network test: opened native CE lobby with %d players on %d machines",
+					game->player_count, game->machine_count);
+			}
+		}
+		if (game && game->machine_count > 0)
+		{
+			char description[13];
+			short i;
+			for (i = 0; i < 12 && game->variant.human_readable_game_description[i]; i++)
+				description[i] = (char)game->variant.human_readable_game_description[i];
+			description[i] = 0;
+			platform_log("network test: lobby variant=%s engine=%ld flags=%lx health=%.2f score=%ld "
+				"weapons=%ld teams=%d minutes=%d ff=%d loadout=%d primary=%d secondary=%d machines=%d",
+				description, game->variant.game_engine_index, game->variant.universal_variant.flags,
+				game->variant.universal_variant.health, game->variant.universal_variant.score_to_win,
+				game->variant.universal_variant.weapon_set, game->variant.universal_variant.teams,
+				game->variant_options.time_limit, game->variant_options.friendly_fire,
+				game->variant_options.loadout, game->variant_options.primary_weapon,
+				game->variant_options.secondary_weapon, game->machine_count);
+		}
+	}
 	switch (network_test.mode)
 	{
 	case _network_test_host:
@@ -934,6 +1016,7 @@ void network_test_update(
 				char path[128];
 
 				struct game_variant variant;
+				struct game_variant_options options;
 
 				if(map_family_parse(network_test.map_name,NULL,0)!=_map_family_xbox)
 					snprintf(path,sizeof(path),"%s",network_test.map_name);
@@ -948,10 +1031,16 @@ void network_test_update(
 					variant = *game_engine_get_variant_by_name(&variant, variant_name);
 					platform_log("network test: game %d, %s", network_test.variant_index + 1, variant_name);
 				}
+				/* Exercise the same preset implementation as natural Server Setup.
+				This entire path is disabled unless debug.network_test is set. */
+				game_variant_options_default(&variant, &options);
+				if (match_rules_preset_get() != MATCH_RULES_PRESET_STANDARD)
+					match_rules_apply_variant_preset(match_rules_preset_get(), &variant, &options);
 				/* debug.network_test_score: a short game, to test the next */
 				if (network_test.score_to_win > 0)
 					variant.universal_variant.score_to_win = network_test.score_to_win;
 				player_ui_set_game_variant(&variant);
+				player_ui_set_game_variant_options(&options);
 				network_game_server_change_game_variant(global_network_game_server_get(), &variant);
 				network_game_server_open_game(global_network_game_server_get());
 				network_test.map_set = TRUE;

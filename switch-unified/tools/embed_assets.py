@@ -117,6 +117,32 @@ def hud_assets_build(n: Any, prefix: str, output: Path) -> List[Path]:
     return [output]
 
 
+UI_FONTS = Path("port/linux/ui/fonts")
+UI_FONT_FILES = ["NotoSans-Regular.ttf", "NotoSans-Bold.ttf", "input_xbox.ttf",
+                 "input_playstation.ttf", "input_nintendo.ttf", "input_keyboard.ttf"]
+
+
+def ui_fonts_build(n: Any, prefix: str, output: Path) -> List[Path]:
+    n.rule(name=f"{prefix}_embed_fonts", command="$python tools/embed_assets.py --fonts $out",
+           description=f"{prefix.upper()} EMBED FONTS $out")
+    n.build(outputs=output, rule=f"{prefix}_embed_fonts",
+            implicit=[Path("tools/embed_assets.py"), *(UI_FONTS / name for name in UI_FONT_FILES)])
+    return [output]
+
+
+def overlay_fonts(output: Path) -> None:
+    lines = ["/* generated overlay font data; do not edit */"]
+    for index, name in enumerate(UI_FONT_FILES):
+        lines.append(f"static const unsigned int font{index}[] = {{")
+        lines.extend(words((ROOT / UI_FONTS / name).read_bytes()))
+        lines.append("};")
+    lines.append(f"const unsigned int *const ui_font_files[{len(UI_FONT_FILES)}] = {{")
+    lines.append(", ".join(f"font{index}" for index in range(len(UI_FONT_FILES))))
+    lines.append("};")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text("\n".join(lines) + "\n")
+
+
 def png_size(data: bytes, name: str) -> tuple:
     """The width and height of an 8-bit RGBA, non-interlaced PNG (the only
     kind port/linux/src/hud_hires.c reads)."""
@@ -129,6 +155,9 @@ def png_size(data: bytes, name: str) -> tuple:
 
 
 def main() -> None:
+    if len(sys.argv) == 3 and sys.argv[1] == "--fonts":
+        overlay_fonts(Path(sys.argv[2]))
+        return
     if len(sys.argv) != 2:
         sys.exit("usage: embed_assets.py OUTPUT.c")
     lines = [

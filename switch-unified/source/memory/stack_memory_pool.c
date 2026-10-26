@@ -229,6 +229,56 @@ static struct stack_memory_pool_block *stack_memory_pool_resize_block(
 
 /* ---------- globals */
 
+#ifdef HALO_ANDROID
+/* Keep allocation provenance outside the pool: a damaged header must not be
+ * trusted as a string pointer when reporting the first corruption. */
+static struct
+{
+	struct stack_memory_pool_block *block;
+	unsigned long size;
+	char const *file;
+	unsigned long line;
+} pool_allocation_trace[256];
+static unsigned long pool_allocation_trace_next;
+static boolean pool_fault_reported;
+
+static void pool_record_allocation(struct stack_memory_pool_block *block,
+	unsigned long size, char const *file, unsigned long line)
+{
+	unsigned long index = pool_allocation_trace_next++ % 256;
+	pool_allocation_trace[index].block = block;
+	pool_allocation_trace[index].size = size;
+	pool_allocation_trace[index].file = file;
+	pool_allocation_trace[index].line = line;
+}
+
+static void pool_report_first_fault(struct stack_memory_pool_block *block,
+	char const *reason)
+{
+	extern void platform_log(char const *format, ...);
+	unsigned long age;
+	if (pool_fault_reported)
+		return;
+	pool_fault_reported = TRUE;
+	for (age = 0; age < 256 && age < pool_allocation_trace_next; age++)
+	{
+		unsigned long index = (pool_allocation_trace_next - age - 1) % 256;
+		if (pool_allocation_trace[index].block == block)
+		{
+			platform_log("[pool_first_fault] reason=%s block=%p allocated_bytes=%lu file=%s line=%lu trace_age=%lu",
+				reason, (void *)block, pool_allocation_trace[index].size,
+				pool_allocation_trace[index].file, pool_allocation_trace[index].line, age);
+			return;
+		}
+	}
+	platform_log("[pool_first_fault] reason=%s block=%p allocation=outside_recent_256",
+		reason, (void *)block);
+}
+#else
+#define pool_record_allocation(block, size, file, line) ((void)0)
+#define pool_report_first_fault(block, reason) ((void)0)
+#endif
+
 /* ---------- public code */
 
 void stack_memory_pool_reset(
@@ -757,8 +807,9 @@ static boolean memory_block_valid(
 	if (!block)
 		return FALSE;
 	block_size = block->size_and_flags&0x7FFFFFFF;
-	if ((block_size-sizeof(*block)) <= 0)
+	if (block_size <= sizeof(*block))
 	{
+		pool_report_first_fault(block, "invalid_size");
 		display_assert(
 			"!\"pointer has invalid size\"",
 			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
@@ -771,6 +822,7 @@ static boolean memory_block_valid(
 	{
 		if (block->header_signature != 'fryd')
 		{
+			pool_report_first_fault(block, "header");
 			display_assert(
 				"!\"this memory has been corrupted\"",
 				"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
@@ -783,6 +835,7 @@ static boolean memory_block_valid(
 		{
 			if (*(unsigned long *)((byte *)block+block_size-sizeof(unsigned long)) != 'chkn')
 			{
+				pool_report_first_fault(block, "footer");
 				display_assert(
 					"!\"wrote beyond the valid address space for this block\"",
 					"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
@@ -1061,6 +1114,7 @@ static struct stack_memory_pool_block *stack_memory_pool_allocate(
 				block = pool->blocks[pool->next_block_index];
 				block->file = file;
 				block->line = line;
+				pool_record_allocation(block, size, file, line);
 				if (!pool->first_block)
 				{
 					match_assert(

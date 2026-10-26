@@ -1,3 +1,9 @@
+## NxHalo Steam Deck/Linux update: 2.9.9
+
+[Runtime and source](https://github.com/Jmesmykil/HolaDeck/releases/tag/v0.2.9.9-steamdeck-lobby-stability). Read the [lobby stability guide](docs/LOBBY-STABILITY-2.9.9.md) and [gametype guide](docs/NATIVE-GAMETYPES-2.9.8.md). Supply your own game data.
+
+Upstream project documentation follows.
+
 # Halo: Combat Evolved for Linux, Windows and Android
 
 [![Join our Discord](https://invidget.switchblade.xyz/9gqcHyr5km)](https://discord.gg/9gqcHyr5km)
@@ -61,21 +67,6 @@ Each platform has its own instructions:
 | Linux (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/linux/README.md](port/linux/README.md) |
 | Windows (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/windows/README.md](port/windows/README.md) |
 | Android (arm64 app, OpenGL ES 3, SDL3) | [port/android/README.md](port/android/README.md) |
-
-### Nintendo Switch preview
-
-The NxHalo community Switch preview is available as a standalone homebrew NRO
-in [v0.2.9.4-switch-coopfix1-preview](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.4-switch-coopfix1-preview).
-It is not part of the OpenCE release downloads or its standard Linux, Windows,
-and Android CI builds. The NRO does not include Halo game maps, resource maps,
-console keys, or an NSP installer. See [BUILD-SWITCH.md](BUILD-SWITCH.md) for
-the Switch host/guest build recipe and the preview's acceptance limits.
-
-The co-op lifecycle 2.9.4 preview was staged and read back at
-`switch/NxHalo-Content29/halo.nro`; safe unmount was declined and the volume was
-left mounted. That is the standalone NRO path; a HOME-menu NSP forwarder target
-has not been established, and no Switch runtime launch or gameplay acceptance
-is claimed for this preview.
 
 The Linux README also gives the controls, the settings and the multiplayer
 functions. These are almost the same on all platforms.

@@ -1,3 +1,6 @@
+#ifdef HALO_SWITCH_DEKO3D
+#include "../../switch/guest/d3d8_resources_dk.inc"
+#else
 /*
 D3D8_RESOURCES.C
 
@@ -472,3 +475,5 @@ HRESULT WINAPI D3DXGetErrorStringA(HRESULT error, LPSTR buffer, UINT buffer_leng
 	}
 	return S_OK;
 }
+
+#endif /* HALO_SWITCH_DEKO3D */

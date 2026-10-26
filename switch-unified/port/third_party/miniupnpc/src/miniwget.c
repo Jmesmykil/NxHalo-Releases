@@ -508,7 +508,7 @@ parseURL(const char * url,
 		p2 = strchr(p1, ']');
 		if(p2 && scope && scope < p2 && scope_id) {
 			/* parse scope */
-#if defined(IF_NAMESIZE) && !defined(__SWITCH__)
+#ifdef IF_NAMESIZE
 			char tmp[IF_NAMESIZE];
 			int l;
 			scope++;

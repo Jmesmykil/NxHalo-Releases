@@ -109,6 +109,48 @@ enum
 
 /* everything a translated pixel shader depends on; the GLSL program cache
 is keyed by these bytes */
+#ifdef HALO_SWITCH_DEKO3D
+struct nv2a_pixel_shader_key
+{
+	DWORD combiner_state[D3DRS_PS_MAX];
+	/* D3DRS_PSTEXTUREMODES lies past D3DRS_PS_MAX */
+	DWORD texture_modes;
+	unsigned char sampler_type[4];
+	unsigned char alpha_kill[4];
+	/* D3DTSS_COLORSIGN: channels (bit 0 alpha ... bit 3 blue, as
+	D3DTSIGN_*) that hold signed data in an unsigned texture format */
+	unsigned char color_sign[4];
+	/* D3DCMP_* function for the alpha test, or 0 when disabled */
+	unsigned long alpha_test_function;
+	unsigned char fog_enable;
+	unsigned char fog_table_mode;
+	/* inside a visibility test: count the samples that pass (Android) */
+	unsigned char count_samples;
+	/* a high-res HUD meter (hud_hires.h) drawn with the meter's blend (the
+	destination kept by the source's alpha): that alpha is eased to 1 by the
+	coverage texture 0's green holds, so that the meter darkens what is
+	behind it only where it covers it (the Xbox's point-sampled meters stop
+	at their texels' edges; filtered ones have a fringe of faint texels) */
+	unsigned char coverage_alpha;
+	/* Discrete meter thresholds in texture 0's red are read at level zero,
+	without filtering. Coverage/brightness still use the filtered lookup. */
+	unsigned char point_threshold;
+	/* a model lighting program's draw lit for each pixel
+	(display.per_pixel_lighting): nv2a_vertex_lighting's lights, or 0 for
+	the diffuse color the vertex shader computed */
+	unsigned char per_pixel_lighting;
+	/* drawn into a multisampled target (display.anti_aliasing's
+	multisampling), its samples a pixel: the alpha test covers samples in
+	proportion to how far alpha is past the reference, not all of the pixel
+	or none of it, so that cut-out edges (foliage, grates) are smoothed too */
+	unsigned char alpha_test_samples;
+	/* the source's blend factor, applied here instead (1 the blend color, 2
+	one less it, 3 its alpha, 4 one less that; 0 none): WebGL refuses a
+	blend of a constant color factor with a constant alpha one, as the
+	meters' (shader_transparent_meter) */
+	unsigned char source_blend;
+};
+#else
 struct nv2a_pixel_shader_key
 {
 	DWORD combiner_state[D3DRS_PS_MAX];
@@ -141,6 +183,7 @@ struct nv2a_pixel_shader_key
 	or none of it, so that cut-out edges (foliage, grates) are smoothed too */
 	unsigned char alpha_test_samples;
 };
+#endif
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
 
@@ -187,7 +230,10 @@ struct xgpu_texture_description
 	BOOL compressed;
 	unsigned long pitch; /* linear textures */
 	BOOL hires;         /* a high-res HUD texture drawn in the texture's place (hud_hires.h) */
-	BOOL hires_coverage; /* ... whose green is its coverage (a meter's) */
+	BOOL hires_coverage;
+#ifdef HALO_SWITCH_DEKO3D
+	BOOL hires_point_threshold;
+#endif /* ... whose green is its coverage (a meter's) */
 };
 
 void xgpu_texture_describe(DWORD format_word, DWORD size_word, struct xgpu_texture_description *description);

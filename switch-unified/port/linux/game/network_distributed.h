@@ -106,6 +106,11 @@ enum
 	/* co-op: where the host's devices are (doors, elevators), when they move
 	(network_coop.c) */
 	_distributed_message_coop_device_states = 77,
+	/* negotiated deterministic Zombies lunge prediction; old peers ignore
+	unknown distributed kinds and retain ordinary melee */
+	_distributed_message_infected_lunge_capability = 78,
+	/* host confirmation for the current game's lunge capability */
+	_distributed_message_infected_lunge_capability_ack = 79,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -201,6 +206,8 @@ boolean distributed_player_is_local(long player_index);
 long distributed_living_unit(struct player_datum const *player);
 /* whether the player is one of that client machine's (the host) */
 boolean distributed_machine_has_player(long machine_index, short player_index);
+/* whether this player negotiated matching infected-lunge prediction */
+boolean network_distributed_player_lunge_supported(long player_index);
 void distributed_count_correction(void);
 /* (the host) the client machines in the game, but for its own; their count */
 short distributed_client_machines(long *machine_indices, short maximum);

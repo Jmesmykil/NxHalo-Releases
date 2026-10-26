@@ -281,6 +281,12 @@ boolean input_abstraction_port_reload(
 		keyboard_controls[controller_index].reload_ticks != 0;
 }
 
+boolean input_abstraction_port_vehicle_boost(short controller_index)
+{
+    return controller_index >= 0 && controller_index < MAXIMUM_GAMEPADS &&
+        TEST_FLAG(halo_keyboard_actions(controller_index), HALO_KEYBOARD_VEHICLE_BOOST);
+}
+
 boolean input_abstraction_port_action_only(
 	short controller_index)
 {

@@ -297,3 +297,18 @@ DWORD WINAPI XQueryMemoryProtect(LPVOID address)
 	}
 	return protect;
 }
+
+#ifdef HALO_SWITCH_DEKO3D
+unsigned long platform_contiguous_block_size(const void *address)
+{
+	unsigned long first, count = 0;
+
+	if (!platform_is_contiguous(address))
+		return 0;
+	first = ((unsigned long)address - PLATFORM_CONTIGUOUS_BASE) / PAGE_SIZE_BYTES;
+	pthread_mutex_lock(&arena_lock);
+	count = block_page_count[first];
+	pthread_mutex_unlock(&arena_lock);
+	return count * PAGE_SIZE_BYTES;
+}
+#endif

@@ -156,6 +156,9 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "saved games/player_profile.h"
 #include "saved games/playlist_profile.h"
+#ifdef HALO_GAME_BROWSER
+#include "match_rules.h"
+#endif
 #include "saved games/saved_game_files.h"
 #include "interface/ui_widget.h"
 #include "interface/virtual_keyboard.h"
@@ -232,6 +235,12 @@ static struct
 	struct game_variant_options original;
 	struct game_variant_options current;
 } player_ui_edit_options;
+#ifdef HALO_GAME_BROWSER
+static short player_ui_edit_mode_original;
+static short player_ui_edit_mode_current;
+static short player_ui_edit_matchup_original;
+static short player_ui_edit_matchup_current;
+#endif
 static struct game_variant_options player_ui_multiplayer_options;
 static char player1_profile_path[0x100] = { 0 };
 
@@ -430,7 +439,12 @@ boolean player_ui_edit_profile_is_dirty(
 					sizeof(struct game_variant)) ||
 					/* port: and its PC options */
 					csmemcmp(&player_ui_edit_options.original, &player_ui_edit_options.current,
-						sizeof(struct game_variant_options)))
+						sizeof(struct game_variant_options)) ||
+#ifdef HALO_GAME_BROWSER
+					player_ui_edit_mode_original != player_ui_edit_mode_current ||
+					player_ui_edit_matchup_original != player_ui_edit_matchup_current ||
+#endif
+					FALSE)
 				{
 					result = TRUE;
 				}
@@ -464,6 +478,10 @@ boolean player0_joystick_set_is_normal(
 void player_ui_end_editing_profile(
 	void)
 {
+#ifdef HALO_GAME_BROWSER
+	player_ui_edit_mode_original = player_ui_edit_mode_current = MATCH_RULES_PRESET_STANDARD;
+	player_ui_edit_matchup_original = player_ui_edit_matchup_current = 0;
+#endif
 	clear_profile_edit_data();
 
 	return;
@@ -725,6 +743,22 @@ void player_ui_remember_player1_profile(
 	return;
 }
 
+#ifdef HALO_GAME_BROWSER
+short player_ui_get_edit_playlist_native_mode(void)
+{
+	return player_ui_edit_mode_current;
+}
+
+void player_ui_set_edit_playlist_native_mode(short preset, short matchup)
+{
+	if (preset < MATCH_RULES_PRESET_STANDARD || preset >= MATCH_RULES_PRESET_COUNT ||
+		matchup < 0 || matchup >= MATCH_RULES_MATCHUP_COUNT)
+		return;
+	player_ui_edit_mode_current = preset;
+	player_ui_edit_matchup_current = matchup;
+}
+#endif
+
 void player_ui_begin_editing_profile(
 	long profile_index)
 {
@@ -764,6 +798,11 @@ void player_ui_begin_editing_profile(
 				/* port: and its PC options */
 				playlist_profile_get_options(profile_index, &player_ui_edit_options.original);
 				player_ui_edit_options.current = player_ui_edit_options.original;
+#ifdef HALO_GAME_BROWSER
+				playlist_profile_get_native_mode(profile_index, &player_ui_edit_mode_original, &player_ui_edit_matchup_original);
+				player_ui_edit_mode_current = player_ui_edit_mode_original;
+				player_ui_edit_matchup_current = player_ui_edit_matchup_original;
+#endif
 			}
 			else
 			{
@@ -834,10 +873,15 @@ boolean player_ui_save_profile(
 						player_ui_globals.edit_profile.current.variant.human_readable_game_description);
 					if (new_profile_index != NONE)
 					{
-						playlist_profile_save_with_options(
+						playlist_profile_save_with_options_and_native_mode(
 							new_profile_index,
 							&player_ui_globals.edit_profile.current.variant,
-							&player_ui_edit_options.current);
+							&player_ui_edit_options.current,
+#ifdef HALO_GAME_BROWSER
+							player_ui_edit_mode_current, player_ui_edit_matchup_current);
+#else
+							0, 0);
+#endif
 						player_ui_globals.edit_profile_index = new_profile_index;
 						if (saved_game_file_get_path_to_enclosing_directory(
 							new_profile_index,
@@ -862,10 +906,15 @@ boolean player_ui_save_profile(
 			}
 			else
 			{
-				playlist_profile_save_with_options(
+				playlist_profile_save_with_options_and_native_mode(
 					player_ui_globals.edit_profile_index,
 					&player_ui_globals.edit_profile.current.variant,
-					&player_ui_edit_options.current);
+					&player_ui_edit_options.current,
+#ifdef HALO_GAME_BROWSER
+					player_ui_edit_mode_current, player_ui_edit_matchup_current);
+#else
+					0, 0);
+#endif
 				if (saved_game_file_get_path_to_enclosing_directory(
 					player_ui_globals.edit_profile_index,
 					directory_path))
@@ -1213,6 +1262,10 @@ void player0_look_invert_pitch(
 static void clear_profile_edit_data(
 	void)
 {
+#ifdef HALO_GAME_BROWSER
+	player_ui_edit_mode_original = player_ui_edit_mode_current = MATCH_RULES_PRESET_STANDARD;
+	player_ui_edit_matchup_original = player_ui_edit_matchup_current = 0;
+#endif
 	player_ui_globals.edit_profile_index = NONE;
 	return;
 }

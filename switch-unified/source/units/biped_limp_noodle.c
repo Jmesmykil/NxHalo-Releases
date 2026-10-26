@@ -33,6 +33,12 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/errors.h"
+#include "game/game.h"
+#include "game/game_engine.h"
+#if defined(__linux__) || defined(HALO_ANDROID)
+#include "halo_phase_profile.h"
+#include "halo_corpse_budget.h"
+#endif
 #include "math/real_math.h"
 #include "models/model_animation_definitions.h"
 #include "models/model_definitions.h"
@@ -295,14 +301,14 @@ static void biped_limp_noodle_move_relax_and_constrain_positions(
 
 	total_iterations = biped->biped.limp_body_max_relaxation_iterations;
 	if (total_iterations <= 0 || total_iterations >= 30)
-		return;
+		goto collision_user_end;
 
 	current_iteration = biped->biped.limp_body_current_relaxation_iterations;
 	relaxation_fraction =
 		(real)(current_iteration + 1) /
 		(real)total_iterations;
 	if (realcmp(relaxation_fraction, 0.f))
-		return;
+		goto collision_user_end;
 	if (current_iteration >= total_iterations)
 		goto collision_user_end;
 
@@ -694,6 +700,51 @@ static void biped_limp_noodle_adjust_orientations(
 	return;
 }
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+/* Settling changes corpse node poses, not the object's movement or network
+ * state. Bound simultaneous pose solvers in multiplayer; campaign is unchanged.
+ * Full datum handles prevent a recycled slot inheriting admission. */
+static boolean biped_limp_budget_admit(long index)
+{
+ static long tick = -1, selected[HALO_CORPSE_SOLVERS_PER_TICK];
+ static unsigned cursor, selected_count;
+ static long pending[MAXIMUM_OBJECTS_PER_MAP];
+ static unsigned long admitted, deferred, peak;
+ long now = game_time_get();
+ if (!game_engine_running()) return TRUE;
+#if defined(__linux__) && !defined(HALO_ANDROID) && defined(HALO_PRIVATE_BENCHMARK)
+ /* Private loopback A/B harness only; ordinary builds use the bounded path. */
+ extern int halo_private_corpse_unbounded(void);
+ if (halo_private_corpse_unbounded()) return TRUE;
+#endif
+ if (tick != now) {
+  struct object_iterator it;
+  unsigned count = 0;
+  if (now < tick) { cursor=0; admitted=deferred=peak=0; }
+  tick=now;
+  object_iterator_new(&it, _object_mask_biped, 0);
+  while (object_iterator_next(&it)) {
+   struct biped_datum *body=biped_get(it.index);
+   if (TEST_FLAG(body->object.damage_flags, _object_dead_bit) &&
+       TEST_FLAG(body->biped.flags, _biped_limp_body_physics_active_bit) &&
+       body->biped.limp_body_current_relaxation_iterations < body->biped.limp_body_max_relaxation_iterations)
+    pending[count++]=it.index;
+  }
+  selected_count=halo_corpse_budget_select(pending,count,selected,&cursor);
+  if(count>peak)peak=count;
+  if(now%150==0) {
+   platform_log("[corpse_budget] tick=%ld limit=%d pending_peak=%lu admitted=%lu deferred=%lu",now,HALO_CORPSE_SOLVERS_PER_TICK,peak,admitted,deferred);
+   admitted=deferred=peak=0;
+  }
+ }
+ for(unsigned i=0;i<selected_count;i++) if(selected[i]==index){admitted++;return TRUE;}
+ deferred++;return FALSE;
+}
+
+#else
+#define biped_limp_budget_admit(index) TRUE
+#endif
+
 boolean biped_limp_noodle_relax_nodes_onto_environment(
 	long biped_index)
 {
@@ -720,6 +771,7 @@ boolean biped_limp_noodle_relax_nodes_onto_environment(
 	if (!relaxation_complete)
 	{
 		long node_index;
+        if (!biped_limp_budget_admit(biped_index)) return FALSE;
 
 		for (node_index = 0; node_index < animation_graph->nodes.count; node_index++)
 		{

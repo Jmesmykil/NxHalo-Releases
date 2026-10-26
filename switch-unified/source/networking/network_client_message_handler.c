@@ -203,6 +203,7 @@ symbols in this file:
 
 /* port/linux/game/network_distributed.c's */
 void network_distributed_handle_message(long machine_index, word const *message, word size);
+void network_distributed_handle_stream_message(long machine_index, word const *message, word size);
 
 /* ---------- constants */
 
@@ -715,7 +716,12 @@ boolean network_game_client_handle_message(
 				address */
 				if (network_game_client_address_matches_server(client, source_address))
 				{
-					network_distributed_handle_message(NONE, message, message_size);
+					/* Reliable host data arrives on the authenticated stream;
+					host datagrams remain an untrusted source. */
+					if (network_connection_last_read_was_unreliable())
+						network_distributed_handle_message(NONE, message, message_size);
+					else
+						network_distributed_handle_stream_message(NONE, message, message_size);
 				}
 				else
 				{

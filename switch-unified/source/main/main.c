@@ -331,6 +331,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+#include "halo_phase_profile.h"
+#endif
 #include "cseries.h"
 #include "errors.h"
 #include "cseries/profile.h"
@@ -1811,7 +1814,13 @@ void main_pregame_render(
 	static struct render_window window;
 
 	collision_log_continue_period(TRUE);
+#if defined(__linux__) || defined(HALO_ANDROID)
+    { uint64_t frame = halo_guest_phases.frame, begin = halo_profile_now_us();
+      sound_render();
+      halo_frame_phase_add(&halo_guest_frame_phases, HALO_FRAME_SOUND, begin, halo_profile_now_us(), frame); }
+#else
 	sound_render();
+#endif
 	{
 		real_point3d position = { 0.0f, 0.0f, 0.0f };
 		real_vector3d forward = { 0.0f, 0.0f, 1.0f };
@@ -3098,7 +3107,13 @@ static void main_game_render(
 
 	lock_global_random_seed();
 	collision_log_continue_period(TRUE);
+#if defined(__linux__) || defined(HALO_ANDROID)
+    { uint64_t frame = halo_guest_phases.frame, begin = halo_profile_now_us();
+      sound_render();
+      halo_frame_phase_add(&halo_guest_frame_phases, HALO_FRAME_SOUND, begin, halo_profile_now_us(), frame); }
+#else
 	sound_render();
+#endif
 	force_single_screen = game_engine_force_single_screen();
 	last_local_player_index = NONE;
 
@@ -3294,6 +3309,9 @@ void main_loop(
 			main_reset_map_private();
 		}
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+        { uint64_t frame_begin = halo_profile_now_us(), frame_entry = halo_guest_phases.frame;
+#endif
 		profile_frame_start();
 		input_frame_begin();
 		input_update();
@@ -3395,7 +3413,13 @@ void main_loop(
 				{
 					profile_render_start();
 					render_interpolation_frame_begin();
+#if defined(__linux__) || defined(HALO_ANDROID)
+                    { uint64_t frame = halo_guest_phases.frame, begin = halo_profile_now_us();
+                      main_game_render((double)main_globals.seconds_elapsed);
+                      halo_phase_add(&halo_guest_phases, HALO_PHASE_RENDER, begin, halo_profile_now_us(), frame); }
+#else
 					main_game_render((double)main_globals.seconds_elapsed);
+#endif
 					render_interpolation_frame_end();
 					profile_render_end();
 				}
@@ -3418,6 +3442,9 @@ void main_loop(
 		input_frame_end();
 		profile_frame_end();
 		main_frame_rate_debug();
+#if defined(__linux__) || defined(HALO_ANDROID)
+          halo_frame_phase_add(&halo_guest_frame_phases, HALO_FRAME_TOTAL, frame_begin, halo_profile_now_us(), frame_entry); }
+#endif
 
 		if (main_globals.restart_time)
 		{

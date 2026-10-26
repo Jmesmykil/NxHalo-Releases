@@ -1,3 +1,6 @@
+#ifdef HALO_SWITCH_DEKO3D
+#include "../../switch/guest/hud_hires_dk.c.inc"
+#else
 /*
 HUD_HIRES.C
 
@@ -264,3 +267,5 @@ unsigned int hud_hires_override_texture(long asset, unsigned long *levels)
 	*levels = textures[asset].levels;
 	return textures[asset].texture;
 }
+
+#endif

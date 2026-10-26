@@ -28,18 +28,30 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 # Build configuration
 #---------------------------------------------------------------------------------
-TARGET		:=	halo
-BUILD		:=	build
+ifeq ($(DEKO3D),1)
+TARGET := halo-deko
+BUILD := build-deko
+else
+TARGET := halo
+BUILD := build
+endif
 SOURCES		:=	host ../third_party/miniupnpc/src
 INCLUDES	:=	include ../android/include ../linux/src ../third_party/miniupnpc/include ../third_party/miniupnpc/src
-ROMFS		:=	romfs
-ROMFS_FILES	:=	$(wildcard $(TOPDIR)/$(ROMFS)/*)
+ifeq ($(DEKO3D),1)
+ROMFS := romfs-deko
+else
+ROMFS := romfs
+endif
 APP_JSON	:=	$(CURDIR)/halo.json
 
 # NRO metadata
-APP_TITLE	:=	HALO: CE Content Preview 2.9.4
+APP_TITLE	:=	HALO: Combat Evolved
 APP_AUTHOR	:=	NxHalo contributors
-APP_VERSION	:=	2.9.4-preview
+ifeq ($(DEKO3D),1)
+APP_VERSION := 0.2.9.9-dk1
+else
+APP_VERSION := 0.2.9.9-u36
+endif
 APP_TITLEID	:=	010048414C210000
 export NACPFLAGS += --titleid=$(APP_TITLEID)
 
@@ -57,6 +69,13 @@ CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 CFLAGS	+=	$(INCLUDE) \
 			-I$(DEVKITPRO)/portlibs/switch/include \
 			-I$(DEVKITPRO)/portlibs/switch/include/SDL2
+
+ifeq ($(DEKO3D),1)
+CFLAGS += -DHALO_SWITCH_DEKO3D=1 -DHOST_DK_UAM_COMMIT=\"5a5afc2bae8b\"
+LIBS_DEKO := -ldeko3d
+else
+EXCLUDE_DEKO := host_dk.c host_dk_shaders.c host_dk_hud.c host_uam_alloc.c host_deko_bridge.c
+endif
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
 
@@ -77,7 +96,7 @@ export LIBPATHS	:=	-L$(DEVKITPRO)/portlibs/switch/lib -L$(DEVKITPRO)/libnx/lib
 LIBS	:=	-lSDL2 \
 			-lGLESv2 -lEGL \
 			-lglapi -ldrm_nouveau \
-			-lcurl -lz -lstdc++ -lnx -lm -lpthread
+			-lcurl -lz -lstdc++ $(LIBS_DEKO) -lnx -lm -lpthread
 
 #---------------------------------------------------------------------------------
 # Source file discovery
@@ -91,10 +110,19 @@ export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+CFILES := $(filter-out $(EXCLUDE_DEKO),$(CFILES))
+
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 
+ifeq ($(DEKO3D),1)
+ifeq ($(strip $(UAM_OBJECT)),)
+$(error DEKO3D=1 requires verified isolated UAM_OBJECT; no stub shader compiler allowed)
+endif
+export DEKO_OBJECTS := $(UAM_OBJECT)
+endif
+
 export OFILES_SRC	:=	$(CFILES:.c=.o) $(SFILES:.s=.o)
-export OFILES		:=	$(OFILES_SRC)
+export OFILES		:=	$(OFILES_SRC) $(DEKO_OBJECTS)
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 					-I$(CURDIR)/$(BUILD) \
@@ -149,8 +177,13 @@ DEPENDS	:=	$(OFILES:.o=.d)
 
 all: $(OUTPUT).nro $(OUTPUT).nso $(OUTPUT).npdm
 
-$(OUTPUT).nro: $(OUTPUT).elf $(OUTPUT).nacp $(ROMFS_FILES)
+$(OUTPUT).nro: $(OUTPUT).elf $(OUTPUT).nacp $(TOPDIR)/$(ROMFS)/halo_guest.elf
 $(OUTPUT).elf: $(OFILES)
+
+# The guest comes from the ILP32 build; never apply host ELF link rules to it.
+$(TOPDIR)/$(ROMFS)/halo_guest.elf:
+	@echo "Missing guest ELF: build and copy the ILP32 guest first" >&2
+	@exit 1
 
 # NSP packaging uses installer/installer.py with explicit local inputs.
 # It is separate from compilation, so host builds need no keys or map staging.

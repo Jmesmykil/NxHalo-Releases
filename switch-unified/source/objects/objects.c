@@ -3810,6 +3810,41 @@ boolean object_force_inside_bsp(
 	return result;
 }
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+#include "halo_phase_profile.h"
+extern void platform_log(char const *format, ...);
+static struct halo_phase_timing object_sections[6];
+static uint64_t object_sections_since;
+static void object_section(unsigned slot, uint64_t *begin, boolean sampled)
+{
+    if (sampled) {
+        uint64_t now = halo_profile_now_us(), elapsed = now - *begin;
+        struct halo_phase_timing *t = &object_sections[slot];
+        t->calls++; t->total_us += elapsed;
+        if (elapsed > t->max_us) t->max_us = elapsed;
+        *begin = now;
+    }
+}
+static void object_sections_report(void)
+{
+    uint64_t now = halo_profile_now_us();
+    static char const *names[] = { "type_update", "damage_export", "node_matrices", "functions_colors", "lights", "postprocess" };
+    if (!object_sections_since) object_sections_since = now;
+    if (now-object_sections_since < 5000000) return;
+    for (unsigned i=0;i<6;i++)
+        platform_log("[object_pass] tick=%ld sampled=1/16 part=%s calls=%llu cpu_us=%llu max_us=%llu",
+            game_time_get(), names[i], (unsigned long long)object_sections[i].calls,
+            (unsigned long long)object_sections[i].total_us, (unsigned long long)object_sections[i].max_us);
+    lights_reconnect_profile_report();
+    object_type_profile_report();
+    { extern void biped_profile_report(void); biped_profile_report(); }
+    memset(object_sections,0,sizeof(object_sections)); object_sections_since=now;
+}
+#define OBJECT_SECTION(n) object_section(n, &section_begin, sampled)
+#else
+#define OBJECT_SECTION(n) ((void)0)
+#endif
+
 static boolean object_update(
 	long object_index)
 {
@@ -3817,6 +3852,10 @@ static boolean object_update(
 	struct object_datum *object = object_get(object_index);
 	struct object_definition *object_definition = object_definition_get(object->definition_index);
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+    boolean sampled = (object_index & 15) == (game_time_get() & 15);
+    uint64_t section_begin = sampled ? halo_profile_now_us() : 0;
+#endif
 	boolean result = TRUE;
 	if (!TEST_FLAG(header->flags, _object_header_do_not_update_bit))
 	{
@@ -3836,20 +3875,24 @@ static boolean object_update(
 		}
 
 		object_type_update(object_index);
+		OBJECT_SECTION(0);
 		if (object_definition->object.collision_model.index!=NONE)
 		{
 			object_damage_update(object_index);
 		}
 
 		object_type_export_function_values(object_index);
+		OBJECT_SECTION(1);
 
 		if (!TEST_FLAG(object->object.flags, _object_do_not_recompute_node_matrices_bit))
 		{
 			object_compute_node_matrices(object_index);
 		}
 
+		OBJECT_SECTION(2);
 		object_compute_function_values(object_index);
 		object_compute_change_colors(object_index);
+		OBJECT_SECTION(3);
 
 		if (
 			TEST_FLAG(object->object.flags, _object_dynamic_lighting_recompute_bit) &&
@@ -3862,6 +3905,7 @@ static boolean object_update(
 			object_connect_lights(object_index, TRUE, TRUE);
 		}
 
+		OBJECT_SECTION(4);
 		// Update children (if we have any)
 		if (object->object.first_child_object_index!=NONE)
 		{
@@ -3876,7 +3920,11 @@ static boolean object_update(
 			}
 		}
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+        if (sampled) section_begin = halo_profile_now_us();
+#endif
 		object_postprocess_node_matrices(object_index);
+		OBJECT_SECTION(5);
 	}
 
 	return result;
@@ -4538,6 +4586,9 @@ void objects_update(
 	}
 
 	objects_garbage_collection();
+#if defined(__linux__) || defined(HALO_ANDROID)
+    object_sections_report();
+#endif
 
 	profile_exit(section);
 
@@ -4574,14 +4625,12 @@ static void object_connect_lights(
 		{
 			if (!object->object.attachment_types[i] && object->object.attachment_indices[i]!=NONE)
 			{
-				if (disconnect)
-				{
-					light_disconnect_from_map(object->object.attachment_indices[i]);
-				}
-				if (reconnect)
-				{
-					light_reconnect_to_map(object->object.attachment_indices[i]);
-				}
+                if (disconnect && reconnect)
+                    light_refresh_map_attachment(object->object.attachment_indices[i]);
+                else {
+                    if (disconnect) light_disconnect_from_map(object->object.attachment_indices[i]);
+                    if (reconnect) light_reconnect_to_map(object->object.attachment_indices[i]);
+                }
 			}
 		}
 	}

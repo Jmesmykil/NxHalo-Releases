@@ -62,18 +62,7 @@ struct sockaddr_un {
 #include <sys/socket.h>
 #include <sys/param.h>
 #include <sys/time.h>
-#if defined(__SWITCH__)
-/* libnx has no Unix-domain sockets. Keep miniupnpc's optional local SSDP
- * daemon probe buildable; the Switch socket layer rejects AF_UNIX and the
- * caller falls back to multicast discovery. */
-#ifndef AF_UNIX
-#define AF_UNIX 1
-#endif
-#define UNIX_PATH_LEN 108
-struct sockaddr_un { unsigned short sun_family; char sun_path[UNIX_PATH_LEN]; };
-#else
 #include <sys/un.h>
-#endif
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -83,7 +72,7 @@ struct sockaddr_un { unsigned short sun_family; char sun_path[UNIX_PATH_LEN]; };
 
 #include "miniupnpc_socketdef.h"
 
-#if !defined(__DragonFly__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__APPLE__) && !defined(_WIN32) && !defined(__CYGWIN__) && !defined(__sun) && !defined(__GNU__) && !defined(__FreeBSD_kernel__) && !defined(__HAIKU__) && !defined(__SWITCH__)
+#if !defined(__DragonFly__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__APPLE__) && !defined(_WIN32) && !defined(__CYGWIN__) && !defined(__sun) && !defined(__GNU__) && !defined(__FreeBSD_kernel__) && !defined(__HAIKU__)
 #define HAS_IP_MREQN
 #endif
 
@@ -739,11 +728,6 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	{
 		if(ipv6) {
 #if !defined(_WIN32)
-			#if defined(__SWITCH__)
-			if(error)
-				*error = MINISSDPC_INVALID_INPUT;
-			goto error; /* libnx does not expose if_nametoindex(). */
-			#else
 			/* according to MSDN, if_nametoindex() is supported since
 			 * MS Windows Vista and MS Windows Server 2008.
 			 * http://msdn.microsoft.com/en-us/library/bb408409%28v=vs.85%29.aspx */
@@ -759,7 +743,6 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			{
 				PRINT_SOCKET_ERROR("setsockopt IPV6_MULTICAST_IF");
 			}
-			#endif
 #else
 #ifdef DEBUG
 			printf("Setting of multicast interface not supported in IPv6 under Windows.\n");

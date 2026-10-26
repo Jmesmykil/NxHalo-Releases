@@ -665,6 +665,7 @@ symbols in this file:
 #include "game/game_allegiance.h"
 #include "game/game_globals.h"
 #include "game/game_engine.h"
+#include "match_rules.h"
 #include "game/players.h"
 #include "hs/object_lists.h"
 #include "interface/first_person_weapons.h"
@@ -2160,6 +2161,9 @@ boolean unit_add_grenade_to_inventory(
 		7282,
 		equipment_definition->equipment.powerup_type==_equipment_powerup_grenade);
 
+	if (!match_rules_grenade_pickup_allowed(unit_index))
+		return FALSE;
+
 	/* port: only the types a unit carries (a map's type) */
 	if (!VALID_INDEX(equipment_definition->equipment.grenade_type, NUMBER_OF_UNIT_GRENADE_TYPES) &&
 		!grenade_type_reported)
@@ -2384,6 +2388,58 @@ void unit_drop_current_equipment(
 	}
 
 	return;
+}
+
+boolean unit_definition_can_use_weapon(
+	long unit_definition_index,
+	long weapon_definition_index)
+{
+	struct unit_definition *unit_definition;
+	struct animation_graph *animation_graph;
+	struct weapon_definition *weapon_definition;
+	char const *weapon_label;
+	short seat_index;
+
+	if (unit_definition_index == NONE || weapon_definition_index == NONE)
+		return FALSE;
+	unit_definition = unit_definition_get(unit_definition_index);
+	weapon_definition = weapon_definition_get(weapon_definition_index);
+	if (!unit_definition || !weapon_definition ||
+		unit_definition->object.animation_graph.index == NONE)
+		return FALSE;
+	animation_graph = animation_graph_definition_get(unit_definition->object.animation_graph.index);
+	if (!animation_graph)
+		return FALSE;
+	weapon_label = weapon_definition->weapon.label;
+	if (!weapon_label || !weapon_label[0])
+		return FALSE;
+
+	/* Unparented player spawns start in the standing base seat. Match the
+	weapon-label test used by unit_can_use_weapon without creating a unit. */
+	for (seat_index = 0; seat_index < animation_graph->unit_seats.count; ++seat_index)
+	{
+		struct animation_graph_unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->unit_seats, seat_index, struct animation_graph_unit_seat);
+		short class_index;
+		if (!_stricmp(base_seat_labels[_unit_base_seat_stand], seat->label))
+		{
+			for (class_index = 0; class_index < seat->weapon_classes.count; ++class_index)
+			{
+				struct animation_graph_weapon_class *weapon_class = TAG_BLOCK_GET_ELEMENT(
+					&seat->weapon_classes, class_index, struct animation_graph_weapon_class);
+				short type_index;
+				for (type_index = 0; type_index < weapon_class->weapon_types.count; ++type_index)
+				{
+					struct animation_graph_weapon_type *weapon_type = TAG_BLOCK_GET_ELEMENT(
+						&weapon_class->weapon_types, type_index, struct animation_graph_weapon_type);
+					if (!_stricmp(weapon_label, weapon_type->label))
+						return TRUE;
+				}
+			}
+			return FALSE;
+		}
+	}
+	return FALSE;
 }
 
 boolean unit_can_use_weapon(
@@ -8317,6 +8373,9 @@ boolean unit_add_weapon_to_inventory(
 	which was then used as a weapon. In the released maps they all name
 	weapons (224 initial weapons, 32 item collection entries, every
 	starting profile) */
+	if (!match_rules_weapon_allowed_for_unit(unit_index, weapon->definition_index))
+		return FALSE;
+
 	if (weapon->object.type!=_object_type_weapon)
 	{
 		static boolean reported = FALSE;

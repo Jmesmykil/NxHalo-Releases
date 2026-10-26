@@ -126,6 +126,16 @@ static void write_to_debug_file(
 	char const *string,
 	boolean date)
 {
+#ifdef HALO_ANDROID
+    /* Native Switch diagnostics share the bounded host log queue. Opening,
+     * appending and flushing debug.txt here stalls the simulation/render
+     * thread behind SD writes, especially during joins and mass deaths. */
+    extern void platform_log(char const *format, ...);
+    (void)date;
+    platform_log("[debug] ms=%ld %s", system_milliseconds(), string);
+    return;
+#endif
+
 	static FILE *volatile debug_file = NULL;
 	FILE *file = debug_file;
 	char prefix[32];

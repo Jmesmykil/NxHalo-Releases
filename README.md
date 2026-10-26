@@ -31,11 +31,18 @@ Complete race-route packs, specialized bots, Prop Hunt, persistent friends, full
 [Guide](steam-unified/docs/LOBBY-STABILITY-2.9.9.md) ·
 [Acceptance](releases/v0.2.9.9-steamdeck-lobby-stability/ACCEPTANCE.json) ·
 [Deck hardware evidence](releases/v0.2.9.9-steamdeck-lobby-stability/DECK-GPU.json).
-## Nintendo Switch
+## Nintendo Switch — Unified37 deko3d preview
 
-The newest Switch package remains [Co-op Lifecycle Preview 2.9.4](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.4-switch-coopfix1-preview): Homebrew Menu NRO, source and build evidence. NRO SHA-256: e98eea315b6733ff1b3d2f6d3b19d4539332540b32157181ec5d8ac328e2c2d0. Cross-build and UMS readback passed; physical launch is not confirmed. This Linux release does not replace the Switch executable.
+[Download Unified37 and matching source](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.9-switch-unified37-deko-preview).
 
-Use your own compatible data under sdmc:/switch/halo/maps/; this preview saves under sdmc:/switch/halo/save-community24/. Older Profile33/Build14 releases remain historical downloads.
+This Switch 1 build adds native deko3d rendering, asynchronous shader compilation and preloading, GPU resource retirement, HUD/loading integration, and bounded UDP receive batching. The owner tested this exact installed-title package on an original Switch and reported it works great on October 25, 2026. Full-campaign coverage, large-lobby capacity and measured FPS gains remain unverified. Switch 2 is not validated by this test.
+
+Install `Halo_CE_Unified37.nsp` using your existing homebrew title installer. It updates the existing NxHalo title. Keep your current installer for rollback. Supply your own compatible maps under `sdmc:/switch/halo/maps/`; saves remain under `sdmc:/switch/halo/save-community24/`. No game maps, console keys or saves are supplied. This release is the tested NSP; the older Homebrew Menu NRO remains in its separate release.
+
+Package SHA-256: `0c7d3abf235d98149e42e634f518b8d89e1290ae89ae3f6615cfbb89f6aac98d`.
+Display version: `0.2.9.9-dk1`. Logs: `sdmc:/switch/halo/halo-unified37-deko.log`.
+
+Renderer integration derives from [halo-ce-universal Build114](https://github.com/thelinkin3000/halo-ce-universal/tree/201e0f18011a30ea6d098ad249bf17eba005d653), with upstream attribution and licenses retained. The filtered source and build notes document the required shader-generation inputs. Private Unified38 gameplay fixes are being tested separately and are not part of this download.
 
 ## Install and play
 

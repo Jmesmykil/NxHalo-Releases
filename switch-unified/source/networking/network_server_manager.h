@@ -92,6 +92,9 @@ short network_game_server_matching_player_names(
 	short maximum_count);
 unsigned long network_game_server_machine_address(
 	long machine_index);
+/* Current-session voice roster; addresses are only joined game peers. */
+int network_game_server_port_voice_roster(unsigned long *addresses, int *slots, int capacity);
+int network_game_server_port_voice_sender_slot(unsigned long address, int controller, int *slot);
 char const *network_game_server_machine_hardware_id(
 	long machine_index);
 void network_game_server_update_ticks(

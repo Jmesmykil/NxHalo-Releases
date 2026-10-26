@@ -25,9 +25,7 @@ void host_sdl_scancode_name(int scancode, char *buffer, uint32_t size) {
 int host_sdl_scancode_from_name(const char *name) { return (int)SDL_GetScancodeFromName(name); }
 int host_sdl_show_message_box(uint32_t flags, const char *title, const char *message, int count,
                              const uint32_t *button_flags, const int *ids, const uint32_t *texts) {
-    if (count < 0 || count > 8 || (count > 0 && (!button_flags || !ids || !texts))) return -1;
-    /* Guest pointers are 32-bit mapped addresses, not host SDL object
-     * handles. SDL consumes the text during this blocking call; none escape. */
+    if (count < 0 || count > 8 || (count && (!button_flags || !ids || !texts))) return -1;
     SDL_MessageBoxButtonData buttons[8];
     for (int i = 0; i < count; i++) {
         buttons[i].flags = button_flags[i]; buttons[i].buttonid = ids[i];
@@ -39,11 +37,7 @@ int host_sdl_show_message_box(uint32_t flags, const char *title, const char *mes
 }
 int host_sdl_open_url(const char *url) {
     WebCommonConfig config;
-    if (!url) return 0;
-    if (strncmp(url, "https://", 8)) {
-        SDL_SetError("Switch browser supports HTTPS links only; use the SD card import menu for local files");
-        return 0;
-    }
+    if (!url || strncmp(url, "https://", 8)) return 0;
     Result rc = webPageCreate(&config, url);
     if (R_SUCCEEDED(rc)) rc = webConfigShow(&config, NULL);
     if (R_FAILED(rc)) host_logf(3, "[browser] web applet failed: 0x%x", rc);

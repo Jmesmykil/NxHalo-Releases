@@ -51,6 +51,21 @@ short map_family_parse(
 	long length;
 	short family;
 
+	/* OpenCE 24's CE identifier is a flat path namespace, not a folder
+	   supplied by the peer. The cache resolver still receives only its leaf. */
+	if (!_strnicmp(map, "custom_maps\\", 12))
+	{
+		base = map + 12;
+		length = (long)strlen(base);
+		if (file && size > 0)
+		{
+			if (length >= size || length >= MAP_FAMILY_FILE_LENGTH)
+				file[0] = 0;
+			else
+				snprintf(file, (size_t)size, "%.*s", (int)length, base);
+		}
+		return _map_family_custom_edition;
+	}
 	for (cursor = map; *cursor; cursor++)
 	{
 		if (*cursor == '\\' || *cursor == '/')

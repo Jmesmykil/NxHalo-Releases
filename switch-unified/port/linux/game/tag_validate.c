@@ -17,8 +17,9 @@ walked once through its group's schema:
   checked (a bit a byte, the claims below), so that the walk also never
   visits a byte twice: a map whose blocks point at each other cannot make
   it take longer than its size;
-- counts are cut to what the game has room for, indices, enums and tags
-  past what they name are corrected, runtime values reset (tag_schema.h);
+- counts are cut to what the game has room for, except the v24 CE blocks
+  explicitly marked by their schemas; indices, enums and tags past what they
+  name are corrected, runtime values reset (tag_schema.h);
 - then, once every tag has been through it, the checks that look at other
   tags or at graphs (a bsp's nodes, a model's) run.
 A map is refused if any pointer is wrong; anything else is corrected and
@@ -35,6 +36,16 @@ runs it alone on a map file.
 #include "cseries.h"
 #include "cache/physical_memory_map.h"
 #include "tag_schema.h"
+#include "halo_network_profile.h"
+
+#if defined(__GNUC__)
+/* The standalone map_validate utility does not link the runtime or CE loader.
+ * Weak references make it retain legacy clamping while the game can enable
+ * the v24-only CE block exception after both exact profile and cache version
+ * are known. */
+extern int network_profile_active_version(void) __attribute__((weak));
+extern long ce_map_cache_version __attribute__((weak));
+#endif
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -172,6 +183,20 @@ holds */
 static unsigned long tag_validate_claims[CLAIM_WORDS];
 
 static char const tag_validate_empty_name[] = "";
+
+/* Preserve only the three CE tool-capped blocks marked by their schemas, and
+ * only when the running game is both on exact profile 24 and loading a v609
+ * Custom Edition cache. Undefined weak symbols mean the standalone validator
+ * and legacy profiles keep the original caps. */
+static boolean tag_validate_preserve_ce_blocks(void)
+{
+#if defined(__GNUC__)
+	return network_profile_active_version && &ce_map_cache_version != NULL &&
+		network_profile_active_version() == 24 && ce_map_cache_version == 609;
+#else
+	return FALSE;
+#endif
+}
 
 /* ---------- prototypes */
 
@@ -526,7 +551,8 @@ static void validate_block_extent(
 		tag_validate_refuse(validation, "has %ld elements", block->count);
 		return;
 	}
-	if (field->maximum > 0 && block->count > field->maximum)
+	if (field->maximum > 0 && block->count > field->maximum &&
+		!((field->flags & FLAG(_tag_schema_ce_preserve_bit)) && tag_validate_preserve_ce_blocks()))
 	{
 		tag_validate_correct(validation, "has %ld elements, more than the game's %ld: cut to %ld",
 			block->count, field->maximum, field->maximum);

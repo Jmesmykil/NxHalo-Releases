@@ -32,6 +32,8 @@ this list to generate the guest's entry points */
 #define GL_FUNCTIONS(X) \
 	X(glGetString) \
 	X(glGetIntegerv) \
+	X(glGetFloatv) \
+	X(glGetUniformfv) \
 	X(glCopyImageSubData) \
 	X(glGenerateMipmap) \
 	X(glGetError) \
@@ -268,6 +270,8 @@ pointers, sees the declarations without these aliases */
 #ifdef HALO_ANDROID
 #define glGetString halo_glGetString
 #define glGetIntegerv halo_glGetIntegerv
+#define glGetFloatv halo_glGetFloatv
+#define glGetUniformfv halo_glGetUniformfv
 #define glCopyImageSubData halo_glCopyImageSubData
 #define glGenerateMipmap halo_glGenerateMipmap
 #define glGetError halo_glGetError

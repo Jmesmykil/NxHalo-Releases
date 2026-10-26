@@ -223,9 +223,9 @@ int host_native_memory_initialize(uint32_t base, uint32_t size, uint32_t prefix_
      * Xbox base is supplied explicitly so a standalone kernel-API probe can
      * run where the emulator has placed its own host code. The game always
      * supplies the original 0x80000000 contract. */
-    const uintptr_t required_base[] = {xbox_base, base, HOST_GUEST_IMAGE_LIMIT};
-    const size_t required_size[] = {HALO_GUEST_WINDOW_SIZE, size, HOST_GUEST_POOL_SIZE};
-    for (unsigned i = 0; i < 3; i++)
+    const uintptr_t required_base[] = {xbox_base, base, HOST_GUEST_IMAGE_LIMIT, HOST_CE_TAG_BASE};
+    const size_t required_size[] = {HALO_GUEST_WINDOW_SIZE, size, HOST_GUEST_POOL_SIZE, HOST_CE_TAG_SIZE};
+    for (unsigned i = 0; i < sizeof(required_base) / sizeof(required_base[0]); i++)
     {
         for (unsigned j = 0; j < i; j++)
             if (native_overlap(required_base[i], required_size[i], required_base[j], required_size[j]))
@@ -251,7 +251,8 @@ int host_native_memory_initialize(uint32_t base, uint32_t size, uint32_t prefix_
     }
     if (native_map_data(xbox_base, HALO_GUEST_WINDOW_SIZE) != 0 ||
         native_map_data(data_base, image_end - data_base) != 0 ||
-        native_map_data(HOST_GUEST_IMAGE_LIMIT, HOST_GUEST_POOL_SIZE) != 0) goto fail;
+        native_map_data(HOST_GUEST_IMAGE_LIMIT, HOST_GUEST_POOL_SIZE) != 0 ||
+        native_map_data(HOST_CE_TAG_BASE, HOST_CE_TAG_SIZE) != 0) goto fail;
     code_backing = memalign(NATIVE_PAGE, code_size);
     if (!code_backing) goto fail;
     Result rc = svcCreateCodeMemory(&code_handle, code_backing, code_size);

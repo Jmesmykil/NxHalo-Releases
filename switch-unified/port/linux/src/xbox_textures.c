@@ -796,6 +796,7 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 	static unsigned int trace_identity_hits, trace_identity_misses;
 	int pack_enabled = texture_pack_enabled();
 	const char *trace = getenv("HALO_TEXTURE_PACK_TRACE");
+	const char *trace_filter = getenv("HALO_TEXTURE_PACK_TRACE_FILTER");
 	*target = entry->target;
 	*description = entry->description;
 	if (trace && trace[0] && !trace_settings_logged)
@@ -821,7 +822,8 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 				entry->bitmap_tag[sizeof(entry->bitmap_tag)-1] = 0;
 				entry->bitmap_index = bitmap_index;
 				entry->bitmap_identity_checked = TRUE;
-				if (trace && trace[0] && trace_identity_hits < 16)
+				if (trace && trace[0] && trace_identity_hits < 16 &&
+				    (!trace_filter || !trace_filter[0] || strstr(entry->bitmap_tag, trace_filter)))
 				{
 					fprintf(stderr, "texture pack identity hit: address=0x%lx data=0x%lx tag=%s bitmap=%ld size=%lux%lu\n",
 						entry->address, (unsigned long)entry->data, entry->bitmap_tag,

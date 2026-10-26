@@ -142,6 +142,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+#include "halo_phase_profile.h"
+#endif
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "cseries/profile.h"
@@ -2163,6 +2166,16 @@ static void update_alien_scout_physics(
 
 			maximum_acceleration = definition->unknown300;
 
+            /* Accelerate through the normal collision-aware hover physics. */
+            if (TEST_FLAG(vehicle->vehicle.flags, _vehicle_control_crouch_bit) &&
+                vehicle->unit.driver_object_index != NONE &&
+                vehicle->unit.throttle.i > 0.05f && vehicle->object.up.k > 0.5f &&
+                !TEST_FLAG(vehicle->vehicle.flags, _vehicle_control_jump_bit))
+            {
+                maximum_speed *= 1.75f;
+                maximum_acceleration *= 1.5f;
+            }
+
 			target_velocity.i = maximum_speed*vehicle->unit.throttle.i;
 			target_velocity.j = maximum_speed*vehicle->unit.throttle.j;
 			acceleration.i = target_velocity.i-local_velocity.i;
@@ -2446,6 +2459,76 @@ body has the same padded size and 98 relocations. The remaining residual is
 instruction scheduling, branch layout, and relocation placement. Keep the
 file-static call topology intact while closing it. */
 
+/* Shared native control uses the existing crouch bit for Ghost boost. */
+/* Authored stationary gun emplacements can use the human-jeep type while
+   supplying no vehicle physics or locomotion (e.g. 3Tiers' 50cal). */
+static boolean vehicle_definition_is_stationary_gunner(
+    const struct vehicle_definition *definition)
+{
+    struct mounted_initial_weapon
+    {
+        struct tag_reference weapon;
+        long unused[5];
+    };
+    boolean gunner = FALSE;
+    boolean weapon = FALSE;
+    long index;
+    real slide_rates[2];
+    boolean tag_index_is_group(long tag_index, long group_tag);
+
+    if (definition->vehicle_type != _vehicle_type_human_jeep ||
+        definition->unit.object.physics.index != NONE ||
+        definition->unknown2f8 != 0.0f || definition->unknown2fc != 0.0f ||
+        definition->unknown300 != 0.0f || definition->unknown304 != 0.0f ||
+        definition->unknown330 != 0.0f || definition->unknown334 != 0.0f ||
+        definition->unit.unit.seats.count <= 0 ||
+        definition->unit.unit.seats.count > 32 ||
+        definition->unit.unit.initial_weapons.count <= 0 ||
+        definition->unit.unit.initial_weapons.count > 16)
+        return FALSE;
+
+    /* HEK offsets 0x338/0x33c are slide acceleration/deceleration. */
+    csmemcpy(slide_rates, definition->unused338, sizeof(slide_rates));
+    if (slide_rates[0] != 0.0f || slide_rates[1] != 0.0f)
+        return FALSE;
+
+    for (index = 0; index < definition->unit.unit.seats.count; ++index)
+    {
+        const struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+            &definition->unit.unit.seats, index, struct unit_seat);
+        if (TEST_FLAG(seat->flags, _unit_seat_driver_bit))
+            return FALSE;
+        if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit))
+            gunner = TRUE;
+    }
+    for (index = 0; index < definition->unit.unit.initial_weapons.count; ++index)
+    {
+        const struct mounted_initial_weapon *initial = TAG_BLOCK_GET_ELEMENT(
+            &definition->unit.unit.initial_weapons, index, struct mounted_initial_weapon);
+        if (initial->weapon.group_tag == 'weap' &&
+            tag_index_is_group(initial->weapon.index, 'weap'))
+            weapon = TRUE;
+    }
+    return gunner && weapon;
+}
+
+boolean vehicle_definition_is_turret(long definition_index)
+{
+    const struct vehicle_definition *definition;
+    boolean tag_index_is_group(long tag_index, long group_tag);
+    if (definition_index == NONE || !tag_index_is_group(definition_index, VEHICLE_DEFINITION_TAG))
+        return FALSE;
+    definition = vehicle_specific_definition_get(definition_index);
+    return definition->vehicle_type == _vehicle_type_turret ||
+        vehicle_definition_is_stationary_gunner(definition);
+}
+
+boolean vehicle_supports_boost(long vehicle_index)
+{
+    struct unit_datum *vehicle = vehicle_try_and_get(vehicle_index);
+    return vehicle && vehicle_specific_definition_get(vehicle->definition_index)->vehicle_type == _vehicle_type_alien_scout;
+}
+
 boolean vehicle_update(
 	long vehicle_index)
 {
@@ -2460,6 +2543,9 @@ boolean vehicle_update(
 	vehicle = vehicle_datum_get(vehicle_index);
 	definition = vehicle_specific_definition_get(vehicle->definition_index);
 
+#if defined(__linux__) || defined(HALO_ANDROID)
+    uint64_t profile_begin = halo_profile_now_us(), profile_frame = halo_guest_phases.frame;
+#endif
 	profile_enter(vehicle_update_section);
 
 	if (vehicle->object.parent_object_index!=NONE)
@@ -2751,6 +2837,9 @@ animate:
 	}
 
 	profile_exit(vehicle_update_section);
+#if defined(__linux__) || defined(HALO_ANDROID)
+    halo_phase_add(&halo_guest_phases, HALO_PHASE_VEHICLE, profile_begin, halo_profile_now_us(), profile_frame);
+#endif
 
 	return TRUE;
 }

@@ -112,6 +112,16 @@ SCREENS = {
              "Echo sounds as the place you are in does, and\nmuffle those behind walls, as the Xbox did.", None),
             ("SOUND:", "audio.enabled", ON_OFF,
              "Play sound at all; from the next time the game\nstarts.", None),
+            # (the row's widgets keep the name "voice" the menu has had)
+            ("VOICE CHAT:", "audio.voice_enabled", ON_OFF,
+             "Talk to nearby players. Off by default; voice\nrequires compatible clients.", None, "voice"),
+            ("VOICE MODE:", "audio.voice_mode", [("PUSH TO TALK", "ptt"), ("OPEN MIC", "open")],
+             "Open mic transmits without holding a key.\nRequires compatible clients and a joined session.",
+             None),
+            ("LOBBY/MENU VOICE:", "audio.voice_in_menus", ON_OFF,
+             "Allow voice in connected lobbies and menus.\nUses your voice mode. Off by default.", None),
+            ("PUSH-TO-TALK:", "controls.voice_ptt", [("V", "V"), ("X", "X"), ("C", "C")],
+             "Hold this keyboard key while playing to transmit\nin push-to-talk mode. Open mic does not use it.", None),
         ],
     },
     "network_setup": {
@@ -269,7 +279,7 @@ def _setting_screen(folder: str, spec: dict) -> list:
                           ("color", "#FF2896FF"), ("align", "center"), ("text_y", 1),
                           ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
                           ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")],
-                         ['<on event="created" run="port setting load"/>'])
+                         ['<on event="created" run="port setting load"/>', '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
     extra += _button(f"{base}/button_defaults", 3, ['<on event="a" run="port settings defaults"/>',
                                                     '<on event="start" run="port settings defaults"/>'])
     extra += _button(f"{base}/button_ok", 1, ['<on event="a" run="port settings save" back="true"/>',
