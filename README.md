@@ -1,37 +1,11 @@
 # NxHalo — Halo for Nintendo Switch and Steam Deck
 
-## Current Steam Deck/Linux 2.9.9 — lobby stability
+| Platform | Current download | Status |
+| --- | --- | --- |
+| Nintendo Switch 1 | [Unified37 installer, source and checksums](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.9-switch-unified37-deko-preview) | Tested by the owner on Switch 1 |
+| Steam Deck / Linux | [2.9.9 runtime and source](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.9-steamdeck-lobby-stability) | Separate native Linux build |
 
-[Download runtime and matching source](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.9-steamdeck-lobby-stability).
-Executable SHA-256: 13661136b9dc51b454d6d665df0c4306415bcd3c01f2c862180166591fc4229b. This exact build is installed through the existing Deck shortcut, with the previous 2.9.8 and stable 2.9.6 rollbacks retained.
-
-## Changes
-
-- A multiplayer round returns to its current map, gametype and custom rules instead of stale playlist defaults. Co-op keeps its separate mission progression.
-- Gun Game weapon replacement retains the prior weapon on failure, selects the new stage on success and removes spare weapons.
-- The name editor rebinds tag-backed keyboard data and clears it before cache teardown.
-- Online Play includes a separate Native V24 view, preserves verified newer-version entries, displays directory/cache state and keeps endpoint selection stable across refresh.
-- V24 is an explicit compatibility profile; V21 remains the host default and existing older native profiles remain selectable. V24 handles the official flat custom-map namespace and authored CE609 vehicle selection.
-- Installed Maps has searchable, paged family/type/details navigation with capacity4096; invalid/resource files are distinguished. Native folder import/cancel preserves selected and enabled packs.
-
-## Verified evidence
-
-The acceptance receipt identifies exact checks and limits for the real Gun Game restart, keyboard cache transition and independent official v24 client admission. Private Deck AMD GPU gameplay against the unchanged2.9.6 native executable passed; real remote input advanced the weapon ladder. Existing saves, maps, controller settings, launcher and normal audio volume were preserved. Tests use silent audio and do not capture a hardware microphone.
-
-The independent v24 runtime check covers stock Beavercreek and two players; CE609 authored-vehicle behavior and reverse-direction admission require separate checks.
-
-The owner's completed online Gun Game win is retained separately from automated evidence. No synthetic128-row test is described as real128-player gameplay.
-
-## Compatibility and remaining work
-
-Supply your own compatible maps and resource files. Shared-map sword, faction models and authored tracks/towers require the same compatible map on participants. Voice requires compatible native receive/playback support. A classic PC/CE or browser listing does not prove executable/protocol compatibility; private or unannounced games cannot be guaranteed by a public directory.
-
-Complete race-route packs, specialized bots, Prop Hunt, persistent friends, full campaign lifecycle, human microphone use, real capacity and physical Switch acceptance remain separate backlog items. This Linux release does not replace the separate Switch executable.
-
-[Guide](steam-unified/docs/LOBBY-STABILITY-2.9.9.md) ·
-[Acceptance](releases/v0.2.9.9-steamdeck-lobby-stability/ACCEPTANCE.json) ·
-[Deck hardware evidence](releases/v0.2.9.9-steamdeck-lobby-stability/DECK-GPU.json).
-## Nintendo Switch — Unified37 deko3d preview
+## Current Nintendo Switch — Unified37 deko3d
 
 [Download Unified37 and matching source](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.9-switch-unified37-deko-preview).
 
@@ -44,7 +18,39 @@ Display version: `0.2.9.9-dk1`. Logs: `sdmc:/switch/halo/halo-unified37-deko.log
 
 Renderer integration derives from [halo-ce-universal Build114](https://github.com/thelinkin3000/halo-ce-universal/tree/201e0f18011a30ea6d098ad249bf17eba005d653), with upstream attribution and licenses retained. The filtered source and build notes document the required shader-generation inputs. Private Unified38 gameplay fixes are being tested separately and are not part of this download.
 
-## Install and play
+
+## Current Steam Deck/Linux 2.9.9 — lobby stability
+
+[Download runtime and matching source](https://github.com/Jmesmykil/NxHalo-Releases/releases/tag/v0.2.9.9-steamdeck-lobby-stability).
+Executable SHA-256: 13661136b9dc51b454d6d665df0c4306415bcd3c01f2c862180166591fc4229b. This exact build is installed through the existing Deck shortcut, with the previous 2.9.8 and stable 2.9.6 rollbacks retained.
+
+## Steam Deck / Linux changes
+
+- A multiplayer round returns to its current map, gametype and custom rules instead of stale playlist defaults. Co-op keeps its separate mission progression.
+- Gun Game weapon replacement retains the prior weapon on failure, selects the new stage on success and removes spare weapons.
+- The name editor rebinds tag-backed keyboard data and clears it before cache teardown.
+- Online Play includes a separate Native V24 view, preserves verified newer-version entries, displays directory/cache state and keeps endpoint selection stable across refresh.
+- V24 is an explicit compatibility profile; V21 remains the host default and existing older native profiles remain selectable. V24 handles the official flat custom-map namespace and authored CE609 vehicle selection.
+- Installed Maps has searchable, paged family/type/details navigation with capacity4096; invalid/resource files are distinguished. Native folder import/cancel preserves selected and enabled packs.
+
+## Steam Deck / Linux evidence
+
+The acceptance receipt identifies exact checks and limits for the real Gun Game restart, keyboard cache transition and independent official v24 client admission. Private Deck AMD GPU gameplay against the unchanged2.9.6 native executable passed; real remote input advanced the weapon ladder. Existing saves, maps, controller settings, launcher and normal audio volume were preserved. Tests use silent audio and do not capture a hardware microphone.
+
+The independent v24 runtime check covers stock Beavercreek and two players; CE609 authored-vehicle behavior and reverse-direction admission require separate checks.
+
+The owner's completed online Gun Game win is retained separately from automated evidence. No synthetic128-row test is described as real128-player gameplay.
+
+## Compatibility and remaining work
+
+Supply your own compatible maps and resource files. Shared-map sword, faction models and authored tracks/towers require the same compatible map on participants. Voice requires compatible native receive/playback support. A classic PC/CE or browser listing does not prove executable/protocol compatibility; private or unannounced games cannot be guaranteed by a public directory.
+
+Complete race-route packs, specialized bots, Prop Hunt, persistent friends, full campaign lifecycle, human microphone use and real capacity remain separate backlog items. Unified37 Switch gameplay was confirmed separately by the owner; exhaustive Switch coverage remains open. This Linux release does not replace the separate Switch executable.
+
+[Guide](steam-unified/docs/LOBBY-STABILITY-2.9.9.md) ·
+[Acceptance](releases/v0.2.9.9-steamdeck-lobby-stability/ACCEPTANCE.json) ·
+[Deck hardware evidence](releases/v0.2.9.9-steamdeck-lobby-stability/DECK-GPU.json).
+## Steam Deck / Linux installation
 
 Extract the Linux runtime, supply your own compatible game maps in assets/maps, and run launch_halo.sh natively with Proton OFF. Keep your existing settings and saves. No game maps, resource companions, console keys or personal saves are provided.
 
